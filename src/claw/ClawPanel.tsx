@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 
-// Injects the RBOT embed widget (self-contained IIFE, brings its own Shadow-DOM UI)
-// once the visibility gate passes. No iframe, no local styling — the embed owns it.
-const RBOT_EMBED_URL = 'https://tonystool.taild5f39d.ts.net/tardbot/embed.js';
+// RBOT runs as a top-level page on its authenticated edge. Opening it in a new
+// tab avoids browser local-network restrictions on cross-origin subresources.
+const RBOT_APP_URL = 'https://tonystool.taild5f39d.ts.net/tardbot/';
 const CLAW_KEY = 'maanster-claw-9481';
 const STORAGE_KEY = 'maanster.claw';
-const EMBED_SCRIPT_ID = 'rbot-embed-script';
 
 function isUnlocked(): boolean {
   if (typeof window === 'undefined') return false;
@@ -40,16 +39,32 @@ export default function ClawPanel() {
     setUnlocked(isUnlocked());
   }, []);
 
-  useEffect(() => {
-    if (!unlocked) return;
-    if (document.getElementById(EMBED_SCRIPT_ID)) return;
+  if (!unlocked) return null;
 
-    const script = document.createElement('script');
-    script.id = EMBED_SCRIPT_ID;
-    script.src = RBOT_EMBED_URL;
-    script.defer = true;
-    document.body.appendChild(script);
-  }, [unlocked]);
-
-  return null;
+  return (
+    <a
+      href={RBOT_APP_URL}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Open RBOT in a new tab"
+      style={{
+        position: 'fixed',
+        top: '50%',
+        right: 0,
+        zIndex: 2147483000,
+        transform: 'translateY(-50%)',
+        padding: '16px 10px',
+        borderRadius: '12px 0 0 12px',
+        background: '#7C3AED',
+        color: '#fff',
+        boxShadow: '-2px 2px 8px rgba(0,0,0,0.25)',
+        font: '600 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif',
+        letterSpacing: '0.5px',
+        textDecoration: 'none',
+        writingMode: 'vertical-rl',
+      }}
+    >
+      🤖 RBOT
+    </a>
+  );
 }
