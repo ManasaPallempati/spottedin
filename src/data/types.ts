@@ -56,11 +56,33 @@ export interface Order {
   payMethod: PayMethod;
 }
 
-// Mock auth — phone-OTP always succeeds. `sellerId` is which seeded seller
-// the logged-in demo user "is" (drives the Profile tab / SellerProfile screen).
+// Browser-local demo auth (email or mobile + password, PBKDF2-hashed in
+// localStorage — NOT production security). `sellerId` points at the Seller
+// profile created for this account (drives the Profile tab / SellerProfile).
 export interface AuthUser {
+  id: string;
+  email: string;
   phone: string;
   sellerId: string;
+}
+
+export interface RegisterInput {
+  name: string;
+  handle: string;
+  email: string;
+  phone: string;
+  password: string;
+  city: string;
+  bio: string;
+  avatarEmoji: string;
+}
+
+export interface UpdateProfileInput {
+  name: string;
+  handle: string;
+  city: string;
+  bio: string;
+  avatarEmoji: string;
 }
 
 // Input shape for creating a listing — everything the data layer fills in

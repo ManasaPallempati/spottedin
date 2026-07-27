@@ -262,6 +262,9 @@ ul {
   border-radius: 50%;
   background: var(--bg);
   flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .price-tag {

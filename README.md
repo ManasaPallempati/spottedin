@@ -2,7 +2,12 @@
 
 Depop/Poshmark-style pre-loved resale marketplace for India. V1 is a
 production-quality web MVP with seeded demo data (no live backend). Prices in ₹.
-Phone-OTP login is mocked.
+
+Auth is browser-local demo auth: register once with a seller profile (unique
+email, 10-digit Indian mobile, unique handle), then log in with email **or**
+mobile plus password. Accounts live only in that browser's localStorage;
+passwords are stored as salted PBKDF2 hashes, never plaintext. This is a
+static-site demo — not production security and no SMS/email is ever sent.
 
 **Pre-loved. Re-loved.**
 

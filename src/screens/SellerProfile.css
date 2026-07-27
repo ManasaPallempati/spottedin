@@ -54,3 +54,48 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+.seller-profile__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.seller-profile__logout {
+  border: 0;
+  background: transparent;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
+.seller-profile__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.seller-profile__edit-row {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 12px;
+}
+
+.seller-profile__avatar-input {
+  text-align: center;
+  font-size: 22px;
+}
+
+.seller-profile__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.seller-profile__error {
+  color: var(--accent-2);
+  font-size: 13px;
+  font-weight: 600;
+}

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { HashRouter, Link, Route, Routes, useLocation } from 'react-router-dom';
 import Feed from './screens/Feed';
 import ListingDetail from './screens/ListingDetail';
@@ -8,12 +9,7 @@ import Checkout from './screens/Checkout';
 import Inbox from './screens/Inbox';
 import Chat from './screens/Chat';
 import ClawPanel from './claw/ClawPanel';
-import { getUser } from './data/store';
-
-function myProfilePath() {
-  const user = getUser();
-  return user ? `/seller/${user.sellerId}` : '/login';
-}
+import { getUser, subscribe } from './data/store';
 
 // Routes where the bottom tab bar is hidden — full-screen / transactional flows.
 function showBottomNav(pathname: string): boolean {
@@ -26,9 +22,13 @@ function showBottomNav(pathname: string): boolean {
 
 function BottomNav() {
   const location = useLocation();
+  const [user, setUser] = useState(() => getUser());
+
+  useEffect(() => subscribe(() => setUser(getUser())), []);
+
   if (!showBottomNav(location.pathname)) return null;
 
-  const profilePath = myProfilePath();
+  const profilePath = user ? `/seller/${user.sellerId}` : '/login';
   const isProfileActive = location.pathname.startsWith('/seller/');
 
   return (

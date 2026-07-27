@@ -8,8 +8,10 @@ import type {
   Listing,
   Order,
   PayMethod,
+  RegisterInput,
   Seller,
   Thread,
+  UpdateProfileInput,
 } from './types';
 import { listings as seedListings, sellers, threads as seedThreads } from './seed';
 
@@ -18,8 +20,16 @@ const KEYS = {
   threads: 'maanster.threads',
   orders: 'maanster.orders',
   auth: 'maanster.auth',
+  accounts: 'maanster.accounts',
+  profiles: 'maanster.profiles',
   liked: 'maanster.likedIds',
 } as const;
+
+interface StoredAccount {
+  user: AuthUser;
+  passwordSalt: string;
+  passwordHash: string;
+}
 
 const AUTO_REPLIES = [
   'Sounds good!',
@@ -121,9 +131,11 @@ export function toggleLike(id: string): void {
 
 export function createListing(input: CreateListingInput): Listing {
   const user = getUser();
+  if (!user) throw new Error('Log in to create a listing');
+
   const listing: Listing = {
     id: `l-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-    sellerId: user?.sellerId ?? sellers[0].id,
+    sellerId: user.sellerId,
     title: input.title,
     description: input.description,
     priceINR: input.priceINR,
@@ -147,7 +159,8 @@ export function createListing(input: CreateListingInput): Listing {
 // ---- Sellers -----------------------------------------------------------
 
 export function getSeller(id: string): Seller | undefined {
-  return sellers.find((s) => s.id === id);
+  return load<Seller[]>(KEYS.profiles, []).find((s) => s.id === id)
+    ?? sellers.find((s) => s.id === id);
 }
 
 export function getSellerListings(id: string): Listing[] {
@@ -233,20 +246,147 @@ export function getOrder(id: string): Order | undefined {
   return readOrders().find((o) => o.id === id);
 }
 
-// ---- Auth (mocked phone-OTP) ---------------------------------------------
+// ---- Auth (browser-local demo: PBKDF2-hashed passwords in localStorage) ----
 
 export function getUser(): AuthUser | null {
-  return load<AuthUser | null>(KEYS.auth, null);
+  const user = load<AuthUser | null>(KEYS.auth, null);
+  if (!user) return null;
+  // Sessions from the old mocked-OTP build have no backing account/profile;
+  // drop them so the app never shows an "own" profile it can't edit.
+  if (!readAccounts().some((account) => account.user.id === user.id)) {
+    localStorage.removeItem(KEYS.auth);
+    return null;
+  }
+  return user;
 }
 
-export function loginWithOtp(phone: string, _otp: string): AuthUser {
-  const digits = phone.replace(/\D/g, '');
-  const digitSum = digits.split('').reduce((sum, d) => sum + Number(d), 0);
-  const sellerId = sellers[digitSum % sellers.length].id;
-  const user: AuthUser = { phone: digits, sellerId };
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '').slice(-10);
+}
+
+function normalizeHandle(handle: string): string {
+  const value = handle.trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9._]/g, '');
+  return `@${value}`;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password: string, saltHex: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const saltParts = saltHex.match(/.{1,2}/g) ?? [];
+  const salt = new Uint8Array(saltParts.map((part) => Number.parseInt(part, 16)));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 120_000 },
+    key,
+    256,
+  );
+  return bytesToHex(new Uint8Array(bits));
+}
+
+function readAccounts(): StoredAccount[] {
+  return load<StoredAccount[]>(KEYS.accounts, []);
+}
+
+export async function registerUser(input: RegisterInput): Promise<AuthUser> {
+  const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.phone);
+  const handle = normalizeHandle(input.handle);
+  const accounts = readAccounts();
+  const profiles = load<Seller[]>(KEYS.profiles, []);
+
+  if (!input.name.trim()) throw new Error('Enter your name');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address');
+  if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('Enter a valid 10-digit Indian mobile number');
+  if (input.password.length < 8) throw new Error('Password must be at least 8 characters');
+  if (handle.length < 4) throw new Error('Handle must be at least 3 characters');
+  if (accounts.some((account) => account.user.email === email)) throw new Error('That email is already registered');
+  if (accounts.some((account) => account.user.phone === phone)) throw new Error('That mobile number is already registered');
+  if ([...sellers, ...profiles].some((seller) => seller.handle.toLowerCase() === handle)) {
+    throw new Error('That handle is already taken');
+  }
+
+  const id = `u-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const sellerId = `seller-${id}`;
+  const user: AuthUser = { id, email, phone, sellerId };
+  const profile: Seller = {
+    id: sellerId,
+    handle,
+    name: input.name.trim(),
+    avatarEmoji: input.avatarEmoji.trim().slice(0, 4) || '🙂',
+    bio: input.bio.trim() || 'New to Maanster Market',
+    city: input.city.trim() || 'India',
+    rating: 0,
+    sales: 0,
+  };
+  const passwordSalt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const passwordHash = await hashPassword(input.password, passwordSalt);
+
+  save(KEYS.accounts, [...accounts, { user, passwordSalt, passwordHash }]);
+  save(KEYS.profiles, [...profiles, profile]);
   save(KEYS.auth, user);
   emit();
   return user;
+}
+
+export async function loginWithPassword(identifier: string, password: string): Promise<AuthUser> {
+  const value = identifier.trim();
+  const isEmail = value.includes('@');
+  const normalized = isEmail ? normalizeEmail(value) : normalizePhone(value);
+  const account = readAccounts().find((candidate) => (
+    isEmail ? candidate.user.email === normalized : candidate.user.phone === normalized
+  ));
+
+  if (!account || await hashPassword(password, account.passwordSalt) !== account.passwordHash) {
+    throw new Error('Email/mobile number or password is incorrect');
+  }
+
+  save(KEYS.auth, account.user);
+  emit();
+  return account.user;
+}
+
+export function updateMyProfile(input: UpdateProfileInput): Seller {
+  const user = getUser();
+  if (!user) throw new Error('Log in to update your profile');
+
+  const profiles = load<Seller[]>(KEYS.profiles, []);
+  const index = profiles.findIndex((profile) => profile.id === user.sellerId);
+  if (index === -1) throw new Error('Profile not found');
+
+  const handle = normalizeHandle(input.handle);
+  if (!input.name.trim()) throw new Error('Enter your name');
+  if (handle.length < 4) throw new Error('Handle must be at least 3 characters');
+  if ([...sellers, ...profiles].some((profile) => (
+    profile.id !== user.sellerId && profile.handle.toLowerCase() === handle
+  ))) {
+    throw new Error('That handle is already taken');
+  }
+
+  const profile: Seller = {
+    ...profiles[index],
+    name: input.name.trim(),
+    handle,
+    city: input.city.trim() || 'India',
+    bio: input.bio.trim() || 'New to Maanster Market',
+    avatarEmoji: input.avatarEmoji.trim().slice(0, 4) || '🙂',
+  };
+  profiles[index] = profile;
+  save(KEYS.profiles, profiles);
+  emit();
+  return profile;
 }
 
 export function logout(): void {

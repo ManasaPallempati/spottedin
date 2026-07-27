@@ -5,7 +5,10 @@ Single source of truth for all build agents. Do not deviate from file ownership 
 ## Product
 **Maanster Market** — Depop/Poshmark-style resale marketplace for India. V1 is a
 production-quality web MVP with seeded demo data (no live backend yet). Prices in ₹.
-Phone-OTP login is mocked (any 10-digit number + any 6-digit OTP succeeds).
+Auth is browser-local demo auth: register (name, unique handle/email/10-digit
+Indian mobile, password ≥8 chars) then log in by email or mobile + password.
+Passwords stored as salted PBKDF2 hashes in localStorage — demo only, not
+production security.
 Tagline: "Pre-loved. Re-loved."
 
 ## Stack & conventions
@@ -37,8 +40,9 @@ getFeed(filter?:category), getListing(id), getSeller(id), getSellerListings(id),
 toggleLike(id), createListing(input):Listing (persists to localStorage, prepends to feed),
 getThreads(), getThread(id), sendMessage(threadId,text) (peer auto-replies after 1.2s
 from a small canned pool), placeOrder(listingId,payMethod):Order,
-auth: getUser(), loginWithOtp(phone,otp) (mock, always succeeds, persists),
-logout(). Seeded content in src/data/seed.ts (scaffold owns): 12 sellers, 24 listings —
+auth: getUser(), registerUser(input) (validates + dedupes email/mobile/handle,
+creates a Seller profile, persists session), loginWithPassword(emailOrMobile,
+password), updateMyProfile(input) (owned profile only), logout(). Seeded content in src/data/seed.ts (scaffold owns): 12 sellers, 24 listings —
 India-flavored resale items (banarasi saree, cricket jersey, Air Jordans, lehenga, vintage
 film camera, kurta set, PS5 controller, brass diya set, denim jacket, mechanical keyboard,
 silk dupatta, sneakers…), realistic ₹ prices (299–24999), each with a distinct two-stop
@@ -60,7 +64,7 @@ use uploaded photo (FileReader → dataURL, stored via createListing).
 - Agent SELLER: src/screens/SellerProfile.tsx (header, rating, grid of their listings),
   src/screens/CreateListing.tsx (photo upload w/ preview, title, desc, category, size,
   condition, ₹ price → createListing → navigate to new listing, confetti-free success toast),
-  src/screens/Login.tsx (mock phone-OTP, 2 steps, India +91 UI).
+  src/screens/Login.tsx (log in / create-profile tabs, India +91 UI).
 - Agent CHECKOUT: src/screens/Checkout.tsx (order summary, payment method picker styled
   like Razorpay sheet: UPI apps row / card / COD, place order → OrderSuccess state with
   order id; "Payments by Razorpay — sandbox" note).

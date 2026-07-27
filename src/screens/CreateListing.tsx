@@ -1,7 +1,7 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
-import { createListing } from '../data/store';
+import { createListing, getUser, subscribe } from '../data/store';
 import type { Category, Condition } from '../data/types';
 import './CreateListing.css';
 
@@ -36,6 +36,7 @@ const EMOJIS = ['🛍️', '👕', '👗', '👟', '📷', '🎮', '🧣', '🪔
 
 export default function CreateListing() {
   const navigate = useNavigate();
+  const [user, setUser] = useState(() => getUser());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('women');
@@ -47,6 +48,12 @@ export default function CreateListing() {
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => subscribe(() => setUser(getUser())), []);
+
+  useEffect(() => {
+    if (!user) navigate('/login', { replace: true });
+  }, [user, navigate]);
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -69,23 +76,29 @@ export default function CreateListing() {
     }
     setError('');
 
-    const listing = createListing({
-      title: title.trim(),
-      description: description.trim(),
-      priceINR: priceNum,
-      category,
-      size: size.trim() || undefined,
-      condition,
-      gradient,
-      emoji,
-      photoDataUrl,
-    });
+    try {
+      const listing = createListing({
+        title: title.trim(),
+        description: description.trim(),
+        priceINR: priceNum,
+        category,
+        size: size.trim() || undefined,
+        condition,
+        gradient,
+        emoji,
+        photoDataUrl,
+      });
 
-    setShowToast(true);
-    window.setTimeout(() => {
-      navigate(`/listing/${listing.id}`);
-    }, 900);
+      setShowToast(true);
+      window.setTimeout(() => {
+        navigate(`/listing/${listing.id}`);
+      }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not list this item');
+    }
   }
+
+  if (!user) return null;
 
   return (
     <div className="create-listing">

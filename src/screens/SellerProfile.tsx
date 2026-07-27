@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import TopBar from '../components/TopBar';
 import Avatar from '../components/Avatar';
 import EmptyState from '../components/EmptyState';
 import ListingCard from '../components/ListingCard';
-import { getSeller, getSellerListings, subscribe } from '../data/store';
+import {
+  getSeller,
+  getSellerListings,
+  getUser,
+  logout,
+  subscribe,
+  updateMyProfile,
+} from '../data/store';
 import type { Listing, Seller } from '../data/types';
 import './SellerProfile.css';
 
 export default function SellerProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [seller, setSeller] = useState<Seller | undefined>(() => (id ? getSeller(id) : undefined));
   const [listings, setListings] = useState<Listing[]>(() => (id ? getSellerListings(id) : []));
+  const [editing, setEditing] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -33,6 +43,25 @@ export default function SellerProfile() {
   }
 
   const liveCount = listings.filter((l) => l.status === 'live').length;
+  const isOwnProfile = getUser()?.sellerId === seller.id;
+
+  function handleProfileSave(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    try {
+      updateMyProfile({
+        name: String(data.get('name') ?? ''),
+        handle: String(data.get('handle') ?? ''),
+        city: String(data.get('city') ?? ''),
+        bio: String(data.get('bio') ?? ''),
+        avatarEmoji: String(data.get('avatarEmoji') ?? ''),
+      });
+      setEditing(false);
+      setProfileError('');
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Could not update profile');
+    }
+  }
 
   return (
     <div className="seller-profile">
@@ -59,7 +88,57 @@ export default function SellerProfile() {
             <span className="seller-profile__stat-label">Listed</span>
           </div>
         </div>
+
+        {isOwnProfile && !editing && (
+          <div className="seller-profile__actions">
+            <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+              Edit profile
+            </button>
+            <button
+              type="button"
+              className="seller-profile__logout"
+              onClick={() => {
+                logout();
+                navigate('/login', { replace: true });
+              }}
+            >
+              Log out
+            </button>
+          </div>
+        )}
       </div>
+
+      {isOwnProfile && editing && (
+        <form className="seller-profile__edit" onSubmit={handleProfileSave}>
+          <div className="seller-profile__edit-row">
+            <div>
+              <label className="field-label" htmlFor="profile-avatar">Avatar</label>
+              <input
+                id="profile-avatar"
+                name="avatarEmoji"
+                className="input seller-profile__avatar-input"
+                defaultValue={seller.avatarEmoji}
+                maxLength={4}
+              />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="profile-name">Full name</label>
+              <input id="profile-name" name="name" className="input" defaultValue={seller.name} required />
+            </div>
+          </div>
+          <label className="field-label" htmlFor="profile-handle">Handle</label>
+          <input id="profile-handle" name="handle" className="input" defaultValue={seller.handle} required />
+          <label className="field-label" htmlFor="profile-city">City</label>
+          <input id="profile-city" name="city" className="input" defaultValue={seller.city} />
+          <label className="field-label" htmlFor="profile-bio">Bio</label>
+          <textarea id="profile-bio" name="bio" className="textarea" maxLength={160} defaultValue={seller.bio} />
+          {profileError && <p className="seller-profile__error" role="alert">{profileError}</p>}
+          <div className="seller-profile__edit-actions">
+            <button type="button" className="btn btn-outline" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save profile</button>
+          </div>
+        </form>
+      )}
 
       {listings.length === 0 ? (
         <EmptyState emoji="📦" title="Nothing listed yet" subtitle="Items this seller lists will show up here." />
