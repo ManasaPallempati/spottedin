@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import './claw.css';
+import { useEffect, useState } from 'react';
 
-// Local-only OpenClaw gateway — reachable only on Tony's machine.
-const OPENCLAW_URL = 'http://127.0.0.1:18789';
+// Injects the RBOT embed widget (self-contained IIFE, brings its own Shadow-DOM UI)
+// once the visibility gate passes. No iframe, no local styling — the embed owns it.
+const RBOT_EMBED_URL = 'https://tonystool.taild5f39d.ts.net/tardbot/embed.js';
 const CLAW_KEY = 'maanster-claw-9481';
 const STORAGE_KEY = 'maanster.claw';
-const IFRAME_TIMEOUT_MS = 4000;
+const EMBED_SCRIPT_ID = 'rbot-embed-script';
 
 function isUnlocked(): boolean {
   if (typeof window === 'undefined') return false;
@@ -35,116 +35,21 @@ function isUnlocked(): boolean {
 
 export default function ClawPanel() {
   const [unlocked, setUnlocked] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [iframeFailed, setIframeFailed] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setUnlocked(isUnlocked());
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!unlocked) return;
+    if (document.getElementById(EMBED_SCRIPT_ID)) return;
 
-    setIframeFailed(false);
-    setIframeLoaded(false);
+    const script = document.createElement('script');
+    script.id = EMBED_SCRIPT_ID;
+    script.src = RBOT_EMBED_URL;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, [unlocked]);
 
-    timeoutRef.current = window.setTimeout(() => {
-      setIframeFailed((failed) => failed || !iframeLoaded);
-    }, IFRAME_TIMEOUT_MS);
-
-    return () => {
-      if (timeoutRef.current !== null) {
-        window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  useEffect(() => {
-    if (iframeLoaded && timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, [iframeLoaded]);
-
-  if (!unlocked) return null;
-
-  return (
-    <>
-      <button
-        type="button"
-        className="claw-tab"
-        onClick={() => setOpen(true)}
-        aria-label="Open OpenClaw panel"
-      >
-        🔧 TardBot
-      </button>
-
-      {open && (
-        <div className="claw-overlay" onClick={() => setOpen(false)}>
-          <div className="claw-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="claw-panel__header">
-              <span className="claw-panel__title">
-                OpenClaw — full instance · delegates to Claude &amp; Codex
-              </span>
-              <div className="claw-panel__actions">
-                <a
-                  className="claw-panel__icon-btn"
-                  href={OPENCLAW_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Open in new tab"
-                  title="Open in new tab"
-                >
-                  ↗
-                </a>
-                <button
-                  type="button"
-                  className="claw-panel__icon-btn"
-                  onClick={() => setOpen(false)}
-                  aria-label="Close panel"
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="claw-panel__body">
-              {!iframeFailed && (
-                <iframe
-                  src={OPENCLAW_URL}
-                  title="OpenClaw"
-                  className="claw-panel__iframe"
-                  onLoad={() => setIframeLoaded(true)}
-                  onError={() => setIframeFailed(true)}
-                />
-              )}
-
-              {iframeFailed && (
-                <div className="claw-fallback">
-                  <div className="claw-fallback__emoji">🔧</div>
-                  <div className="claw-fallback__title">Can't reach OpenClaw</div>
-                  <div className="claw-fallback__note">
-                    Gateway is local-only: reachable on Tony's machine.
-                  </div>
-                  <a
-                    className="btn btn-primary"
-                    href={OPENCLAW_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open in new tab
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return null;
 }
