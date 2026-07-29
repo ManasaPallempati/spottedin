@@ -56,13 +56,15 @@ export interface Order {
   payMethod: PayMethod;
 }
 
-// Browser-local demo auth (email or mobile + password, PBKDF2-hashed in
-// localStorage — NOT production security). `sellerId` points at the Seller
-// profile created for this account (drives the Profile tab / SellerProfile).
+// Authenticated identity. When Supabase is configured, `id` and `sellerId`
+// are both the Supabase auth user UUID (the canonical user/seller identity)
+// and the session is Supabase-backed. When it isn't configured, this is a
+// browser-local demo account (PBKDF2-hashed password in localStorage — NOT
+// production security). `sellerId` points at the Seller/profile row that
+// drives the Profile tab / SellerProfile.
 export interface AuthUser {
   id: string;
   email: string;
-  phone: string;
   sellerId: string;
 }
 
@@ -70,7 +72,6 @@ export interface RegisterInput {
   name: string;
   handle: string;
   email: string;
-  phone: string;
   password: string;
   city: string;
   bio: string;

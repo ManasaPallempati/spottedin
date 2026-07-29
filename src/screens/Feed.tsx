@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ListingCard from '../components/ListingCard';
 import EmptyState from '../components/EmptyState';
-import { getFeed, subscribe } from '../data/store';
-import type { Category } from '../data/types';
+import { loadFeed } from '../data/listings';
+import type { Category, Listing } from '../data/types';
 
 const CHIPS: { key: Category | 'all'; label: string; emoji: string }[] = [
   { key: 'all', label: 'All', emoji: '✨' },
@@ -16,15 +16,31 @@ const CHIPS: { key: Category | 'all'; label: string; emoji: string }[] = [
 
 export default function Feed() {
   const [active, setActive] = useState<Category | 'all'>('all');
-  const [tick, setTick] = useState(0);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => subscribe(() => setTick((t) => t + 1)), []);
-
-  const listings = useMemo(
-    () => getFeed(active === 'all' ? undefined : active),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active, tick]
-  );
+  useEffect(() => {
+    let activeRequest = true;
+    setLoading(true);
+    setError('');
+    void loadFeed(active === 'all' ? undefined : active)
+      .then((nextListings) => {
+        if (activeRequest) setListings(nextListings);
+      })
+      .catch((err: unknown) => {
+        if (activeRequest) {
+          setListings([]);
+          setError(err instanceof Error ? err.message : 'Could not load listings');
+        }
+      })
+      .finally(() => {
+        if (activeRequest) setLoading(false);
+      });
+    return () => {
+      activeRequest = false;
+    };
+  }, [active]);
 
   return (
     <div className="feed">
@@ -98,7 +114,11 @@ export default function Feed() {
         </div>
       </div>
 
-      {listings.length === 0 ? (
+      {loading ? (
+        <EmptyState emoji="⏳" title="Loading listings…" />
+      ) : error ? (
+        <EmptyState emoji="⚠️" title="Could not load listings" subtitle={error} />
+      ) : listings.length === 0 ? (
         <EmptyState emoji="🔍" title="Nothing here yet" subtitle="Try a different category." />
       ) : (
         <div className="listing-grid">

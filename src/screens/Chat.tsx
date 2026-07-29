@@ -2,31 +2,84 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import TopBar from '../components/TopBar';
+import { useAuth } from '../auth/AuthProvider';
+import {
+  loadMarketplaceThread,
+  sendMarketplaceMessage,
+} from '../data/messages';
+import { isSupabaseConfigured } from '../data/supabase';
 import { getListing, getSeller, getThread, sendMessage, subscribe } from '../data/store';
 import type { Thread } from '../data/types';
 import './Chat.css';
 
 export default function Chat() {
   const { id } = useParams();
-  const [thread, setThread] = useState<Thread | undefined>(() => (id ? getThread(id) : undefined));
+  const { user } = useAuth();
+  const [thread, setThread] = useState<Thread | undefined>(
+    () => (!isSupabaseConfigured && id ? getThread(id) : undefined),
+  );
   const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!id) return;
-    setThread(getThread(id));
-    return subscribe(() => setThread(getThread(id)));
-  }, [id]);
+    if (!id || !user) return;
+    if (!isSupabaseConfigured) {
+      setThread(getThread(id));
+      setLoading(false);
+      return subscribe(() => setThread(getThread(id)));
+    }
+
+    let active = true;
+    const refresh = () => {
+      void loadMarketplaceThread(id, user.id)
+        .then((next) => {
+          if (active) {
+            setThread(next);
+            setError('');
+          }
+        })
+        .catch((err: unknown) => {
+          if (active) setError(err instanceof Error ? err.message : 'Could not load conversation');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 5000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [id, user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [thread?.messages.length]);
 
+  if (loading && !thread) {
+    return (
+      <>
+        <TopBar title="Chat" />
+        <EmptyState emoji="⏳" title="Loading chat…" />
+      </>
+    );
+  }
+
   if (!thread) {
     return (
       <>
         <TopBar title="Chat" />
-        <EmptyState emoji="✉️" title="Chat not found" subtitle="This conversation doesn't exist." />
+        <EmptyState
+          emoji={error ? '⚠️' : '✉️'}
+          title={error ? 'Could not load chat' : 'Chat not found'}
+          subtitle={error || "This conversation doesn't exist."}
+        />
       </>
     );
   }
@@ -36,9 +89,25 @@ export default function Chat() {
 
   function handleSend(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || !thread) return;
-    sendMessage(thread.id, trimmed);
-    setDraft('');
+    if (!trimmed || !thread || !user || sending) return;
+    if (!isSupabaseConfigured) {
+      sendMessage(thread.id, trimmed);
+      setDraft('');
+      return;
+    }
+    void (async () => {
+      setSending(true);
+      setError('');
+      try {
+        await sendMarketplaceMessage(thread.id, user.id, trimmed);
+        setThread(await loadMarketplaceThread(thread.id, user.id));
+        setDraft('');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not send message');
+      } finally {
+        setSending(false);
+      }
+    })();
   }
 
   function handleMakeOffer() {
@@ -75,6 +144,7 @@ export default function Chat() {
       )}
 
       <div className="chat__messages">
+        {error && <p role="alert">{error}</p>}
         {thread.messages.length === 0 && (
           <EmptyState emoji="👋" title="Say hello" subtitle="Start the conversation about this item." />
         )}
@@ -115,7 +185,12 @@ export default function Chat() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <button type="submit" className="chat__composer-send" disabled={!draft.trim()} aria-label="Send">
+        <button
+          type="submit"
+          className="chat__composer-send"
+          disabled={!draft.trim() || sending}
+          aria-label="Send"
+        >
           ➤
         </button>
       </form>

@@ -95,10 +95,12 @@ ul {
 /* ---- Bottom tab nav ---------------------------------------------------- */
 
 .bottom-nav {
-  position: absolute;
-  left: 0;
-  right: 0;
+  position: fixed;
+  left: 50%;
+  right: auto;
   bottom: 0;
+  width: min(100%, var(--app-max-width));
+  transform: translateX(-50%);
   height: var(--bottom-nav-height);
   display: flex;
   align-items: center;

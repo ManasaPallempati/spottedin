@@ -1,15 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getUser, loginWithPassword, registerUser } from '../data/store';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
+import { sanitizeReturnTo } from '../auth/returnTo';
+import { isValidEmail, isValidProfileHandle } from '../auth/validation';
+import { isSupabaseConfigured } from '../data/supabase';
 import './Login.css';
 
-type Mode = 'login' | 'register';
+type View = 'login' | 'register' | 'forgot' | 'confirm';
 
 const EMPTY_REGISTER = {
   name: '',
   handle: '',
   email: '',
-  phone: '',
   password: '',
   city: '',
   bio: '',
@@ -18,30 +20,57 @@ const EMPTY_REGISTER = {
 
 export default function Login() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>('login');
-  const [identifier, setIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const location = useLocation();
+  const {
+    status,
+    user,
+    errorMessage,
+    pendingEmail,
+    signUp,
+    signIn,
+    resendConfirmation,
+    requestPasswordReset,
+  } = useAuth();
+
+  const [view, setView] = useState<View>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [register, setRegister] = useState(EMPTY_REGISTER);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    const user = getUser();
-    if (user) navigate(`/seller/${user.sellerId}`, { replace: true });
-  }, [navigate]);
+  const routeState = (
+    typeof location.state === 'object' && location.state !== null ? location.state : {}
+  ) as { returnTo?: unknown };
+  const requestedPath = sanitizeReturnTo(routeState.returnTo, '');
 
-  function changeMode(nextMode: Mode) {
-    setMode(nextMode);
+  useEffect(() => {
+    if (status === 'authenticated' && user) {
+      navigate(requestedPath || `/seller/${user.sellerId}`, { replace: true });
+    }
+  }, [status, user, requestedPath, navigate]);
+
+  // signIn against an unverified account rejects AND flips status; make sure
+  // the resend UI is what the user sees, whichever path got them here.
+  useEffect(() => {
+    if (status === 'unconfirmed') setView('confirm');
+  }, [status]);
+
+  function switchView(next: View) {
+    setView(next);
     setError('');
+    setNotice('');
   }
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    setNotice('');
     try {
-      const user = await loginWithPassword(identifier, loginPassword);
-      navigate(`/seller/${user.sellerId}`, { replace: true });
+      await signIn(email, password);
+      // Navigation happens via the authenticated-status effect above.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log in');
     } finally {
@@ -55,13 +84,59 @@ export default function Login() {
       setError('Enter your name');
       return;
     }
+    if (!isValidProfileHandle(register.handle)) {
+      setError('Handle must be 3–30 letters, numbers, dots, or underscores');
+      return;
+    }
+    if (!isValidEmail(register.email)) {
+      setError('Enter a valid email address');
+      return;
+    }
+    if (register.password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
     setSubmitting(true);
     setError('');
+    setNotice('');
     try {
-      const user = await registerUser(register);
-      navigate(`/seller/${user.sellerId}`, { replace: true });
+      const { needsConfirmation } = await signUp(register);
+      if (needsConfirmation) setView('confirm');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create your account');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleForgot(e: FormEvent) {
+    e.preventDefault();
+    if (!isValidEmail(email)) {
+      setError('Enter a valid email address');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    setNotice('');
+    try {
+      await requestPasswordReset(email);
+      setNotice(`If an account exists for ${email.trim()}, a password reset link is on its way.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not request a password reset');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResend() {
+    setSubmitting(true);
+    setError('');
+    setNotice('');
+    try {
+      await resendConfirmation(pendingEmail ?? email);
+      setNotice('Confirmation email sent. Check your inbox and spam folder.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not resend the confirmation email');
     } finally {
       setSubmitting(false);
     }
@@ -79,37 +154,51 @@ export default function Login() {
         <p className="login-screen__tagline">Pre-loved. Re-loved.</p>
       </div>
 
-      <div className="login-screen__tabs" aria-label="Account action">
-        <button
-          type="button"
-          aria-pressed={mode === 'login'}
-          className={mode === 'login' ? 'is-active' : ''}
-          onClick={() => changeMode('login')}
-        >
-          Log in
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === 'register'}
-          className={mode === 'register' ? 'is-active' : ''}
-          onClick={() => changeMode('register')}
-        >
-          Create profile
-        </button>
-      </div>
+      {status === 'error' && errorMessage && (
+        <p className="login-screen__error" role="alert">
+          {errorMessage} — the link may have expired. Log in below or request a new one.
+        </p>
+      )}
 
-      {mode === 'login' ? (
+      {!isSupabaseConfigured && (
+        <p className="login-screen__demo" role="note">
+          Demo mode: no auth server is configured. Accounts live only in this
+          browser and are not secure production accounts.
+        </p>
+      )}
+
+      {(view === 'login' || view === 'register') && (
+        <div className="login-screen__tabs" aria-label="Account action">
+          <button
+            type="button"
+            aria-pressed={view === 'login'}
+            className={view === 'login' ? 'is-active' : ''}
+            onClick={() => switchView('login')}
+          >
+            Log in
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === 'register'}
+            className={view === 'register' ? 'is-active' : ''}
+            onClick={() => switchView('register')}
+          >
+            Create profile
+          </button>
+        </div>
+      )}
+
+      {view === 'login' && (
         <form className="login-screen__form" onSubmit={handleLogin}>
-          <label className="field-label" htmlFor="identifier">Email or mobile number</label>
+          <label className="field-label" htmlFor="login-email">Email</label>
           <input
-            id="identifier"
+            id="login-email"
             className="input"
-            type="text"
-            inputMode="text"
+            type="email"
             autoComplete="username"
-            placeholder="you@example.com or 9876543210"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             autoFocus
             required
           />
@@ -119,17 +208,23 @@ export default function Login() {
             className="input"
             type="password"
             autoComplete="current-password"
-            value={loginPassword}
-            onChange={(e) => setLoginPassword(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
           {error && <p className="login-screen__error" role="alert">{error}</p>}
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? 'Logging in…' : 'Log in'}
           </button>
-          <p className="login-screen__hint">Use the email or mobile number you registered with.</p>
+          {isSupabaseConfigured && (
+            <button type="button" className="login-screen__link" onClick={() => switchView('forgot')}>
+              Forgot password?
+            </button>
+          )}
         </form>
-      ) : (
+      )}
+
+      {view === 'register' && (
         <form className="login-screen__form" onSubmit={handleRegister}>
           <div className="login-screen__profile-row">
             <div className="login-screen__avatar-field">
@@ -148,6 +243,7 @@ export default function Login() {
                 id="name"
                 className="input"
                 autoComplete="name"
+                maxLength={80}
                 value={register.name}
                 onChange={(e) => setField('name', e.target.value)}
                 required
@@ -159,6 +255,7 @@ export default function Login() {
             id="handle"
             className="input"
             placeholder="@your.handle"
+            maxLength={31}
             value={register.handle}
             onChange={(e) => setField('handle', e.target.value)}
             required
@@ -173,24 +270,6 @@ export default function Login() {
             onChange={(e) => setField('email', e.target.value)}
             required
           />
-          <label className="field-label" htmlFor="register-phone">Mobile number</label>
-          <div className="login-screen__phone-row">
-            <span className="login-screen__prefix">+91</span>
-            <input
-              id="register-phone"
-              className="input"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              placeholder="98765 43210"
-              pattern="[6-9][0-9]{9}"
-              title="10-digit Indian mobile number starting with 6–9"
-              value={register.phone}
-              maxLength={10}
-              onChange={(e) => setField('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-              required
-            />
-          </div>
           <label className="field-label" htmlFor="register-password">Password</label>
           <input
             id="register-password"
@@ -208,6 +287,7 @@ export default function Login() {
             id="city"
             className="input"
             autoComplete="address-level2"
+            maxLength={80}
             value={register.city}
             onChange={(e) => setField('city', e.target.value)}
           />
@@ -225,9 +305,76 @@ export default function Login() {
             {submitting ? 'Creating profile…' : 'Create profile'}
           </button>
           <p className="login-screen__hint">
-            Demo accounts are saved only in this browser. No SMS or email is sent.
+            {isSupabaseConfigured
+              ? 'We’ll email you a confirmation link. Your account works after you confirm.'
+              : 'Demo accounts are saved only in this browser. No email is sent.'}
           </p>
         </form>
+      )}
+
+      {view === 'forgot' && (
+        <form className="login-screen__form" onSubmit={handleForgot}>
+          <h2 className="login-screen__panel-title">Reset your password</h2>
+          <label className="field-label" htmlFor="forgot-email">Email</label>
+          <input
+            id="forgot-email"
+            className="input"
+            type="email"
+            autoComplete="username"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoFocus
+            required
+          />
+          {error && <p className="login-screen__error" role="alert">{error}</p>}
+          {notice && <p className="login-screen__notice" role="status">{notice}</p>}
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? 'Sending…' : 'Send reset link'}
+          </button>
+          <button type="button" className="login-screen__link" onClick={() => switchView('login')}>
+            Back to log in
+          </button>
+        </form>
+      )}
+
+      {view === 'confirm' && (
+        <div className="login-screen__form">
+          <h2 className="login-screen__panel-title">Confirm your email</h2>
+          <p className="login-screen__copy">
+            {pendingEmail
+              ? `We sent a confirmation link to ${pendingEmail}. Open it to activate your account, then log in.`
+              : 'Your email address is not confirmed yet. Enter it below to resend the confirmation link.'}
+          </p>
+          {!pendingEmail && (
+            <>
+              <label className="field-label" htmlFor="confirm-email">Email</label>
+              <input
+                id="confirm-email"
+                className="input"
+                type="email"
+                autoComplete="username"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </>
+          )}
+          {error && <p className="login-screen__error" role="alert">{error}</p>}
+          {notice && <p className="login-screen__notice" role="status">{notice}</p>}
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            disabled={submitting}
+            onClick={() => void handleResend()}
+          >
+            {submitting ? 'Sending…' : 'Resend confirmation email'}
+          </button>
+          <button type="button" className="login-screen__link" onClick={() => switchView('login')}>
+            Back to log in
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,7 @@
+project_id = "spotted-in"
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.delivery-webhook]
+verify_jwt = false

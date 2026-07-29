@@ -1,21 +1,68 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
+import { useAuth } from '../auth/AuthProvider';
+import { loadMarketplaceThreads } from '../data/messages';
+import { isSupabaseConfigured } from '../data/supabase';
 import { getListing, getSeller, getThreads, subscribe } from '../data/store';
 import type { Thread } from '../data/types';
 import './Inbox.css';
 
-function useThreads(): Thread[] {
-  const [threads, setThreads] = useState<Thread[]>(() => getThreads());
+function useThreads(): {
+  threads: Thread[];
+  loading: boolean;
+  error: string;
+} {
+  const { user } = useAuth();
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => subscribe(() => setThreads(getThreads())), []);
+  useEffect(() => {
+    if (!user) return;
+    if (!isSupabaseConfigured) {
+      const sync = () => {
+        setThreads(getThreads());
+        setLoading(false);
+      };
+      sync();
+      return subscribe(sync);
+    }
 
-  return threads;
+    let active = true;
+    const refresh = () => {
+      setError('');
+      void loadMarketplaceThreads(user.id)
+        .then((next) => {
+          if (active) setThreads(next);
+        })
+        .catch((err: unknown) => {
+          if (active) setError(err instanceof Error ? err.message : 'Could not load conversations');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+    };
+  }, [user]);
+
+  return { threads, loading, error };
 }
 
 export default function Inbox() {
-  const threads = useThreads();
+  const { threads, loading, error } = useThreads();
 
+  if (loading) {
+    return <EmptyState emoji="⏳" title="Loading messages…" />;
+  }
+  if (error) {
+    return <EmptyState emoji="⚠️" title="Could not load messages" subtitle={error} />;
+  }
   if (threads.length === 0) {
     return <EmptyState emoji="💬" title="No messages yet" subtitle="Message a seller from a listing to start a chat." />;
   }

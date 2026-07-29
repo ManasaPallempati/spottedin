@@ -1,7 +1,11 @@
-import { useState, type MouseEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type MouseEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
 import type { Listing } from '../data/types';
-import { isLiked, toggleLike } from '../data/store';
+import {
+  isMarketplaceFavorite,
+  toggleMarketplaceFavorite,
+} from '../data/favorites';
 import PriceTag from './PriceTag';
 
 interface ListingCardProps {
@@ -9,15 +13,52 @@ interface ListingCardProps {
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
-  const [liked, setLiked] = useState(() => isLiked(listing.id));
+  const navigate = useNavigate();
+  const { status, user } = useAuth();
+  const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(listing.likes);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLikes(listing.likes);
+  }, [listing.likes]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !user) {
+      setLiked(false);
+      return;
+    }
+    let active = true;
+    void isMarketplaceFavorite(listing.id, user.id)
+      .then((favorite) => {
+        if (active) setLiked(favorite);
+      })
+      .catch(() => {
+        if (active) setLiked(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listing.id, status, user]);
 
   function handleLike(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    toggleLike(listing.id);
-    setLiked((prev) => !prev);
-    setLikes((prev) => prev + (liked ? -1 : 1));
+    if (status !== 'authenticated' || !user) {
+      navigate('/login', { state: { returnTo: `/listing/${listing.id}` } });
+      return;
+    }
+    if (saving) return;
+    void (async () => {
+      setSaving(true);
+      try {
+        const next = await toggleMarketplaceFavorite(listing.id, user.id);
+        setLiked(next);
+        setLikes((prev) => Math.max(0, prev + (next ? 1 : -1)));
+      } finally {
+        setSaving(false);
+      }
+    })();
   }
 
   return (
@@ -41,6 +82,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
           className="listing-card__like"
           aria-label={liked ? 'Unlike' : 'Like'}
           onClick={handleLike}
+          disabled={saving}
         >
           {liked ? '❤️' : '🤍'}
         </button>
