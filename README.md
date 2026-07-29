@@ -44,6 +44,23 @@ npm run preview   # preview the production build
 npm test          # authentication unit tests
 ```
 
+## Install on an iPhone
+
+The app is an installable PWA, so it reaches a phone home screen without the
+App Store. The service worker only ships in a production build, so `npm run
+dev` will not show install behaviour — use `npm run preview` or the deployed
+site.
+
+1. Open the site in **Safari** on iOS (Chrome on iOS cannot install PWAs).
+2. Share → **Add to Home Screen** → Add.
+3. Launch it from the home screen. It opens standalone, with no Safari chrome.
+
+Precaching covers the built shell only. Supabase requests are deliberately left
+out of `runtimeCaching` so auth sessions, listings, and messages are never
+served stale.
+
+Native (Expo/React Native) is a later phase — see `MOBILE_STRATEGY.md`.
+
 ## Structure
 
 ```
