@@ -1,64 +1,128 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getAdapter } from "@/data/adapter";
+import { useRouter } from "next/navigation";
+import { use } from "react";
+import { ListingImage } from "@/components/ListingImage";
+import { useStore } from "@/state/store";
 
-export const dynamic = "force-dynamic";
+export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const { orders, listings, openThread } = useStore();
+  const order = orders.find((o) => o.id === id);
+  const listing = order ? listings.find((l) => l.id === order.listingId) : undefined;
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const data = getAdapter();
-  const order = await data.getOrder(id);
-  if (!order) notFound();
-  const listing = await data.getListing(order.listingId);
+  if (!order) {
+    return (
+      <main className="screen flex min-h-[60dvh] flex-col items-center justify-center gap-3">
+        <p className="mono text-[10px] text-[var(--ink-dim)]">order not found</p>
+        <Link href="/closet" className="meta text-[9px] text-[var(--acc)]">
+          BACK TO CLOSET
+        </Link>
+      </main>
+    );
+  }
+
+  async function messageSeller() {
+    if (!listing) return;
+    const threadId = await openThread(listing.id, listing.sellerHandle);
+    router.push(`/inbox/${threadId}`);
+  }
 
   return (
-    <main className="screen px-4 pt-5">
-      <h1 className="display text-[20px]">ORDER #{order.id.toUpperCase()}</h1>
-      <p className="meta mt-1 text-[8.5px] text-[var(--ink-muted)]">
-        {order.carrier} · ETA {order.eta}
+    <main className="screen px-4 pb-10 pt-5">
+      <header className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Back"
+          className="text-[13px] text-[rgba(237,235,228,.6)]"
+        >
+          ←
+        </button>
+        <h1 className="display text-[19px]">ON ITS WAY</h1>
+      </header>
+
+      <p className="mono mt-2 text-[9px] uppercase text-[rgba(237,235,228,.42)]">
+        ORDER #{order.id.toUpperCase()} · {order.carrier} · ETA {order.eta}
       </p>
 
       {listing && (
-        <div className="card-surface mt-4 flex items-center gap-3 px-3 py-3">
-          <span
-            className="h-12 w-12 rounded-[10px]"
-            style={{ background: `linear-gradient(160deg, ${listing.photo.c1}, ${listing.photo.c2})` }}
-          />
-          <div className="flex-1">
-            <p className="text-[12px] font-medium">{listing.title}</p>
-            <p className="text-[10px] text-[var(--ink-muted)]">paid ${order.pricePaid}</p>
-          </div>
+        <div className="card-surface mt-3.5 flex items-center gap-3 rounded-[13px] p-2.5">
+          <ListingImage photo={listing.photos[0]} className="h-[54px] w-11 flex-none rounded-[8px]" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12px] font-semibold">{listing.title}</span>
+            <span className="mono mt-0.5 block text-[8.5px] uppercase text-[rgba(237,235,228,.42)]">
+              PAID ${order.pricePaid} · @{listing.sellerHandle}
+            </span>
+          </span>
         </div>
       )}
 
-      {/* Live map region placeholder */}
-      <div className="mt-4 flex h-32 items-center justify-center rounded-[14px] border border-[var(--hairline)] bg-[#101014]">
-        <span className="meta text-[8.5px] text-[var(--ink-dim)]">EN ROUTE — {order.status.toUpperCase()}</span>
+      <div className="relative mt-3.5 h-[110px] overflow-hidden rounded-[14px] bg-[#141417]">
+        <p className="mono absolute inset-0 flex items-center justify-center text-[9px] text-[rgba(237,235,228,.45)]">
+          live map — memphis → sf
+        </p>
+        <span
+          className="pulse absolute left-[38%] top-[46%] block h-2.5 w-2.5 rounded-full bg-[var(--acc)]"
+          aria-hidden
+        />
       </div>
 
-      <ol className="mt-5 flex flex-col gap-4">
-        {order.steps.map((step) => (
-          <li key={step.label} className="flex items-center gap-3">
-            <span
-              className={
-                step.state === "active"
-                  ? "live-dot"
-                  : `h-[6px] w-[6px] rounded-full ${step.state === "done" ? "bg-[var(--acc)]" : "bg-[var(--elevated)]"}`
-              }
-            />
-            <span
-              className="meta text-[9px]"
-              style={{ color: step.state === "next" ? "var(--ink-dim)" : "var(--ink)" }}
-            >
-              {step.label}
-            </span>
-          </li>
-        ))}
+      <ol className="mt-5 flex flex-col">
+        {order.steps.map((step, i) => {
+          const last = i === order.steps.length - 1;
+          const labelColor =
+            step.state === "next"
+              ? "rgba(237,235,228,.35)"
+              : step.state === "active"
+                ? "var(--acc)"
+                : "var(--ink)";
+          return (
+            <li key={step.label} className="flex gap-3">
+              <span className="flex flex-col items-center">
+                <span
+                  className={`box-border block h-3 w-3 rounded-full border-2 ${step.state === "active" ? "pulse" : ""}`}
+                  style={{
+                    background: step.state === "done" ? "var(--acc)" : "transparent",
+                    borderColor:
+                      step.state === "next" ? "rgba(237,235,228,.25)" : "var(--acc)",
+                  }}
+                  aria-hidden
+                />
+                {!last && (
+                  <span
+                    className="my-0.5 w-0.5 flex-1"
+                    style={{
+                      background:
+                        step.state === "done"
+                          ? "color-mix(in oklab, var(--acc) 45%, transparent)"
+                          : "rgba(237,235,228,.12)",
+                    }}
+                    aria-hidden
+                  />
+                )}
+              </span>
+              <span className="pb-5">
+                <span
+                  className="block text-[11.5px] font-semibold tracking-[.3px]"
+                  style={{ color: labelColor }}
+                >
+                  {step.label}
+                </span>
+                <span className="mono mt-0.5 block text-[8.5px] text-[rgba(237,235,228,.38)]">
+                  {step.detail}
+                </span>
+              </span>
+            </li>
+          );
+        })}
       </ol>
 
-      <Link href="/inbox/t1" className="pill-outline mt-6 block w-full">
+      <button type="button" onClick={messageSeller} className="pill-outline mt-1 w-full">
         MESSAGE SELLER
-      </Link>
+      </button>
     </main>
   );
 }

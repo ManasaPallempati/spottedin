@@ -1,37 +1,52 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { GlobalDropTicker } from "@/components/GlobalDropTicker";
 import { ListingCard } from "@/components/ListingCard";
-import { getAdapter } from "@/data/adapter";
+import { useStore } from "@/state/store";
 
-export const dynamic = "force-dynamic";
+const CATEGORIES = ["ALL", "OUTERWEAR", "TOPS", "BOTTOMS", "SHOES", "BAGS"] as const;
 
-const CATEGORIES = ["ALL", "OUTERWEAR", "TOPS", "BOTTOMS", "SHOES", "BAGS"];
-
-export default async function RackPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ cat?: string }>;
-}) {
-  const { cat = "ALL" } = await searchParams;
-  const now = new Date();
-  const listings = await getAdapter().listListings({ category: cat });
+export default function RackPage() {
+  const { listings, unreadCount } = useStore();
+  const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("ALL");
+  const live = listings.filter((l) => l.status === "live");
+  const visible = cat === "ALL" ? live : live.filter((l) => l.category === cat);
 
   return (
     <main className="screen">
       <header className="flex items-center justify-between px-4 pt-5">
-        <h1 className="display text-[20px]">
+        <h1 className="display text-[19px]">
           SPOTTED<span className="text-[var(--acc)]">●</span>
         </h1>
-        <div className="flex items-center gap-4 text-[var(--ink-muted)]">
-          <Link href="/irl" aria-label="Spotted IRL">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2M12 15a3 3 0 100-6 3 3 0 000 6z" />
-            </svg>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/irl"
+            aria-label="Spotted IRL — snap a fit"
+            className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[rgba(237,235,228,.16)]"
+          >
+            <span
+              aria-hidden
+              className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-[var(--ink)]"
+            >
+              <span className="block h-1 w-1 rounded-full bg-[var(--acc)]" />
+            </span>
           </Link>
-          <Link href="/inbox" aria-label="Inbox">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <path d="M4 6h16v12H4zM4 7l8 6 8-6" />
-            </svg>
+          <Link
+            href="/inbox"
+            aria-label={`Inbox — ${unreadCount} unread`}
+            className="relative flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[rgba(237,235,228,.16)]"
+          >
+            <span
+              aria-hidden
+              className="block h-[11px] w-[13px] rounded-[4px] border-2 border-[var(--ink)]"
+            />
+            {unreadCount > 0 && (
+              <span className="mono absolute -right-[3px] -top-[3px] flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-[var(--acc)] px-0.5 text-[8.5px] font-bold text-[var(--acc-ink)]">
+                {unreadCount}
+              </span>
+            )}
           </Link>
         </div>
       </header>
@@ -40,31 +55,54 @@ export default async function RackPage({
 
       <Link
         href="/search"
-        className="mx-4 mt-3 block rounded-full border border-[var(--hairline)] px-4 py-2.5 text-[10.5px] text-[var(--ink-dim)]"
-        style={{ fontFamily: "var(--font-mono), monospace" }}
+        className="mono mx-4 mt-2.5 block rounded-full border border-[rgba(237,235,228,.12)] px-4 py-2.5 text-[10.5px] tracking-[.3px] text-[rgba(237,235,228,.4)]"
       >
         search the rack — y2k, samba, gorpcore…
       </Link>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="mt-3 flex gap-1.5 overflow-x-auto px-4 pb-0.5" role="tablist" aria-label="Categories">
         {CATEGORIES.map((c) => (
-          <Link key={c} href={c === "ALL" ? "/" : `/?cat=${c}`} className={`chip ${c === cat ? "chip-on" : ""}`}>
+          <button
+            key={c}
+            type="button"
+            role="tab"
+            aria-selected={c === cat}
+            onClick={() => setCat(c)}
+            className={`chip ${c === cat ? "chip-on" : ""}`}
+          >
             {c}
-          </Link>
+          </button>
         ))}
       </div>
 
-      <div className="card-surface mx-4 mt-3 flex items-center justify-between px-4 py-3">
-        <p className="text-[11px] text-[var(--ink-muted)]">
-          invite 2 friends → early access to closet drops
-        </p>
-        <span className="meta text-[8.5px] text-[var(--acc)]">INVITE</span>
+      <div className="px-4 pt-3.5">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2.5 rounded-[13px] border border-dashed px-3.5 py-3 text-left"
+          style={{ borderColor: "color-mix(in oklab, var(--acc) 45%, transparent)" }}
+        >
+          <span className="live-dot" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-semibold tracking-[.3px]">
+              CLOSET DROP — TONIGHT 21:00
+            </span>
+            <span className="mono mt-0.5 block text-[8.5px] text-[rgba(237,235,228,.45)]">
+              @mara.vintage · 32 pieces · invite 2 friends → early access
+            </span>
+          </span>
+          <span className="meta flex-none text-[9px] text-[var(--acc)]">INVITE ↗</span>
+        </button>
       </div>
 
-      <section className="grid grid-cols-2 gap-x-3 gap-y-5 px-4 py-4">
-        {listings.map((l) => (
-          <ListingCard key={l.id} listing={l} now={now} />
+      <section className="grid grid-cols-2 gap-x-2.5 gap-y-4 px-4 py-3.5" aria-label="The rack">
+        {visible.map((l) => (
+          <ListingCard key={l.id} listing={l} />
         ))}
+        {visible.length === 0 && (
+          <p className="mono col-span-2 py-10 text-center text-[9.5px] text-[var(--ink-dim)]">
+            nothing in {cat.toLowerCase()} right now — check back at :00
+          </p>
+        )}
       </section>
     </main>
   );

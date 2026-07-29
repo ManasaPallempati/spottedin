@@ -1,8 +1,21 @@
-import type { Fit, Listing, Order, Seller, Thread } from "./types";
+import type { Fit, Listing, ListingPhoto, Order, Seller, Thread } from "./types";
 
 // The 10 prototype listings (titles/brands/prices/floors from the design handoff).
 // listedAt values are fixed so mock mode is deterministic; prices still move with
-// real time through the shared pricing utils.
+// real time through the shared pricing utils. Photos are tasteful stock shots on
+// solid backgrounds; the gradient renders behind each image as an offline fallback.
+
+const U = (id: string, extra = "") =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=860&q=80${extra}`;
+
+function shots(id: string, alt: string, c1: string, c2: string): ListingPhoto[] {
+  return [
+    { src: U(id), alt, c1, c2 },
+    { src: U(id, "&crop=top"), alt: `${alt} — detail`, c1, c2 },
+    { src: U(id, "&crop=bottom"), alt: `${alt} — close-up`, c1, c2 },
+  ];
+}
+
 export const SEED_LISTINGS: Listing[] = [
   {
     id: "1",
@@ -23,7 +36,7 @@ export const SEED_LISTINGS: Listing[] = [
     watching: 12,
     description:
       "Real leather, broken in right. Small scuff on the left cuff — priced for it. Ships in 24h from SF.",
-    photo: { c1: "#6E4A38", c2: "#7A5340", alt: "leather moto jacket" },
+    photos: shots("photo-1551028719-00167b16eac5", "black leather moto jacket", "#6E4A38", "#7A5340"),
   },
   {
     id: "2",
@@ -43,7 +56,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 41,
     watching: 7,
     description: "True vintage fade, zero repairs. Measured 31x31.",
-    photo: { c1: "#46586E", c2: "#4F627A", alt: "faded 501 denim" },
+    photos: shots("photo-1542272604-787c3835535d", "stack of faded 501 denim", "#46586E", "#4F627A"),
   },
   {
     id: "3",
@@ -63,7 +76,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 28,
     watching: 5,
     description: "Crunchy nylon, colorblocked. Packs into its own pocket.",
-    photo: { c1: "#465544", c2: "#4F5F4D", alt: "nylon windbreaker" },
+    photos: shots("photo-1591047139829-d91aecb6caea", "nylon windbreaker on hanger", "#465544", "#4F5F4D"),
   },
   {
     id: "4",
@@ -83,7 +96,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 96,
     watching: 19,
     description: "Authenticated in-app. Hardware clean, corners sharp.",
-    photo: { c1: "#2E2E33", c2: "#36363C", alt: "nylon mini bag" },
+    photos: shots("photo-1584917865442-de89df76afd3", "black nylon mini bag", "#2E2E33", "#36363C"),
   },
   {
     id: "5",
@@ -103,7 +116,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 33,
     watching: 4,
     description: "Broken in, soles at 85%. Includes extra laces.",
-    photo: { c1: "#3E3B36", c2: "#46433E", alt: "chunky loafers" },
+    photos: shots("photo-1608256246200-53e635b5b65f", "chunky black leather loafers", "#3E3B36", "#46433E"),
   },
   {
     id: "6",
@@ -123,7 +136,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 19,
     watching: 3,
     description: "Deadstock feel. Butter-soft acrylic knit.",
-    photo: { c1: "#77644A", c2: "#826E52", alt: "knit zip polo" },
+    photos: shots("photo-1434389677669-e08b4cac3105", "knit zip polo on rack", "#77644A", "#826E52"),
   },
   {
     id: "7",
@@ -143,7 +156,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 54,
     watching: 9,
     description: "Toggle hems, 8 pockets. The good kind of baggy.",
-    photo: { c1: "#565844", c2: "#5F614C", alt: "parachute cargos" },
+    photos: shots("photo-1624378439575-d8705ad7ae80", "olive parachute cargo pants", "#565844", "#5F614C"),
   },
   {
     id: "8",
@@ -163,7 +176,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 88,
     watching: 15,
     description: "Single stitch, paper thin. Fade is the whole point.",
-    photo: { c1: "#38343A", c2: "#403C42", alt: "band tour tee" },
+    photos: shots("photo-1576566588028-4147f3842f27", "vintage band tour tee", "#38343A", "#403C42"),
   },
   {
     id: "9",
@@ -183,7 +196,7 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 26,
     watching: 6,
     description: "No pulls, zips smooth. Wine colorway, rare.",
-    photo: { c1: "#5C3A44", c2: "#66424D", alt: "fleece puffer vest" },
+    photos: shots("photo-1544022613-e87ca75a784a", "wine fleece puffer vest", "#5C3A44", "#66424D"),
   },
   {
     id: "10",
@@ -203,15 +216,15 @@ export const SEED_LISTINGS: Listing[] = [
     spots: 71,
     watching: 11,
     description: "Worn twice. Box included.",
-    photo: { c1: "#6E6653", c2: "#79705B", alt: "samba sneakers" },
+    photos: shots("photo-1595950653106-6c9ebd614d3a", "samba og sneakers", "#6E6653", "#79705B"),
   },
 ];
 
 export const SEED_SELLERS: Seller[] = [
-  { handle: "mara.vintage", rating: 4.9, sales: 238, repliesIn: "~1h" },
-  { handle: "thriftgod", rating: 4.8, sales: 91, repliesIn: "~2h" },
-  { handle: "y2kcloset", rating: 5.0, sales: 412, repliesIn: "~30m" },
-  { handle: "rackrat", rating: 4.7, sales: 56, repliesIn: "~4h" },
+  { handle: "mara.vintage", rating: 4.9, sales: 238, repliesIn: "<1h" },
+  { handle: "thriftgod", rating: 4.8, sales: 91, repliesIn: "<2h" },
+  { handle: "y2kcloset", rating: 5.0, sales: 412, repliesIn: "<30m" },
+  { handle: "rackrat", rating: 4.7, sales: 56, repliesIn: "<4h" },
 ];
 
 export const SEED_FITS: Fit[] = [
@@ -222,6 +235,12 @@ export const SEED_FITS: Fit[] = [
     plays: "12.4K",
     lookListingIds: ["7", "10", "8"],
     videoUrl: null,
+    poster: {
+      src: U("photo-1515886657613-9f3515b0c78f", "&h=1400"),
+      alt: "street fit with parachute cargos",
+      c1: "#23252B",
+      c2: "#2A2C33",
+    },
   },
   {
     id: "f2",
@@ -230,28 +249,79 @@ export const SEED_FITS: Fit[] = [
     plays: "8.1K",
     lookListingIds: ["1", "2"],
     videoUrl: null,
+    poster: {
+      src: U("photo-1529139574466-a303027c1d8b", "&h=1400"),
+      alt: "leather moto jacket worn on the street",
+      c1: "#292225",
+      c2: "#302A2D",
+    },
   },
   {
     id: "f3",
     sellerHandle: "thriftgod",
-    caption: "samba og on foot. still dropping, move quick",
-    plays: "5.7K",
-    lookListingIds: ["10", "6"],
+    caption: "full fit under $60. yes, everything drops hourly",
+    plays: "22K",
+    lookListingIds: ["6", "3", "10"],
     videoUrl: null,
+    poster: {
+      src: U("photo-1483985988355-763728e1935b", "&h=1400"),
+      alt: "thrifted full fit walking downtown",
+      c1: "#222622",
+      c2: "#2A2E2A",
+    },
   },
 ];
+
+// Session spots seeded so Closet → SPOTTED starts populated (prototype parity).
+export const SEED_SPOTTED_IDS = ["3", "8"];
 
 export const SEED_THREADS: Thread[] = [
   {
     id: "t1",
     listingId: "1",
     withHandle: "mara.vintage",
-    lastMessage: "YOUR OFFER $75 — sent",
+    lastMessage: "yes — fits like a modern M, shoulders are structured",
+    lastAt: "2:32 PM",
     unread: true,
     messages: [
-      { id: "m1", from: "me", type: "text", body: "is the scuff visible when worn?" },
-      { id: "m2", from: "them", type: "text", body: "barely — inner cuff. i can send a close-up" },
-      { id: "m3", from: "me", type: "offer", body: "", offerAmount: 75, offerStatus: "sent" },
+      {
+        id: "m1",
+        from: "them",
+        type: "text",
+        body: "hey — saw you watching the moto. it drops another $1 at the top of the hour",
+      },
+      { id: "m2", from: "me", type: "text", body: "is it true to size? usually wear M" },
+      {
+        id: "m3",
+        from: "them",
+        type: "text",
+        body: "yes — fits like a modern M, shoulders are structured",
+      },
+    ],
+  },
+  {
+    id: "t2",
+    listingId: "6",
+    withHandle: "thriftgod",
+    lastMessage: "can do $30 on the polo if you take it today",
+    lastAt: "11:05 AM",
+    unread: true,
+    messages: [
+      { id: "m4", from: "me", type: "text", body: "would you do $28 on the knit polo?" },
+      { id: "m5", from: "them", type: "text", body: "can do $30 on the polo if you take it today" },
+    ],
+  },
+  {
+    id: "t3",
+    listingId: "7",
+    withHandle: "y2kcloset",
+    lastMessage: "bundle the cargos + tee and i cut 15%",
+    lastAt: "YESTERDAY",
+    unread: false,
+    messages: [
+      { id: "m6", from: "me", type: "text", body: "do the cargos fit tts?" },
+      { id: "m7", from: "them", type: "text", body: "yes, baggy through the leg like the pics" },
+      { id: "m8", from: "them", type: "text", body: "bundle the cargos + tee and i cut 15%" },
     ],
   },
 ];
@@ -260,17 +330,21 @@ export const SEED_ORDERS: Order[] = [
   {
     id: "o1",
     listingId: "10",
+    buyerHandle: "nat.spots",
     pricePaid: 58,
     shippingOption: "tracked",
+    shippingCost: 4.99,
+    total: 62.99,
     status: "in transit",
-    carrier: "USPS",
-    eta: "AUG 02",
+    carrier: "USPS GROUND",
+    eta: "FRI AUG 1",
+    placedAt: "2026-07-29T15:02:00Z",
     steps: [
-      { label: "ORDER CONFIRMED", state: "done" },
-      { label: "SELLER PACKED", state: "done" },
-      { label: "IN TRANSIT", state: "active" },
-      { label: "OUT FOR DELIVERY", state: "next" },
-      { label: "DELIVERED", state: "next" },
+      { label: "ORDER CONFIRMED", detail: "JUL 29 · 3:02 PM", state: "done" },
+      { label: "LABEL CREATED", detail: "JUL 29 · 6:40 PM", state: "done" },
+      { label: "IN TRANSIT — MEMPHIS, TN", detail: "THIS MORNING · 8:12 AM", state: "active" },
+      { label: "OUT FOR DELIVERY", detail: "—", state: "next" },
+      { label: "DELIVERED", detail: "—", state: "next" },
     ],
   },
 ];
