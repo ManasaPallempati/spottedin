@@ -2,6 +2,7 @@
 
 One entry per failed command/step; logged once, then moved on.
 
+- 2026-07-29 — Push to `origin/codex/supabase-auth-rollout` was rejected as non-fast-forward because the remote branch advanced during the build. No force-push, pull, rebase, or dirty-worktree rewrite was attempted. The Spotted checkpoints were redirected to a new isolated `codex/spotted-prod` remote branch.
 - 2026-07-29 — Standalone `npx vercel whoami` timed out after 30 seconds. Local checks confirmed no `VERCEL_TOKEN` and no Vercel CLI auth file, so interactive login—not an application defect—is required before a CLI production deploy. Supabase and Stripe environment variables were also absent; their credentialed gates remain unapplied.
 - 2026-07-29 — Combined Vercel/Supabase authentication probe exceeded its 120-second ceiling, likely while `supabase projects list` waited on remote auth. The call was not retried as a bundle; Supabase activation was deferred and the Vercel identity check continued separately.
 - 2026-07-29 — Second OG verification build failed on Satori's explicit-layout rule because a text block used a `<br>` and therefore had multiple child nodes without `display:flex`. Replaced it with two flex rows. If the final verification rejects the route again, the dynamic OG image will be removed rather than retried further.
