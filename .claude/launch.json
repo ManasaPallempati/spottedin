@@ -5,6 +5,24 @@
       "name": "maanster-preview",
       "url": "http://localhost:4180",
       "port": 4180
+    },
+    {
+      "name": "spotted-public",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/augel/spottedin-b", "run", "start", "--", "-p", "3100"],
+      "port": 3100
+    },
+    {
+      "name": "spotted",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/augel/spottedin-b", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "spottedin-c",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/augel/Claude/Projects/spottedin-c", "run", "dev"],
+      "port": 5173
     }
   ]
 }
