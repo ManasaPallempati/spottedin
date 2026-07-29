@@ -20,6 +20,8 @@ export interface Listing {
   startPrice: number;
   /** Seller-private. Never rendered on buyer-facing surfaces — "floor hidden". */
   floorPrice: number;
+  /** Server-authoritative public price returned by the anonymous listings view. */
+  serverPrice?: number;
   dropRate: DropRate;
   listedAt: string;
   status: "live" | "sold" | "ended";

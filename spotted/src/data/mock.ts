@@ -4,6 +4,7 @@ import { currentPrice } from "@/lib/pricing";
 import {
   SEED_FITS,
   SEED_LISTINGS,
+  SEED_OFFERS,
   SEED_ORDERS,
   SEED_SELLERS,
   SEED_SPOTTED_IDS,
@@ -35,7 +36,7 @@ export function createMockAdapter(): SpottedData {
   const listings: Listing[] = clone(SEED_LISTINGS);
   const threads: Thread[] = clone(SEED_THREADS);
   const orders: Order[] = clone(SEED_ORDERS);
-  const offers: Offer[] = [];
+  const offers: Offer[] = clone(SEED_OFFERS);
   const spots = new Map<string, Spot>();
   const deckSignals: DeckSignal[] = [];
   const wanted: WantedPost[] = [];

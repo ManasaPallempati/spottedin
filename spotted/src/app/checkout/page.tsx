@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { ListingImage } from "@/components/ListingImage";
 import { ME } from "@/data/me";
 import type { CheckoutPrice, Order } from "@/data/types";
+import { shareStoryCard } from "@/lib/story-card";
 import { useStore } from "@/state/store";
 
 export default function CheckoutPage() {
@@ -83,12 +84,14 @@ function CheckoutInner() {
 
   async function shareReceipt() {
     if (!placedOrder) return;
-    const text = `STEAL RECEIPT — ${listing!.title}: paid $${placedOrder.pricePaid}${
-      retail ? `, retail $${retail}, saved $${saved} (−${savedPct}%)` : ""
-    } on SPOTTED`;
     try {
-      if (navigator.share) await navigator.share({ text });
-      else await navigator.clipboard.writeText(text);
+      await shareStoryCard({
+        filename: `spotted-receipt-${placedOrder.id}.png`,
+        kicker: "steal receipt",
+        title: listing!.title,
+        priceLine: `PAID $${placedOrder.pricePaid}`,
+        detailLine: retail ? `RETAIL $${retail} · SAVED $${saved} (−${savedPct}%)` : "0% BUYER FEES",
+      });
       setShared(true);
     } catch {
       setShared(false);
@@ -152,7 +155,7 @@ function CheckoutInner() {
 
         <div className="mt-5 flex gap-2">
           <button type="button" onClick={shareReceipt} className="pill-primary flex-1 text-[10px]">
-            {shared ? "COPIED ✓" : "SHARE RECEIPT"}
+            {shared ? "RECEIPT SAVED ✓" : "SHARE RECEIPT"}
           </button>
           <Link href={`/orders/${placedOrder.id}`} className="pill-outline flex-1 text-[10px]">
             TRACK ORDER

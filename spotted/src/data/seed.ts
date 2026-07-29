@@ -1,4 +1,4 @@
-import type { Fit, Listing, ListingPhoto, Order, Seller, Thread } from "./types";
+import type { Fit, Listing, ListingPhoto, Offer, Order, Seller, Thread } from "./types";
 
 // The 10 prototype listings (titles/brands/prices/floors from the design handoff).
 // listedAt values are fixed so mock mode is deterministic; prices still move with
@@ -275,6 +275,18 @@ export const SEED_FITS: Fit[] = [
 // Session spots seeded so Closet → SPOTTED starts populated (prototype parity).
 export const SEED_SPOTTED_IDS = ["3", "8"];
 
+export const SEED_OFFERS: Offer[] = [
+  {
+    id: "of-seed-1",
+    listingId: "6",
+    buyerHandle: "nat.spots",
+    amount: 30,
+    status: "accepted",
+    createdAt: "2026-07-29T04:35:00Z",
+    expiresAt: "2026-07-30T04:35:00Z",
+  },
+];
+
 export const SEED_THREADS: Thread[] = [
   {
     id: "t1",
@@ -303,12 +315,20 @@ export const SEED_THREADS: Thread[] = [
     id: "t2",
     listingId: "6",
     withHandle: "thriftgod",
-    lastMessage: "can do $30 on the polo if you take it today",
+    lastMessage: "offer accepted — checkout at $30",
     lastAt: "11:05 AM",
     unread: true,
     messages: [
       { id: "m4", from: "me", type: "text", body: "would you do $28 on the knit polo?" },
       { id: "m5", from: "them", type: "text", body: "can do $30 on the polo if you take it today" },
+      {
+        id: "m-offer-seed",
+        from: "me",
+        type: "offer",
+        body: "",
+        offerId: "of-seed-1",
+        offerAmount: 30,
+      },
     ],
   },
   {

@@ -20,6 +20,7 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
   const [sheetOpen, setSheetOpen] = useState(false);
   const [offerAmt, setOfferAmt] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  const [offerError, setOfferError] = useState("");
 
   const seller = useMemo(
     () =>
@@ -45,7 +46,7 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
 
   const price = priceOf(listing);
   const steal = stealOf(listing);
-  const atFloor = price <= listing.floorPrice;
+  const atFloor = listing.serverPrice === undefined && price <= listing.floorPrice;
   const amount = offerAmt ?? Math.round(price * 0.9);
   const progress = seconds === null ? 0 : 1 - seconds / 3600;
   const rateStep =
@@ -65,8 +66,15 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
   async function submitOffer() {
     if (sending) return;
     setSending(true);
-    const threadId = await sendOffer(listing!.id, amount);
-    router.push(`/inbox/${threadId}`);
+    setOfferError("");
+    try {
+      const threadId = await sendOffer(listing!.id, amount);
+      router.push(`/inbox/${threadId}`);
+    } catch {
+      setOfferError("offer didn't send — try again later");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -261,6 +269,11 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
             <p className="mono text-center text-[8.5px] text-[rgba(237,235,228,.38)]">
               sellers accept 71% of offers within −15%
             </p>
+            {offerError && (
+              <p role="alert" className="mono mt-2 text-center text-[8.5px] text-[#ff8b8b]">
+                {offerError}
+              </p>
+            )}
             <button
               type="button"
               onClick={submitOffer}

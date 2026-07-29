@@ -2,6 +2,10 @@
 
 One entry per failed command/step; logged once, then moved on.
 
+- 2026-07-29 — Standalone `npx vercel whoami` timed out after 30 seconds. Local checks confirmed no `VERCEL_TOKEN` and no Vercel CLI auth file, so interactive login—not an application defect—is required before a CLI production deploy. Supabase and Stripe environment variables were also absent; their credentialed gates remain unapplied.
+- 2026-07-29 — Combined Vercel/Supabase authentication probe exceeded its 120-second ceiling, likely while `supabase projects list` waited on remote auth. The call was not retried as a bundle; Supabase activation was deferred and the Vercel identity check continued separately.
+- 2026-07-29 — Second OG verification build failed on Satori's explicit-layout rule because a text block used a `<br>` and therefore had multiple child nodes without `display:flex`. Replaced it with two flex rows. If the final verification rejects the route again, the dynamic OG image will be removed rather than retried further.
+- 2026-07-29 — First production build after adding the OG image failed during `/opengraph-image` prerender: Satori rejected a combined gradient/background value and attempted a dynamic font fallback for the `●` glyph. Replaced both with a solid background and a CSS circle, then continued with one verification rerun.
 - 2026-07-29 — The requested OpenClaw Chrome profile `manasa` could not be opened: `openclaw browser doctor/profiles/tabs --profile manasa` failed once with `GatewayCredentialsRequiredError` for `C:\Users\augel\.openclaw-manasa\openclaw.json`. No control/config credential was changed. Local production rendering was verified with a fresh isolated headless Chrome audit profile instead.
 - 2026-07-29 — Phase 2 Fable screen implementation exceeded the supervising 20-minute execution ceiling and was terminated once (`Invoke-ClaudeDelegate`, model `fable`, exit 124 after 1204s). No retry was launched. The partial result (25 modified files, 5 new files, roughly 2,969 insertions under `spotted/**`) was preserved for direct build/runtime verification and repair.
 

@@ -6,6 +6,7 @@ import { Countdown } from "@/components/Countdown";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingImage } from "@/components/ListingImage";
 import { ME } from "@/data/me";
+import { shareStoryCard } from "@/lib/story-card";
 import { useStore } from "@/state/store";
 
 export default function ClosetPage() {
@@ -26,10 +27,14 @@ export default function ClosetPage() {
   const wrappedSaved = ME.baseline.wrappedSaved + orderSavings;
 
   async function shareWrapped() {
-    const text = `JULY WRAPPED — ${wrappedSteals} steals · $${wrappedSaved} saved on SPOTTED`;
     try {
-      if (navigator.share) await navigator.share({ text });
-      else await navigator.clipboard.writeText(text);
+      await shareStoryCard({
+        filename: "spotted-july-wrapped.png",
+        kicker: "july wrapped",
+        title: `${wrappedSteals} steals`,
+        priceLine: `$${wrappedSaved} SAVED`,
+        detailLine: "TOP ERA Y2K · TOP 4% OF THRIFTERS",
+      });
       setShared(true);
     } catch {
       setShared(false);
@@ -86,7 +91,7 @@ export default function ClosetPage() {
             onClick={shareWrapped}
             className="mono rounded-full border-[1.5px] border-[var(--acc-ink)] px-2.5 py-0.5 text-[8.5px] font-bold"
           >
-            {shared ? "COPIED ✓" : "SHARE ↗"}
+            {shared ? "CARD SAVED ✓" : "SHARE ↗"}
           </button>
         </div>
         <p className="display mt-2 text-[21px] leading-[1.15]">

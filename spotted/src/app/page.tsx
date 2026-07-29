@@ -11,8 +11,27 @@ const CATEGORIES = ["ALL", "OUTERWEAR", "TOPS", "BOTTOMS", "SHOES", "BAGS"] as c
 export default function RackPage() {
   const { listings, unreadCount } = useStore();
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("ALL");
+  const [invited, setInvited] = useState(false);
   const live = listings.filter((l) => l.status === "live");
   const visible = cat === "ALL" ? live : live.filter((l) => l.category === cat);
+
+  async function invite() {
+    const url = `${window.location.origin}/landing?invite=mara`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "SPOTTED closet drop",
+          text: "mara.vintage drops 32 pieces tonight at 21:00. catch it first.",
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+      setInvited(true);
+    } catch {
+      setInvited(false);
+    }
+  }
 
   return (
     <main className="screen">
@@ -78,6 +97,7 @@ export default function RackPage() {
       <div className="px-4 pt-3.5">
         <button
           type="button"
+          onClick={invite}
           className="flex w-full items-center gap-2.5 rounded-[13px] border border-dashed px-3.5 py-3 text-left"
           style={{ borderColor: "color-mix(in oklab, var(--acc) 45%, transparent)" }}
         >
@@ -90,7 +110,9 @@ export default function RackPage() {
               @mara.vintage · 32 pieces · invite 2 friends → early access
             </span>
           </span>
-          <span className="meta flex-none text-[9px] text-[var(--acc)]">INVITE ↗</span>
+          <span className="meta flex-none text-[9px] text-[var(--acc)]">
+            {invited ? "LINK COPIED" : "INVITE ↗"}
+          </span>
         </button>
       </div>
 

@@ -22,12 +22,23 @@ const mono = Space_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://spottedin.co"),
   title: "SPOTTED — prices fall every hour. catch them first.",
   description:
     "GenZ resale fashion marketplace. Every listing drops on the hour until it hits the seller's hidden floor.",
   openGraph: {
     title: "SPOTTED — prices fall every hour. catch them first.",
     description: "GenZ resale fashion. Hourly global drop, 0% seller fees, steal receipts.",
+    url: "/",
+    siteName: "SPOTTED",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "SPOTTED" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SPOTTED — prices fall every hour.",
+    description: "Catch the best secondhand prices before the next global drop.",
+    images: ["/opengraph-image"],
   },
 };
 

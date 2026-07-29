@@ -28,6 +28,7 @@ export function TabBar() {
       <div className="flex items-end justify-around px-2 pb-5 pt-2.5">
         <Link
           href="/"
+          aria-current={active === "/" ? "page" : undefined}
           className="flex w-[54px] flex-col items-center gap-[5px]"
           style={{ color: color("/") }}
         >
@@ -40,6 +41,7 @@ export function TabBar() {
         </Link>
         <Link
           href="/fits"
+          aria-current={active === "/fits" ? "page" : undefined}
           className="flex w-[54px] flex-col items-center gap-[5px]"
           style={{ color: color("/fits") }}
         >
@@ -53,6 +55,7 @@ export function TabBar() {
         <Link
           href="/sell"
           aria-label="Sell — list something"
+          aria-current={active === "/sell" ? "page" : undefined}
           className="-mt-4 flex h-[47px] w-[47px] items-center justify-center rounded-full bg-[var(--acc)] text-[22px] font-light leading-none text-[var(--acc-ink)]"
           style={{ boxShadow: "0 8px 22px color-mix(in oklab, var(--acc) 35%, transparent)" }}
         >
@@ -60,6 +63,7 @@ export function TabBar() {
         </Link>
         <Link
           href="/deck"
+          aria-current={active === "/deck" ? "page" : undefined}
           className="flex w-[54px] flex-col items-center gap-[5px]"
           style={{ color: color("/deck") }}
         >
@@ -73,6 +77,7 @@ export function TabBar() {
         </Link>
         <Link
           href="/closet"
+          aria-current={active === "/closet" ? "page" : undefined}
           className="flex w-[54px] flex-col items-center gap-[5px]"
           style={{ color: color("/closet") }}
         >

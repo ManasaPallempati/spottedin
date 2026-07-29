@@ -44,8 +44,12 @@ function mapListing(row: any): Listing {
     era: row.era,
     category: row.category,
     retailPrice: row.retail_price,
-    startPrice: row.start_price,
-    floorPrice: row.floor_price,
+    // Anonymous reads come from public_listings and never receive start/floor.
+    // Mirror the authoritative price into the private-shaped fields so older
+    // components cannot infer seller limits from the browser payload.
+    startPrice: row.current_price,
+    floorPrice: row.current_price,
+    serverPrice: row.current_price,
     dropRate: row.drop_rate,
     listedAt: row.listed_at,
     status: row.status,
@@ -67,7 +71,11 @@ export function createSupabaseAdapter(): SpottedData {
   const db = client();
   return {
     async listListings(filter) {
-      let query = db.from("listings").select("*");
+      let query = db
+        .from("public_listings")
+        .select(
+          "id,title,brand,size,condition,era,category,retail_price,current_price,drop_rate,listed_at,status,seller_handle,spots,watching,description,photos",
+        );
       if (filter?.status) {
         query = query.eq("status", filter.status);
       }
@@ -83,7 +91,13 @@ export function createSupabaseAdapter(): SpottedData {
       return (data ?? []).map(mapListing);
     },
     async getListing(id) {
-      const { data, error } = await db.from("listings").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await db
+        .from("public_listings")
+        .select(
+          "id,title,brand,size,condition,era,category,retail_price,current_price,drop_rate,listed_at,status,seller_handle,spots,watching,description,photos",
+        )
+        .eq("id", id)
+        .maybeSingle();
       if (error) throw error;
       return data ? mapListing(data) : null;
     },

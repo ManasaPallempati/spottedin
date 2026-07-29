@@ -76,7 +76,8 @@ export default function IrlPage() {
                   className="sr-only"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) setSnapUrl(URL.createObjectURL(file));
+                    if (!file) return;
+                    setSnapUrl(URL.createObjectURL(file));
                     setStage("snapped");
                   }}
                 />

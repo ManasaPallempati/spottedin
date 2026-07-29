@@ -21,10 +21,17 @@ Mock data mode is the default and needs zero credentials. Set `SPOTTED_DATA_MODE
 plus the Supabase vars in `.env.example` to point at a real backend — reads work; writes
 are explicit stubs until the credentialed build-out.
 
+Apply `supabase/migrations/202607290001_spotted_phase1.sql` to a new, Spotted-only
+Supabase project. Anonymous reads use `public_listings`, which computes current prices
+in Postgres and never projects seller `start_price` or `floor_price`. The hourly Vercel
+cron at `/api/cron/hourly` expires stale offers; prices themselves are computed on read.
+
 ## Layout
 
 - `src/lib/pricing.ts` — shared server-computed hourly-drop + steal utilities; every
   function takes `now` so time is injected (tests use fixed dates).
+- `src/lib/story-card.ts` — 1080×1920 downloadable Fit Card, Steal Receipt, and Wrapped
+  exports.
 - `src/data/` — the adapter boundary: `adapter.ts` (interface + mode resolution),
   `mock.ts` (in-memory session writes, seeded from the 10 prototype listings),
   `supabase.ts` (reads + explicit write stubs), `me.ts` (demo session user).
@@ -39,8 +46,8 @@ are explicit stubs until the credentialed build-out.
 - Checkout never trusts URL prices: only an offer *id* travels in the URL, and
   `resolveCheckoutPrice` honors it solely when the offer is accepted, unexpired, and
   tied to that buyer + listing; otherwise the server drop price is charged.
-- Seller floors are private: buyer surfaces render "FLOOR HIDDEN" only. The floor value
-  appears exclusively on the owner's own closet cards.
+- Seller floors are private: buyer surfaces render "FLOOR HIDDEN" only. Credentialed
+  anonymous reads use `public_listings`, which excludes both start and floor values.
 - Supabase search escapes LIKE wildcards and quotes user input before it reaches the
   PostgREST `or=` grammar (`buildSearchOrFilter`), and matches the mock's
   title/brand/era/category parity.

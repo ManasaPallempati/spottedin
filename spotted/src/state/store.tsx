@@ -14,6 +14,7 @@ import { ME } from "@/data/me";
 import {
   SEED_FITS,
   SEED_LISTINGS,
+  SEED_OFFERS,
   SEED_ORDERS,
   SEED_SPOTTED_IDS,
   SEED_THREADS,
@@ -83,7 +84,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [justDropped, setJustDropped] = useState(false);
   const [spottedIds, setSpottedIds] = useState<ReadonlySet<string>>(new Set(SEED_SPOTTED_IDS));
   const [deckSeenIds, setDeckSeenIds] = useState<ReadonlySet<string>>(new Set());
-  const [offers, setOffers] = useState<Record<string, Offer>>({});
+  const [offers, setOffers] = useState<Record<string, Offer>>(
+    Object.fromEntries(SEED_OFFERS.map((offer) => [offer.id, offer])),
+  );
   const [readThreadIds, setReadThreadIds] = useState<ReadonlySet<string>>(new Set());
   const [waitlistJoined, setWaitlistJoined] = useState(false);
   const repliedThreads = useRef(new Set<string>());
@@ -117,6 +120,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Wrapped past :00 — everything just dropped.
       if (prev >= 0 && remaining > prev) {
         setJustDropped(true);
+        void refresh();
         window.setTimeout(() => setJustDropped(false), 6000);
       }
       prev = remaining;
@@ -124,11 +128,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [refresh]);
 
-  const priceOf = useCallback((listing: Listing) => currentPrice(listing, new Date()), []);
+  const priceOf = useCallback(
+    (listing: Listing) => listing.serverPrice ?? currentPrice(listing, new Date()),
+    [],
+  );
   const stealOf = useCallback(
-    (listing: Listing) => stealPercent(currentPrice(listing, new Date()), listing.retailPrice),
+    (listing: Listing) =>
+      stealPercent(listing.serverPrice ?? currentPrice(listing, new Date()), listing.retailPrice),
     [],
   );
 

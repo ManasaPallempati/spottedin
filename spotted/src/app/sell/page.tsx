@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Countdown } from "@/components/Countdown";
 import type { Listing } from "@/data/types";
+import { shareStoryCard } from "@/lib/story-card";
 import { useStore } from "@/state/store";
 
 const SIZES = ["XS", "S", "M", "L", "XL"];
@@ -66,10 +67,14 @@ export default function SellPage() {
   }
 
   async function shareFitCard() {
-    const text = `${displayTitle} — $${startNum}, drops hourly on SPOTTED`;
     try {
-      if (navigator.share) await navigator.share({ text });
-      else await navigator.clipboard.writeText(text);
+      await shareStoryCard({
+        filename: `spotted-fit-${listed?.id ?? "listing"}.png`,
+        kicker: "fit card",
+        title: displayTitle,
+        priceLine: `$${startNum}`,
+        detailLine: `${speed} DROP · 0% SELLER FEES`,
+      });
       setShared(true);
     } catch {
       setShared(false);
@@ -369,7 +374,7 @@ export default function SellPage() {
           </p>
           <div className="mt-4 flex gap-2">
             <button type="button" onClick={shareFitCard} className="pill-primary flex-1 text-[10px]">
-              {shared ? "COPIED ✓" : "SHARE FIT CARD"}
+              {shared ? "CARD SAVED ✓" : "SHARE FIT CARD"}
             </button>
             <Link href="/closet" className="pill-outline flex-1 text-[10px]">
               VIEW CLOSET
