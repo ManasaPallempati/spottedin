@@ -14,6 +14,8 @@ import type {
   UpdateProfileInput,
 } from './types';
 import { listings as seedListings, sellers, threads as seedThreads } from './seed';
+import { isValidProfileHandle, normalizeEmail, normalizeProfileHandle } from '../auth/validation';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 const KEYS = {
   listings: 'maanster.listings',
@@ -39,6 +41,8 @@ const AUTO_REPLIES = [
   'Thanks for your interest 🙏',
   'Can do, deal!',
 ];
+
+let remoteListings: Listing[] = [];
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -69,24 +73,64 @@ export function subscribe(cb: () => void): () => void {
 }
 
 function readListings(): Listing[] {
+  if (isSupabaseConfigured) return remoteListings;
   return load<Listing[]>(KEYS.listings, seedListings);
 }
 function writeListings(list: Listing[]): void {
+  if (isSupabaseConfigured) {
+    remoteListings = list;
+    return;
+  }
   save(KEYS.listings, list);
 }
 
-function readThreads(): Thread[] {
-  return load<Thread[]>(KEYS.threads, seedThreads);
-}
-function writeThreads(list: Thread[]): void {
-  save(KEYS.threads, list);
+/** Updates the in-memory read cache used by synchronous UI consumers in Supabase mode. */
+export function cacheRemoteListings(listings: Listing[], replace = false): void {
+  if (!isSupabaseConfigured) return;
+  if (replace) {
+    remoteListings = listings;
+  } else {
+    const incomingIds = new Set(listings.map((listing) => listing.id));
+    remoteListings = [...listings, ...remoteListings.filter((listing) => !incomingIds.has(listing.id))];
+  }
+  emit();
 }
 
-function readOrders(): Order[] {
-  return load<Order[]>(KEYS.orders, []);
+/** Replaces only one seller's cached listings while preserving other fetched rows. */
+export function cacheRemoteSellerListings(sellerId: string, listings: Listing[]): void {
+  if (!isSupabaseConfigured) return;
+  remoteListings = [
+    ...listings,
+    ...remoteListings.filter((listing) => listing.sellerId !== sellerId),
+  ];
+  emit();
 }
-function writeOrders(list: Order[]): void {
-  save(KEYS.orders, list);
+
+function scopedKey(key: string, userId: string): string {
+  return `${key}.${userId}`;
+}
+
+function cloneSeedThreads(): Thread[] {
+  return seedThreads.map((thread) => ({
+    ...thread,
+    messages: thread.messages.map((message) => ({ ...message })),
+  }));
+}
+
+function readThreads(userId: string): Thread[] {
+  return load<Thread[]>(scopedKey(KEYS.threads, userId), cloneSeedThreads());
+}
+
+function writeThreads(userId: string, list: Thread[]): void {
+  save(scopedKey(KEYS.threads, userId), list);
+}
+
+function readOrders(userId: string): Order[] {
+  return load<Order[]>(scopedKey(KEYS.orders, userId), []);
+}
+
+function writeOrders(userId: string, list: Order[]): void {
+  save(scopedKey(KEYS.orders, userId), list);
 }
 
 function readLiked(): string[] {
@@ -130,8 +174,14 @@ export function toggleLike(id: string): void {
 }
 
 export function createListing(input: CreateListingInput): Listing {
+  if (isSupabaseConfigured) {
+    throw new Error('Use the cloud listing adapter when Supabase is configured');
+  }
   const user = getUser();
   if (!user) throw new Error('Log in to create a listing');
+  if (isSupabaseConfigured && !getSeller(user.sellerId)) {
+    throw new Error('Finish setting up your profile before creating a listing');
+  }
 
   const listing: Listing = {
     id: `l-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
@@ -163,6 +213,21 @@ export function getSeller(id: string): Seller | undefined {
     ?? sellers.find((s) => s.id === id);
 }
 
+/**
+ * Upserts a profile into the local read cache (`KEYS.profiles`). Supabase is
+ * the durable source of truth for Supabase-backed profiles; this cache only
+ * lets synchronous screens (ListingDetail, Chat, Inbox…) render them without
+ * an await, the same way it already does for the browser-local demo profiles.
+ */
+export function cacheSellerProfile(profile: Seller): void {
+  const profiles = load<Seller[]>(KEYS.profiles, []);
+  const index = profiles.findIndex((p) => p.id === profile.id);
+  if (index === -1) profiles.push(profile);
+  else profiles[index] = profile;
+  save(KEYS.profiles, profiles);
+  emit();
+}
+
 export function getSellerListings(id: string): Listing[] {
   return readListings().filter((l) => l.sellerId === id);
 }
@@ -170,15 +235,25 @@ export function getSellerListings(id: string): Listing[] {
 // ---- Threads / chat ------------------------------------------------------
 
 export function getThreads(): Thread[] {
-  return readThreads();
+  const user = getUser();
+  if (!user) return [];
+  return readThreads(user.id);
 }
 
 export function getThread(id: string): Thread | undefined {
-  return readThreads().find((t) => t.id === id);
+  const user = getUser();
+  if (!user) return undefined;
+  return readThreads(user.id).find((t) => t.id === id);
 }
 
 export function getOrCreateThreadForListing(listingId: string): Thread {
-  const existing = readThreads().find((t) => t.listingId === listingId);
+  const user = getUser();
+  if (!user) throw new Error('Log in to message a seller');
+  if (isSupabaseConfigured && !getSeller(user.sellerId)) {
+    throw new Error('Finish setting up your profile before messaging a seller');
+  }
+  const threads = readThreads(user.id);
+  const existing = threads.find((t) => t.listingId === listingId);
   if (existing) return existing;
 
   const listing = getListing(listingId);
@@ -188,13 +263,19 @@ export function getOrCreateThreadForListing(listingId: string): Thread {
     peerId: listing?.sellerId ?? sellers[0].id,
     messages: [],
   };
-  writeThreads([thread, ...readThreads()]);
+  writeThreads(user.id, [thread, ...threads]);
   emit();
   return thread;
 }
 
 export function sendMessage(threadId: string, text: string): void {
-  const all = readThreads();
+  const user = getUser();
+  if (!user) throw new Error('Log in to send a message');
+  if (isSupabaseConfigured && !getSeller(user.sellerId)) {
+    throw new Error('Finish setting up your profile before sending a message');
+  }
+  const userId = user.id;
+  const all = readThreads(userId);
   const idx = all.findIndex((t) => t.id === threadId);
   if (idx === -1 || !text.trim()) return;
 
@@ -202,11 +283,11 @@ export function sendMessage(threadId: string, text: string): void {
     ...all[idx],
     messages: [...all[idx].messages, { from: 'me', text: text.trim(), timeAgo: 'just now' }],
   };
-  writeThreads(all);
+  writeThreads(userId, all);
   emit();
 
   window.setTimeout(() => {
-    const latest = readThreads();
+    const latest = readThreads(userId);
     const i = latest.findIndex((t) => t.id === threadId);
     if (i === -1) return;
     const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
@@ -214,7 +295,7 @@ export function sendMessage(threadId: string, text: string): void {
       ...latest[i],
       messages: [...latest[i].messages, { from: 'peer', text: reply, timeAgo: 'just now' }],
     };
-    writeThreads(latest);
+    writeThreads(userId, latest);
     emit();
   }, 1200);
 }
@@ -222,6 +303,11 @@ export function sendMessage(threadId: string, text: string): void {
 // ---- Checkout / orders ---------------------------------------------------
 
 export function placeOrder(listingId: string, payMethod: PayMethod): Order {
+  const user = getUser();
+  if (!user) throw new Error('Log in to place an order');
+  if (isSupabaseConfigured && !getSeller(user.sellerId)) {
+    throw new Error('Finish setting up your profile before placing an order');
+  }
   const all = readListings();
   const idx = all.findIndex((l) => l.id === listingId);
   if (idx === -1) throw new Error('Listing not found');
@@ -233,7 +319,7 @@ export function placeOrder(listingId: string, payMethod: PayMethod): Order {
     status: 'placed',
     payMethod,
   };
-  writeOrders([order, ...readOrders()]);
+  writeOrders(user.id, [order, ...readOrders(user.id)]);
 
   all[idx] = { ...all[idx], status: 'sold' };
   writeListings(all);
@@ -243,12 +329,30 @@ export function placeOrder(listingId: string, payMethod: PayMethod): Order {
 }
 
 export function getOrder(id: string): Order | undefined {
-  return readOrders().find((o) => o.id === id);
+  const user = getUser();
+  if (!user) return undefined;
+  return readOrders(user.id).find((o) => o.id === id);
 }
 
-// ---- Auth (browser-local demo: PBKDF2-hashed passwords in localStorage) ----
+// ---- Auth --------------------------------------------------------------
+// When Supabase is configured, the session lives in Supabase and
+// `setSessionUser` (called by AuthProvider's onAuthStateChange) is the only
+// writer of `supabaseSessionUser` below — no synchronous localStorage read
+// decides identity. When it isn't configured, this falls back to a
+// browser-local demo account (PBKDF2-hashed password in localStorage — NOT
+// production security).
+
+let supabaseSessionUser: AuthUser | null = null;
+
+/** Called by AuthProvider whenever the Supabase auth state resolves or changes. */
+export function setSessionUser(user: AuthUser | null): void {
+  supabaseSessionUser = user;
+  emit();
+}
 
 export function getUser(): AuthUser | null {
+  if (isSupabaseConfigured) return supabaseSessionUser;
+
   const user = load<AuthUser | null>(KEYS.auth, null);
   if (!user) return null;
   // Sessions from the old mocked-OTP build have no backing account/profile;
@@ -258,19 +362,6 @@ export function getUser(): AuthUser | null {
     return null;
   }
   return user;
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '').slice(-10);
-}
-
-function normalizeHandle(handle: string): string {
-  const value = handle.trim().toLowerCase().replace(/^@/, '').replace(/[^a-z0-9._]/g, '');
-  return `@${value}`;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -300,27 +391,30 @@ function readAccounts(): StoredAccount[] {
   return load<StoredAccount[]>(KEYS.accounts, []);
 }
 
+// Local-demo-only account creation/login. Never called when Supabase is
+// configured — Login.tsx routes to AuthProvider's signUp/signIn instead, and
+// these guard clauses are defense in depth against accidental misuse.
+
 export async function registerUser(input: RegisterInput): Promise<AuthUser> {
+  if (isSupabaseConfigured) throw new Error('Supabase authentication is configured; local demo accounts are disabled');
+
   const email = normalizeEmail(input.email);
-  const phone = normalizePhone(input.phone);
-  const handle = normalizeHandle(input.handle);
+  const handle = normalizeProfileHandle(input.handle);
   const accounts = readAccounts();
   const profiles = load<Seller[]>(KEYS.profiles, []);
 
   if (!input.name.trim()) throw new Error('Enter your name');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address');
-  if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('Enter a valid 10-digit Indian mobile number');
   if (input.password.length < 8) throw new Error('Password must be at least 8 characters');
-  if (handle.length < 4) throw new Error('Handle must be at least 3 characters');
+  if (!isValidProfileHandle(handle)) throw new Error('Handle must be 3–30 letters, numbers, dots, or underscores');
   if (accounts.some((account) => account.user.email === email)) throw new Error('That email is already registered');
-  if (accounts.some((account) => account.user.phone === phone)) throw new Error('That mobile number is already registered');
   if ([...sellers, ...profiles].some((seller) => seller.handle.toLowerCase() === handle)) {
     throw new Error('That handle is already taken');
   }
 
   const id = `u-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const sellerId = `seller-${id}`;
-  const user: AuthUser = { id, email, phone, sellerId };
+  const user: AuthUser = { id, email, sellerId };
   const profile: Seller = {
     id: sellerId,
     handle,
@@ -341,16 +435,14 @@ export async function registerUser(input: RegisterInput): Promise<AuthUser> {
   return user;
 }
 
-export async function loginWithPassword(identifier: string, password: string): Promise<AuthUser> {
-  const value = identifier.trim();
-  const isEmail = value.includes('@');
-  const normalized = isEmail ? normalizeEmail(value) : normalizePhone(value);
-  const account = readAccounts().find((candidate) => (
-    isEmail ? candidate.user.email === normalized : candidate.user.phone === normalized
-  ));
+export async function loginWithPassword(email: string, password: string): Promise<AuthUser> {
+  if (isSupabaseConfigured) throw new Error('Supabase authentication is configured; local demo accounts are disabled');
+
+  const normalized = normalizeEmail(email);
+  const account = readAccounts().find((candidate) => candidate.user.email === normalized);
 
   if (!account || await hashPassword(password, account.passwordSalt) !== account.passwordHash) {
-    throw new Error('Email/mobile number or password is incorrect');
+    throw new Error('Email or password is incorrect');
   }
 
   save(KEYS.auth, account.user);
@@ -359,6 +451,7 @@ export async function loginWithPassword(identifier: string, password: string): P
 }
 
 export function updateMyProfile(input: UpdateProfileInput): Seller {
+  if (isSupabaseConfigured) throw new Error('Supabase authentication is configured; update the profile via profiles.ts');
   const user = getUser();
   if (!user) throw new Error('Log in to update your profile');
 
@@ -366,9 +459,9 @@ export function updateMyProfile(input: UpdateProfileInput): Seller {
   const index = profiles.findIndex((profile) => profile.id === user.sellerId);
   if (index === -1) throw new Error('Profile not found');
 
-  const handle = normalizeHandle(input.handle);
+  const handle = normalizeProfileHandle(input.handle);
   if (!input.name.trim()) throw new Error('Enter your name');
-  if (handle.length < 4) throw new Error('Handle must be at least 3 characters');
+  if (!isValidProfileHandle(handle)) throw new Error('Handle must be 3–30 letters, numbers, dots, or underscores');
   if ([...sellers, ...profiles].some((profile) => (
     profile.id !== user.sellerId && profile.handle.toLowerCase() === handle
   ))) {
@@ -389,7 +482,12 @@ export function updateMyProfile(input: UpdateProfileInput): Seller {
   return profile;
 }
 
-export function logout(): void {
+export async function logout(): Promise<void> {
+  if (isSupabaseConfigured) {
+    // onAuthStateChange fires setSessionUser(null) once Supabase confirms sign-out.
+    await supabase?.auth.signOut();
+    return;
+  }
   localStorage.removeItem(KEYS.auth);
   emit();
 }

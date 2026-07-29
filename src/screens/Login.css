@@ -69,28 +69,39 @@
   font-size: 22px;
 }
 
-.login-screen__phone-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.login-screen__demo {
+  border: 1.5px dashed var(--border);
   border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
-  padding-left: 12px;
-}
-
-.login-screen__phone-row .input {
-  border: none;
-  padding-left: 2px;
-}
-
-.login-screen__phone-row:focus-within {
-  border-color: var(--accent);
-}
-
-.login-screen__prefix {
-  font-weight: 700;
+  padding: 10px 12px;
   color: var(--ink-soft);
-  flex-shrink: 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.login-screen__panel-title {
+  font-size: 18px;
+  text-align: center;
+}
+
+.login-screen__copy {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.login-screen__notice {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-screen__link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 4px;
+  align-self: center;
 }
 
 .login-screen__error {

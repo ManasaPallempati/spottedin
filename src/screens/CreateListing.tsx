@@ -1,7 +1,8 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar';
-import { createListing, getUser, subscribe } from '../data/store';
+import { getUser, subscribe } from '../data/store';
+import { createMarketplaceListing } from '../data/listings';
 import type { Category, Condition } from '../data/types';
 import './CreateListing.css';
 
@@ -44,10 +45,12 @@ export default function CreateListing() {
   const [condition, setCondition] = useState<Condition>('good');
   const [price, setPrice] = useState('');
   const [photoDataUrl, setPhotoDataUrl] = useState<string | undefined>(undefined);
+  const [photoFile, setPhotoFile] = useState<File | undefined>(undefined);
   const [gradient, setGradient] = useState<[string, string]>(GRADIENTS[0]);
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => subscribe(() => setUser(getUser())), []);
 
@@ -58,6 +61,7 @@ export default function CreateListing() {
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => setPhotoDataUrl(reader.result as string);
     reader.readAsDataURL(file);
@@ -76,26 +80,31 @@ export default function CreateListing() {
     }
     setError('');
 
-    try {
-      const listing = createListing({
-        title: title.trim(),
-        description: description.trim(),
-        priceINR: priceNum,
-        category,
-        size: size.trim() || undefined,
-        condition,
-        gradient,
-        emoji,
-        photoDataUrl,
-      });
+    void (async () => {
+      setSubmitting(true);
+      try {
+        const listing = await createMarketplaceListing({
+          title: title.trim(),
+          description: description.trim(),
+          priceINR: priceNum,
+          category,
+          size: size.trim() || undefined,
+          condition,
+          gradient,
+          emoji,
+          photoDataUrl,
+        }, user!.sellerId, photoFile);
 
-      setShowToast(true);
-      window.setTimeout(() => {
-        navigate(`/listing/${listing.id}`);
-      }, 900);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not list this item');
-    }
+        setShowToast(true);
+        window.setTimeout(() => {
+          navigate(`/listing/${listing.id}`);
+        }, 900);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not list this item');
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   }
 
   if (!user) return null;
@@ -239,7 +248,9 @@ export default function CreateListing() {
 
         {error && <p className="create-listing__error">{error}</p>}
 
-        <button type="submit" className="btn btn-primary btn-block">List item</button>
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+          {submitting ? 'Listing…' : 'List item'}
+        </button>
       </form>
 
       {showToast && (

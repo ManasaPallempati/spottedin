@@ -3,8 +3,9 @@
 Live now: https://palle017.github.io/maanster-market/ (GitHub Pages, auto-deploys on every
 push to main via Actions).
 
-Site is password-gated (src/gate/Gate.tsx). Only the SHA-256 of the passphrase lives in
-this repo; the passphrase itself is known to the owner and must never be committed.
+The former site-wide password gate has been removed. RBOT's browser-local
+visibility key only hides its launcher; because it ships in public frontend
+code, it is not an authorization boundary.
 
 ## Flip to maanster.fixingfortmyers.com (one manual DNS step)
 
@@ -30,7 +31,13 @@ http://127.0.0.1:18789 — full OpenClaw Control UI, gateway auth still applies.
 machine that isn't yours the iframe points at the viewer's own localhost, so the public
 gets nothing.
 
-## Phase 2 (not started)
+## Phase 2
 
-Supabase backend (store.ts is shaped to swap in the Supabase client), Razorpay real
-integration, Shiprocket, then the Expo iOS app per Downloads/resalemarketplaceiosplan.md.
+Supabase email/password authentication, durable profiles, listings,
+listing-image storage, favorites, and basic messaging are implemented locally on
+`codex/supabase-auth-rollout`; see `AUTH_ROLLOUT.md` for the migration, staging,
+SMTP, email-template, and production gates. CI runs `npm test` before every
+Pages build and refuses a production deploy if the public repository variables
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` are absent. No Supabase
+project, production auth deployment, paid SMS, Razorpay, or Shiprocket
+integration has been activated.

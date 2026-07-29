@@ -7,11 +7,17 @@ import EmptyState from '../components/EmptyState';
 import {
   getListing,
   getSeller,
-  isLiked,
-  toggleLike,
   getOrCreateThreadForListing,
   subscribe,
 } from '../data/store';
+import { useAuth } from '../auth/AuthProvider';
+import { isSupabaseConfigured } from '../data/supabase';
+import { loadListing } from '../data/listings';
+import {
+  isMarketplaceFavorite,
+  toggleMarketplaceFavorite,
+} from '../data/favorites';
+import { startMarketplaceConversation } from '../data/messages';
 
 const CONDITION_LABEL: Record<string, string> = {
   new: 'New with tags',
@@ -23,32 +29,121 @@ const CONDITION_LABEL: Record<string, string> = {
 export default function ListingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { status, user, profileStatus } = useAuth();
   const [, setTick] = useState(0);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [loadError, setLoadError] = useState('');
+  const [favorite, setFavorite] = useState(false);
+  const [favoriteSaving, setFavoriteSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => subscribe(() => setTick((t) => t + 1)), []);
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    setLoading(true);
+    setLoadError('');
+    void loadListing(id)
+      .catch((err: unknown) => {
+        if (active) setLoadError(err instanceof Error ? err.message : 'Could not load listing');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || status !== 'authenticated' || !user) {
+      setFavorite(false);
+      return;
+    }
+    let active = true;
+    void isMarketplaceFavorite(id, user.id)
+      .then((next) => {
+        if (active) setFavorite(next);
+      })
+      .catch((err: unknown) => {
+        if (active) setActionError(err instanceof Error ? err.message : 'Could not load favorite');
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, status, user]);
 
   const listing = id ? getListing(id) : undefined;
   const seller = listing ? getSeller(listing.sellerId) : undefined;
+
+  if (loading && (!listing || !seller)) {
+    return (
+      <>
+        <TopBar title="Listing" />
+        <EmptyState emoji="⏳" title="Loading listing…" />
+      </>
+    );
+  }
 
   if (!listing || !seller) {
     return (
       <>
         <TopBar title="Listing" />
-        <EmptyState emoji="🕵️" title="Listing not found" subtitle="It may have been removed." />
+        <EmptyState
+          emoji={loadError ? '⚠️' : '🕵️'}
+          title={loadError ? 'Could not load listing' : 'Listing not found'}
+          subtitle={loadError || 'It may have been removed.'}
+        />
       </>
     );
   }
 
-  const liked = isLiked(listing.id);
   const sold = listing.status === 'sold';
 
   function handleLike() {
-    toggleLike(listing!.id);
+    if (status !== 'authenticated' || !user) {
+      navigate('/login', {
+        state: { returnTo: `/listing/${listing!.id}` },
+      });
+      return;
+    }
+    if (favoriteSaving) return;
+    void (async () => {
+      setFavoriteSaving(true);
+      setActionError('');
+      try {
+        setFavorite(await toggleMarketplaceFavorite(listing!.id, user.id));
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Could not update favorite');
+      } finally {
+        setFavoriteSaving(false);
+      }
+    })();
   }
 
   function handleMessage() {
-    const thread = getOrCreateThreadForListing(listing!.id);
-    navigate(`/chat/${thread.id}`);
+    if (status === 'initializing') return;
+    if (status !== 'authenticated') {
+      navigate('/login', {
+        state: { returnTo: `/listing/${listing!.id}` },
+      });
+      return;
+    }
+    if (isSupabaseConfigured && profileStatus !== 'ready') {
+      navigate(`/seller/${user!.sellerId}`);
+      return;
+    }
+    void (async () => {
+      setActionError('');
+      try {
+        const thread = isSupabaseConfigured
+          ? await startMarketplaceConversation(listing!.id, user!.id)
+          : getOrCreateThreadForListing(listing!.id);
+        navigate(`/chat/${thread.id}`);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Could not start conversation');
+      }
+    })();
   }
 
   function handleBuy() {
@@ -178,10 +273,11 @@ export default function ListingDetail() {
         <button
           type="button"
           className="listing-detail__like"
-          aria-label={liked ? 'Unlike' : 'Like'}
+          aria-label={favorite ? 'Unlike' : 'Like'}
           onClick={handleLike}
+          disabled={favoriteSaving}
         >
-          {liked ? '❤️' : '🤍'}
+          {favorite ? '❤️' : '🤍'}
         </button>
       </div>
 
@@ -200,6 +296,7 @@ export default function ListingDetail() {
         </div>
 
         <p className="listing-detail__desc">{listing.description}</p>
+        {actionError && <p className="listing-detail__meta" role="alert">{actionError}</p>}
 
         <Link to={`/seller/${seller.id}`} className="listing-detail__seller">
           <Avatar emoji={seller.avatarEmoji} size={44} />

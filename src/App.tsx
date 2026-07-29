@@ -5,10 +5,14 @@ import ListingDetail from './screens/ListingDetail';
 import SellerProfile from './screens/SellerProfile';
 import CreateListing from './screens/CreateListing';
 import Login from './screens/Login';
+import ResetPassword from './screens/ResetPassword';
 import Checkout from './screens/Checkout';
 import Inbox from './screens/Inbox';
 import Chat from './screens/Chat';
+import SavedListings from './screens/SavedListings';
 import ClawPanel from './claw/ClawPanel';
+import RequireAuth from './components/RequireAuth';
+import AuthProvider from './auth/AuthProvider';
 import { getUser, subscribe } from './data/store';
 
 // Routes where the bottom tab bar is hidden — full-screen / transactional flows.
@@ -17,6 +21,7 @@ function showBottomNav(pathname: string): boolean {
   if (pathname.startsWith('/checkout/')) return false;
   if (pathname.startsWith('/chat/')) return false;
   if (pathname === '/login') return false;
+  if (pathname === '/reset-password') return false;
   return true;
 }
 
@@ -39,6 +44,13 @@ function BottomNav() {
       >
         <span className="bottom-nav__icon" aria-hidden="true">🏠</span>
         Home
+      </Link>
+      <Link
+        to="/saved"
+        className={`bottom-nav__item${location.pathname === '/saved' ? ' is-active' : ''}`}
+      >
+        <span className="bottom-nav__icon" aria-hidden="true">🤍</span>
+        Saved
       </Link>
       <Link
         to="/sell"
@@ -76,11 +88,20 @@ function AppShell() {
           <Route path="/" element={<Feed />} />
           <Route path="/listing/:id" element={<ListingDetail />} />
           <Route path="/seller/:id" element={<SellerProfile />} />
-          <Route path="/sell" element={<CreateListing />} />
-          <Route path="/checkout/:id" element={<Checkout />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/chat/:id" element={<Chat />} />
+          <Route path="/sell" element={<RequireAuth><CreateListing /></RequireAuth>} />
+          <Route path="/checkout/:id" element={<RequireAuth><Checkout /></RequireAuth>} />
+          <Route path="/inbox" element={<RequireAuth><Inbox /></RequireAuth>} />
+          <Route path="/saved" element={<RequireAuth><SavedListings /></RequireAuth>} />
+          <Route path="/chat/:id" element={<RequireAuth><Chat /></RequireAuth>} />
           <Route path="/login" element={<Login />} />
+          <Route
+            path="/reset-password"
+            element={(
+              <RequireAuth requireProfile={false} requireRecovery>
+                <ResetPassword />
+              </RequireAuth>
+            )}
+          />
         </Routes>
       </div>
       <BottomNav />
@@ -93,9 +114,11 @@ function AppShell() {
 export default function App() {
   return (
     <HashRouter>
-      <div className="app-shell">
-        <AppShell />
-      </div>
+      <AuthProvider>
+        <div className="app-shell">
+          <AppShell />
+        </div>
+      </AuthProvider>
     </HashRouter>
   );
 }
