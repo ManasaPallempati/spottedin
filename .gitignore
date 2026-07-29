@@ -12,5 +12,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+supabase/.temp/
+
 .vscode/*
 !.vscode/extensions.json
+
+Spotted_ Fashion marketplace UI.zip

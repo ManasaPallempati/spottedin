@@ -19,10 +19,12 @@ activated or tested.
 5. A concurrent-payment conflict is recorded as `payment_conflict`; it must
    enter a reviewed refund workflow before production.
 
-This foundation collects a buyer payment into the Spotted In Razorpay merchant
-account. It does **not** pay sellers. A real marketplace requires Razorpay
-Route (or an approved alternative), seller Linked Accounts/KYC, transfers,
-settlement timing, reversals, refunds, and reconciliation.
+Spotted In will use Razorpay Route. After a captured payment, the backend
+creates one idempotently claimed transfer for the item price to the seller's
+activated Linked Account, with settlement held indefinitely. Delivery moves
+that transfer to `ready_to_release`; it does **not** release money
+automatically. Release timing remains gated on the returns/disputes policy.
+Sellers cannot create, activate, retry, or release transfers from the browser.
 
 Official references:
 
@@ -32,11 +34,14 @@ Official references:
 - https://razorpay.com/docs/webhooks/payments/
 - https://razorpay.com/docs/payments/route/
 - https://razorpay.com/docs/payments/route/linked-account/
+- https://razorpay.com/docs/api/payments/route/create-transfers-payments/
+- https://razorpay.com/docs/api/payments/route/modify-settlement-hold/
 
 ## Shiprocket flow
 
-1. Sellers need an enabled `seller_fulfillment` row whose pickup location
-   already exists in the connected Shiprocket account.
+1. Spotted In uses one Shiprocket account. Sellers need an enabled
+   `seller_fulfillment` row whose approved pickup location already exists in
+   that central account.
 2. `shiprocket-serviceability` calls the provider with pickup/delivery postal
    codes, package weight, and prepaid/COD mode, then returns sanitized courier
    choices.
@@ -79,17 +84,17 @@ web URL plus localhost during development.
 
 - Hosted Supabase staging project and successful database/RLS tests.
 - Razorpay merchant onboarding/KYC and test keys.
-- Marketplace-of-record decision and Razorpay Route/Linked Account approval
-  before seller payouts are implemented.
+- Razorpay Route activation, seller Linked Account/KYC onboarding, and test
+  transfers with settlement holds.
 - Razorpay Test-mode webhook pointed at `razorpay-webhook`.
 - Shiprocket account/API user, wallet funding, pickup-location setup, and API
   credentials.
-- Shipping ownership decision: one Spotted In account with approved
-  seller-specific pickup locations, or separate seller-owned carrier accounts.
+- Approved seller-specific pickup locations in the central Spotted In
+  Shiprocket account.
 - Shiprocket webhook pointed at `delivery-webhook` with the configured
   `x-api-key`.
-- Address form, seller fulfillment onboarding, refunds, cancellations,
-  returns/RTO, and customer-support policy.
+- Seller fulfillment onboarding, refunds, cancellations, returns/RTO,
+  payout-release timing, and customer-support policy.
 - End-to-end test: quote -> test payment -> verified webhook -> create
   shipment -> AWB -> pickup -> tracking event.
 

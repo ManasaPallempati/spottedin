@@ -48,6 +48,49 @@ export function fetchRazorpayPayment(paymentId: string) {
   return request(`/payments/${encodeURIComponent(paymentId)}`);
 }
 
+export function createHeldRouteTransfer(input: {
+  paymentId: string;
+  accountId: string;
+  amountPaise: number;
+  notes: Record<string, string>;
+}) {
+  return request(`/payments/${encodeURIComponent(input.paymentId)}/transfers`, {
+    method: 'POST',
+    body: JSON.stringify({
+      transfers: [{
+        account: input.accountId,
+        amount: input.amountPaise,
+        currency: 'INR',
+        notes: input.notes,
+        linked_account_notes: Object.keys(input.notes),
+        on_hold: true,
+      }],
+    }),
+  });
+}
+
+export async function createRouteLinkedAccount(input: Record<string, unknown>) {
+  const { keyId, keySecret } = credentials();
+  const response = await fetch('https://api.razorpay.com/v2/accounts', {
+    method: 'POST',
+    headers: {
+      authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) throw new Error(`Razorpay ${response.status}: ${JSON.stringify(payload)}`);
+  return payload;
+}
+
+export function modifyRouteTransferHold(transferId: string, onHold: boolean) {
+  return request(`/transfers/${encodeURIComponent(transferId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ on_hold: onHold }),
+  });
+}
+
 export async function verifyCheckoutSignature(
   orderId: string,
   paymentId: string,

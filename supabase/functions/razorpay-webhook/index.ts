@@ -1,6 +1,7 @@
 import { errorResponse, json } from '../_shared/http.ts';
 import { adminClient } from '../_shared/supabase.ts';
 import { verifyRazorpayWebhook } from '../_shared/razorpay.ts';
+import { ensureHeldSellerTransfer } from '../_shared/route.ts';
 
 Deno.serve(async (request) => {
   try {
@@ -41,16 +42,39 @@ Deno.serve(async (request) => {
         .eq('razorpay_order_id', providerOrderId)
         .maybeSingle();
       if (order && (eventType === 'payment.captured' || eventType === 'order.paid')) {
-        await admin.rpc('finalize_paid_commerce_order', {
+        const { data: finalStatus, error: finalizeError } = await admin.rpc('finalize_paid_commerce_order', {
           target_order_id: order.id,
           target_payment_id: paymentId,
         });
+        if (finalizeError) throw finalizeError;
+        if (finalStatus === 'paid') {
+          await ensureHeldSellerTransfer(order.id).catch((transferError: unknown) => {
+            console.error('Could not create held seller transfer', transferError);
+          });
+        }
       } else if (order && eventType === 'payment.failed') {
         await admin.from('commerce_orders')
           .update({ status: 'payment_failed', razorpay_payment_id: paymentId || null })
           .eq('id', order.id)
           .in('status', ['payment_pending', 'payment_authorized']);
       }
+    }
+
+    const transfer = payload.payload?.transfer?.entity ?? {};
+    const transferId = String(transfer.id ?? '');
+    if (transferId) {
+      const providerStatus = String(transfer.status ?? '');
+      const mappedStatus = providerStatus === 'processed' ? (transfer.on_hold ? 'on_hold' : 'processed')
+        : providerStatus === 'reversed' ? 'reversed'
+        : providerStatus === 'partially_reversed' ? 'partially_reversed'
+        : providerStatus === 'failed' ? 'failed'
+        : 'creating';
+      await admin.from('route_transfers').update({
+        status: mappedStatus,
+        settlement_status: transfer.settlement_status ?? null,
+        on_hold: Boolean(transfer.on_hold),
+        last_error: transfer.error?.description ?? null,
+      }).eq('razorpay_transfer_id', transferId);
     }
     await admin.from('provider_events')
       .update({ processed_at: new Date().toISOString() })

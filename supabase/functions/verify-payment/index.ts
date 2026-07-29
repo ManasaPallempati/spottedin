@@ -1,6 +1,7 @@
 import { corsHeaders, errorResponse, handleOptions, json } from '../_shared/http.ts';
 import { adminClient, requireUser } from '../_shared/supabase.ts';
 import { fetchRazorpayPayment, verifyCheckoutSignature } from '../_shared/razorpay.ts';
+import { ensureHeldSellerTransfer } from '../_shared/route.ts';
 
 Deno.serve(async (request) => {
   const cors = corsHeaders(request);
@@ -46,6 +47,11 @@ Deno.serve(async (request) => {
         { target_order_id: order.id, target_payment_id: body.razorpayPaymentId },
       );
       if (finalizeError) throw finalizeError;
+      if (finalStatus === 'paid') {
+        await ensureHeldSellerTransfer(order.id).catch((transferError: unknown) => {
+          console.error('Could not create held seller transfer', transferError);
+        });
+      }
       return json({ status: finalStatus }, 200, cors);
     }
     if (payment.status === 'authorized') {

@@ -56,7 +56,10 @@ select ok(not has_table_privilege('authenticated', 'public.favorites', 'UPDATE')
 select ok(has_table_privilege('authenticated', 'public.conversations', 'SELECT'), 'authenticated users can read permitted conversations');
 select ok(not has_table_privilege('authenticated', 'public.conversations', 'INSERT'), 'clients cannot insert conversations directly');
 select ok(not has_table_privilege('authenticated', 'public.conversation_members', 'INSERT'), 'clients cannot add conversation members directly');
-select ok(has_table_privilege('authenticated', 'public.messages', 'INSERT'), 'authenticated members can insert messages');
+select ok(
+  has_column_privilege('authenticated', 'public.messages', 'body', 'INSERT'),
+  'authenticated members can insert message bodies'
+);
 select ok(not has_table_privilege('authenticated', 'public.messages', 'UPDATE'), 'messages are immutable');
 select ok(
   has_function_privilege('authenticated', 'public.start_conversation(uuid)', 'EXECUTE'),

@@ -49,10 +49,17 @@ Deno.serve(async (request) => {
     } else if (eventError) {
       throw eventError;
     }
-    await admin.from('shipments').update({
-      status: shipmentStatus(currentStatus),
+    const nextStatus = shipmentStatus(currentStatus);
+    const { data: shipment, error: shipmentError } = await admin.from('shipments').update({
+      status: nextStatus,
       tracking_payload: payload,
-    }).eq('awb_code', awb);
+    }).eq('awb_code', awb).select('order_id').maybeSingle();
+    if (shipmentError) throw shipmentError;
+    if (shipment && nextStatus === 'delivered') {
+      await admin.from('route_transfers').update({
+        status: 'ready_to_release',
+      }).eq('order_id', shipment.order_id).eq('status', 'on_hold');
+    }
     await admin.from('provider_events')
       .update({ processed_at: new Date().toISOString() })
       .eq('provider', 'shiprocket')

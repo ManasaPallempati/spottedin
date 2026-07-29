@@ -46,8 +46,27 @@ declare global {
 
 async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await requireSupabase().functions.invoke(name, { body });
-  if (error) throw error;
+  if (error) {
+    const response = (error as { context?: Response }).context;
+    if (response) {
+      const payload = await response.clone().json().catch(() => null) as { error?: unknown } | null;
+      if (typeof payload?.error === 'string') throw new Error(payload.error);
+    }
+    throw error;
+  }
   return data as T;
+}
+
+export function validateShippingAddress(address: ShippingAddress): string | null {
+  if (!address.name.trim()) return 'Enter the recipient name.';
+  const phone = address.phone.replace(/^\+91/, '');
+  if (!/^[6-9][0-9]{9}$/.test(phone)) return 'Enter a valid 10-digit Indian mobile number.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email.trim())) return 'Enter a valid email address.';
+  if (!address.line1.trim()) return 'Enter the delivery address.';
+  if (!address.city.trim()) return 'Enter the city.';
+  if (!address.state.trim()) return 'Enter the state.';
+  if (!/^[1-9][0-9]{5}$/.test(address.postalCode)) return 'Enter a valid 6-digit Indian PIN code.';
+  return null;
 }
 
 export async function getCourierOptions(
