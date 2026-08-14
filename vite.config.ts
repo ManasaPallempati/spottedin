@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    base: '/maanster-market/',
+    base: '/',
     plugins: [
       react(),
       VitePWA({
@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
         // sessions, listings, and messages must never be served stale.
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          navigateFallback: '/maanster-market/index.html',
+          navigateFallback: '/index.html',
           cleanupOutdatedCaches: true,
         },
         manifest: {
@@ -51,9 +51,9 @@ export default defineConfig(({ mode }) => {
           short_name: 'Maanster',
           description:
             'Pre-loved resale marketplace for India. Buy and sell fashion, sneakers, electronics, home goods and vintage finds.',
-          id: '/maanster-market/',
-          start_url: '/maanster-market/',
-          scope: '/maanster-market/',
+          id: '/',
+          start_url: '/',
+          scope: '/',
           display: 'standalone',
           orientation: 'portrait',
           background_color: '#FAFAF7',

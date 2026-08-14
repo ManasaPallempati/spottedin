@@ -81,4 +81,6 @@ All app state goes through `src/data/store.ts` — components never touch
 ## Deploy
 
 Pushes to `main` build and publish to GitHub Pages via
-`.github/workflows/deploy.yml` (base path `/maanster-market/`).
+`.github/workflows/deploy.yml`, served at the custom domain `spottedin.co`.
+Pushes to `testing` deploy to the staging environment at
+`staging.spottedin.co` (via Netlify).
