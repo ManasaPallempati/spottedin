@@ -1,0 +1,90 @@
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-bar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.filter-bar-chip-active {
+  border-color: transparent;
+  background: #fff;
+  color: #000;
+}
+
+.light .filter-bar-chip-active {
+  background: #000;
+  color: #fff;
+}
+
+.filter-bar-sort {
+  margin-left: auto;
+}
+
+.filter-bar-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-bar-sheet-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.filter-bar-clear {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 8px;
+}
+
+.filter-bar-show {
+  flex: 1;
+}
+
+.filter-bar-sort-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-bar-sort-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 4px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.filter-bar-sort-option:last-child {
+  border-bottom: none;
+}
+
+.filter-bar-sort-check {
+  font-weight: 700;
+}

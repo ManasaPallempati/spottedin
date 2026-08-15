@@ -1,0 +1,75 @@
+/* Onboarding shared chrome (Sizes + Brands) — owned by the onboarding agent */
+
+.onboarding-page {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.onboarding-topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px 0;
+  flex-shrink: 0;
+}
+
+.skip-pill {
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+}
+
+.onboarding-header {
+  padding: 12px 20px 20px;
+  flex-shrink: 0;
+}
+
+.onboarding-header h1 {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.onboarding-header p {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.onboarding-cta-bar {
+  flex-shrink: 0;
+  padding: 12px 20px 20px;
+}
+
+.onboarding-cta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  font-size: 17px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.onboarding-cta-active {
+  background: #000;
+  color: #fff;
+}
+
+/* Both onboarding screens use ~52px-tall chip pills; width/layout is set per screen. */
+.onboarding-page .chip {
+  height: 52px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+}

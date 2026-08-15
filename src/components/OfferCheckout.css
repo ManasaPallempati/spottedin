@@ -1,0 +1,114 @@
+/* owned by Agent B — Round 4 */
+
+.offer-checkout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.offer-checkout-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.offer-checkout-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.offer-checkout-address {
+  font-size: 15px;
+}
+
+.offer-checkout-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.offer-checkout-demo-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+
+.offer-checkout-summary {
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.offer-checkout-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.offer-checkout-summary-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid var(--hairline);
+}
+
+.offer-checkout-pay-error {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.offer-checkout-place-btn {
+  width: 100%;
+}
+
+/* --- confirmation view --- */
+
+.offer-checkout-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 4px;
+  text-align: center;
+}
+
+.offer-checkout-confirm-icon {
+  color: var(--success);
+  margin-bottom: 8px;
+}
+
+.offer-checkout-confirm-title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.offer-checkout-confirm-id {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.offer-checkout-confirm-copy {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.offer-checkout-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}

@@ -1,124 +1,143 @@
-import { useEffect, useState } from 'react';
-import { HashRouter, Link, Route, Routes, useLocation } from 'react-router-dom';
-import Feed from './screens/Feed';
-import ListingDetail from './screens/ListingDetail';
-import SellerProfile from './screens/SellerProfile';
-import CreateListing from './screens/CreateListing';
-import Login from './screens/Login';
-import ResetPassword from './screens/ResetPassword';
-import Checkout from './screens/Checkout';
-import Inbox from './screens/Inbox';
-import Chat from './screens/Chat';
-import SavedListings from './screens/SavedListings';
-import ClawPanel from './claw/ClawPanel';
-import RequireAuth from './components/RequireAuth';
-import AuthProvider from './auth/AuthProvider';
-import { getUser, subscribe } from './data/store';
+import { useEffect } from 'react'
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import BottomNav from './components/BottomNav'
+import { supabase } from './lib/supabase'
+import { AuthProvider, useAuth } from './lib/auth'
+import { AppStateProvider } from './lib/appState'
+import { safeNext } from './lib/safeNext'
+import Welcome from './pages/Welcome'
+import Landing from './pages/Landing'
+import Home from './pages/Home'
+import Discover from './pages/Discover'
+import Sell from './pages/Sell'
+import Inbox from './pages/Inbox'
+import Profile from './pages/Profile'
+import Product from './pages/Product'
+import Shop from './pages/Shop'
+import Search from './pages/Search'
+import Likes from './pages/Likes'
+import Bag from './pages/Bag'
+import Thread from './pages/Thread'
+import Sizes from './pages/onboarding/Sizes'
+import Brands from './pages/onboarding/Brands'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import SellNew from './pages/SellNew'
+import Category from './pages/Category'
+import { setPageIndexing } from './lib/seo'
 
-// Routes where the bottom tab bar is hidden — full-screen / transactional flows.
-function showBottomNav(pathname: string): boolean {
-  if (pathname.startsWith('/listing/')) return false;
-  if (pathname.startsWith('/checkout/')) return false;
-  if (pathname.startsWith('/chat/')) return false;
-  if (pathname === '/login') return false;
-  if (pathname === '/reset-password') return false;
-  return true;
+function RouteIndexingPolicy() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const pageOwnsIndexing =
+      location.pathname === '/' ||
+      location.pathname === '/about' ||
+      location.pathname === '/home' ||
+      location.pathname.startsWith('/category/') ||
+      location.pathname.startsWith('/listing/') ||
+      location.pathname.startsWith('/p/')
+
+    if (!pageOwnsIndexing) {
+      setPageIndexing(false)
+    }
+  }, [location.pathname])
+
+  return null
 }
 
-function BottomNav() {
-  const location = useLocation();
-  const [user, setUser] = useState(() => getUser());
+// After an OAuth round-trip the browser reloads at the app root with a fresh session but
+// no in-memory `next`. We stash the intended destination in sessionStorage before leaving
+// (see Login) and consume it here once the session settles.
+function OAuthReturn() {
+  const { isAuthed } = useAuth()
+  const navigate = useNavigate()
 
-  useEffect(() => subscribe(() => setUser(getUser())), []);
+  useEffect(() => {
+    if (!isAuthed) return
+    const pending = sessionStorage.getItem('spotted_oauth_next')
+    if (!pending) return
+    sessionStorage.removeItem('spotted_oauth_next')
+    navigate(safeNext(pending), { replace: true })
+  }, [isAuthed, navigate])
 
-  if (!showBottomNav(location.pathname)) return null;
-
-  const profilePath = user ? `/seller/${user.sellerId}` : '/login';
-  const isProfileActive = location.pathname.startsWith('/seller/');
-
-  return (
-    <nav className="bottom-nav">
-      <Link
-        to="/"
-        className={`bottom-nav__item${location.pathname === '/' ? ' is-active' : ''}`}
-      >
-        <span className="bottom-nav__icon" aria-hidden="true">🏠</span>
-        Home
-      </Link>
-      <Link
-        to="/saved"
-        className={`bottom-nav__item${location.pathname === '/saved' ? ' is-active' : ''}`}
-      >
-        <span className="bottom-nav__icon" aria-hidden="true">🤍</span>
-        Saved
-      </Link>
-      <Link
-        to="/sell"
-        className={`bottom-nav__item${location.pathname === '/sell' ? ' is-active' : ''}`}
-      >
-        <span className="bottom-nav__sell" aria-hidden="true">➕</span>
-        Sell
-      </Link>
-      <Link
-        to="/inbox"
-        className={`bottom-nav__item${location.pathname === '/inbox' ? ' is-active' : ''}`}
-      >
-        <span className="bottom-nav__icon" aria-hidden="true">💬</span>
-        Inbox
-      </Link>
-      <Link
-        to={profilePath}
-        className={`bottom-nav__item${isProfileActive ? ' is-active' : ''}`}
-      >
-        <span className="bottom-nav__icon" aria-hidden="true">🧑</span>
-        Profile
-      </Link>
-    </nav>
-  );
+  return null
 }
 
 function AppShell() {
-  const location = useLocation();
-  const hasNav = showBottomNav(location.pathname);
+  const location = useLocation()
+  // The sign-in gate and marketing page own the full viewport rather than the
+  // marketplace's mobile-width column.
+  const isFullBleed = location.pathname === '/' || location.pathname === '/about'
+  const hideNav =
+    isFullBleed ||
+    location.pathname === '/login' ||
+    location.pathname === '/signup' ||
+    location.pathname === '/sell' ||
+    location.pathname === '/sell/new' ||
+    location.pathname.startsWith('/onboarding')
+
+  useEffect(() => {
+    // one screen-ping per route change; anon insert-only, never blocks the UI
+    let sid = sessionStorage.getItem('spotted_sid')
+    if (!sid) {
+      sid = Math.random().toString(36).slice(2, 12)
+      sessionStorage.setItem('spotted_sid', sid)
+    }
+    supabase
+      .from('app_opens')
+      .insert({
+        ua: navigator.userAgent.slice(0, 300),
+        path: location.pathname,
+        session_id: sid,
+      })
+      .then(() => undefined, () => undefined)
+  }, [location.pathname])
 
   return (
-    <div className="app-frame">
-      <div className={`app-content${hasNav ? '' : ' app-content--no-nav'}`}>
-        <Routes>
-          <Route path="/" element={<Feed />} />
-          <Route path="/listing/:id" element={<ListingDetail />} />
-          <Route path="/seller/:id" element={<SellerProfile />} />
-          <Route path="/sell" element={<RequireAuth><CreateListing /></RequireAuth>} />
-          <Route path="/checkout/:id" element={<RequireAuth><Checkout /></RequireAuth>} />
-          <Route path="/inbox" element={<RequireAuth><Inbox /></RequireAuth>} />
-          <Route path="/saved" element={<RequireAuth><SavedListings /></RequireAuth>} />
-          <Route path="/chat/:id" element={<RequireAuth><Chat /></RequireAuth>} />
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/reset-password"
-            element={(
-              <RequireAuth requireProfile={false} requireRecovery>
-                <ResetPassword />
-              </RequireAuth>
-            )}
-          />
-        </Routes>
-      </div>
-      <BottomNav />
-      {/* CLAW_MOUNT */}
-      <ClawPanel />
+    <div className={isFullBleed ? 'app-shell app-shell--full' : 'app-shell'}>
+      <RouteIndexingPolicy />
+      <OAuthReturn />
+      <Routes>
+        <Route path="/" element={<Welcome />} />
+        {/* The marketing page kept its metadata and category links; it is the only
+            other route allowed to own indexing (see RouteIndexingPolicy). */}
+        <Route path="/about" element={<Landing />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="/discover" element={<Discover />} />
+        <Route path="/sell" element={<Sell />} />
+        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/listing/:id/:slug" element={<Product />} />
+        <Route path="/listing/:id" element={<Product />} />
+        <Route path="/p/:id" element={<Product />} />
+        <Route path="/shop/:handle" element={<Shop />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/category/:slug" element={<Category />} />
+        <Route path="/likes" element={<Likes />} />
+        <Route path="/bag" element={<Bag />} />
+        <Route path="/inbox/t/:handle" element={<Thread />} />
+        <Route path="/onboarding/sizes" element={<Sizes />} />
+        <Route path="/onboarding/brands" element={<Brands />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/sell/new" element={<SellNew />} />
+        {/* Without this an unmatched hash renders an empty shell rather than a page. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      {!hideNav && <BottomNav />}
     </div>
-  );
+  )
 }
 
 export default function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <div className="app-shell">
+        <AppStateProvider>
           <AppShell />
-        </div>
+        </AppStateProvider>
       </AuthProvider>
     </HashRouter>
-  );
+  )
 }

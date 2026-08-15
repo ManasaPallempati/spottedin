@@ -1,0 +1,185 @@
+/* owned by the "shop" agent — Round 1 */
+
+.shop-page {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 96px;
+}
+
+.shop-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 20px 20px;
+}
+
+.shop-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.shop-handle {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 12px;
+}
+
+.shop-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.shop-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text);
+}
+
+.shop-review-count {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.shop-new-seller {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+.shop-loading {
+  min-height: 100dvh;
+}
+
+.shop-sold {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.shop-follow-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.shop-follow-stat {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.shop-follow-btn {
+  border-radius: var(--radius-pill);
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.shop-follow-btn-solid {
+  background: #fff;
+  color: #000;
+}
+
+.shop-follow-btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--hairline);
+}
+
+.shop-name {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin-top: 12px;
+}
+
+.shop-bio {
+  font-size: 15px;
+  color: var(--text);
+  margin-top: 4px;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-message-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  padding: 10px 24px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.shop-tabs {
+  display: flex;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.shop-tab {
+  flex: 1;
+  padding: 14px 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+  border-bottom: 3px solid transparent;
+}
+
+.shop-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.shop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.shop-likes-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 0 20px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 17px;
+}
+
+.shop-not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 100dvh;
+  padding-bottom: 96px;
+  text-align: center;
+}
+
+.shop-not-found-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-dim);
+}

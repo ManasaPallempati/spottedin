@@ -1,86 +1,72 @@
-# Maanster Market
+# Spotted (spottedin-c)
 
-Depop/Poshmark-style pre-loved resale marketplace for India. V1 is a
-web MVP with seeded local demo data and an attachable Supabase backend. Prices
-in ₹.
-
-This branch contains Supabase email/password authentication, durable public
-profiles, cloud-backed listings, listing-photo storage, favorites, and basic
-messaging. Feed, Listing Detail, Sell, Saved, Inbox, Chat, and Seller Profile
-use Supabase when public configuration is present. Until that configuration is supplied, local development uses clearly
-labeled browser-local demo auth and marketplace data. Demo passwords are
-salted PBKDF2 hashes, never plaintext, but demo mode is not production
-security and sends no email.
-
-See `AUTH_ROLLOUT.md` for the staging, CAPTCHA, SMTP, database-test, and
-deployment gates. Phone OTP remains disabled pending provider budget and TRAI
-DLT compliance.
-
-The product name and future visual direction are recorded in
-`BRAND_DIRECTION.md`. The current Maanster Market styling is prototype UI, not
-the approved Spotted In brand.
-
-The credential-safe Razorpay and Shiprocket implementation and its activation
-gates are documented in `COMMERCE_INTEGRATION.md`.
-
-**Pre-loved. Re-loved.**
-
-See `CONTRACT.md` for the full build spec (this is the source of truth for all
-agents working on this repo).
+Depop-style resale marketplace UI for India — mobile-first web app, dark visual system,
+₹ pricing, mock data. Built to match the reference screen set in [CONTRACT.md](CONTRACT.md),
+which is the source of truth for every screen, token, and copy string.
 
 ## Stack
 
-- Vite + React 18 + TypeScript
-- `react-router-dom` v6 (`HashRouter`, for static-host-friendly routing)
-- Hand-rolled CSS with custom properties (`src/styles/tokens.css`) — no UI library
+Vite 5 · React 18 · TypeScript · react-router-dom (HashRouter) · lucide-react ·
+hand-rolled CSS with design tokens in `src/styles/global.css`.
 
-## Scripts
+## Run
 
 ```bash
 npm install
-npm run dev       # local dev server
-npm run build     # type-check + production build to dist/
-npm run preview   # preview the production build
-npm test          # authentication unit tests
+npm run dev      # http://localhost:5173
+npm run build    # production build (base './', GitHub Pages ready)
 ```
 
-## Install on an iPhone
+## Screens
 
-The app is an installable PWA, so it reaches a phone home screen without the
-App Store. The service worker only ships in a production build, so `npm run
-dev` will not show install behaviour — use `npm run preview` or the deployed
-site.
+| Route | Screen |
+|---|---|
+| `/` | Public landing page (full-width marketing page, no nav) |
+| `/home` | Home feed (search, promo strip, greeting, 2-col listing grid) |
+| `/login` | Sign in — Google, Facebook, and email/password (no nav) |
+| `/signup` | Email sign-up (no nav) |
+| `/discover` | Discover (hero carousel, outfits module, categories) |
+| `/sell` | Sell splash (no-fees onboarding, no nav) |
+| `/inbox` | Inbox (filter chips, empty state) |
+| `/profile` | Profile (tabs, stats, earnings, promo card, empty listings) |
+| `/onboarding/sizes` | Sizes picker (light theme) |
+| `/onboarding/brands` | Brand picker → feed (light theme) |
 
-1. Open the site in **Safari** on iOS (Chrome on iOS cannot install PWAs).
-2. Share → **Add to Home Screen** → Add.
-3. Launch it from the home screen. It opens standalone, with no Safari chrome.
+`/` is the public landing; the marketplace feed lives at `/home`, and the floating
+`BottomNav` is hidden on the landing and on the auth routes (`/login`, `/signup`).
 
-Precaching covers the built shell only. Supabase requests are deliberately left
-out of `runtimeCaching` so auth sessions, listings, and messages are never
-served stale.
+## Auth
 
-Native (Expo/React Native) is a later phase — see `MOBILE_STRATEGY.md`.
+`/login` offers Google, Facebook, and email/password sign-in; `/signup` keeps email
+sign-up. Social sign-in uses Supabase OAuth (`supabase.auth.signInWithOAuth`) — no
+provider secrets live in the app. The `next` redirect target is validated as an internal
+path (`src/lib/safeNext.ts`) and preserved across the OAuth round-trip via sessionStorage.
 
-## Structure
+The Supabase client sets `flowType: 'pkce'` because the app uses `HashRouter`: the default
+implicit flow returns the session in the URL fragment, which is where the router reads the
+route from, so the callback would land on an unmatched path. PKCE returns `?code=…` in the
+query string instead.
 
-```
-src/
-  data/          types, local demo store, Supabase client/profile/listing adapters
-  components/    shared UI: ListingCard, Avatar, PriceTag, TopBar, EmptyState
-  screens/       one file per route (Feed, ListingDetail, SellerProfile,
-                 CreateListing, Login, Checkout, Inbox, Chat)
-  claw/          ClawPanel dev-tools panel (hidden by default, see CONTRACT.md)
-  styles/        tokens.css (design tokens), global.css (resets + shared classes)
-  App.tsx        HashRouter + all routes + bottom tab nav shell
-  main.tsx       entry point
-```
+Google and Facebook must be enabled in the Supabase dashboard (Authentication →
+Providers), with each provider's client ID/secret and the redirect/callback URL
+configured there. That dashboard step is external to this repo and is **not** performed by
+the app — until it is done, the social buttons surface the provider's "not enabled" error.
 
-All app state goes through `src/data/store.ts` — components never touch
-`localStorage` directly.
+## Backend
 
-## Deploy
+The Home feed reads live listings from Supabase (staging project ref
+`masdygvcssrtwseopfmj`) via `src/lib/useListings.ts`. If the query errors or returns
+zero rows, it falls back to the mock listings in `src/data/mock.ts` so the grid is
+never blank.
 
-Pushes to `main` build and publish to GitHub Pages via
-`.github/workflows/deploy.yml`, served at the custom domain `spottedin.co`.
-Pushes to `testing` deploy to the staging environment at
-`staging.spottedin.co` (via Netlify).
+The client (`src/lib/supabase.ts`) reads `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` from the environment, falling back to the staging project's
+public URL and anon key if unset. To point at a different project, set both in a
+local `.env` file — Vite picks up `VITE_`-prefixed vars automatically.
+
+## History
+
+Spotted was previously spread across four repos. As of 2026-08-13 this repo is the only
+active one; `spottedin`, `spottedin-b`, and `maanster-market` are archived on GitHub.
+Design plans, the price-drop engine, and auth/commerce notes worth keeping were copied
+into [docs/salvage/](docs/salvage/README.md), which records what came from where.

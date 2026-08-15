@@ -2,33 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "maanster-dev",
+      "name": "spottedin-c-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5183", "--strictPort"],
-      "port": 5183
-    },
-    {
-      "name": "maanster-preview",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--", "--port", "4180", "--strictPort"],
-      "port": 4180
-    },
-    {
-      "name": "spotted-public",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:/Users/augel/spottedin-b", "run", "start", "--", "-p", "3100"],
-      "port": 3100
-    },
-    {
-      "name": "spotted",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:/Users/augel/spottedin-b", "run", "dev"],
-      "port": 3000
-    },
-    {
-      "name": "spottedin-c",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:/Users/augel/Claude/Projects/spottedin-c", "run", "dev"],
+      "runtimeArgs": ["run", "dev"],
       "port": 5173
     }
   ]

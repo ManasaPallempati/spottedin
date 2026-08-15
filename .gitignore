@@ -1,19 +1,13 @@
 node_modules
 dist
-dist-ssr
-*.local
-.env
-.env.*
-!.env.example
+*.tsbuildinfo
 
-.DS_Store
-Thumbs.db
-
-*.log
-npm-debug.log*
-
-.vscode/*
-!.vscode/extensions.json
-
-supabase/.temp/
-Spotted_ Fashion marketplace UI.zip
+# Local AI-history tooling and its output. history_organizer_output/ is ~57MB of
+# private ChatGPT/Claude/Codex transcripts; this repo is public, and git history
+# is permanent, so these must never be committed here.
+history_organizer_output/
+history_organizer.py
+history_organizer_ui.py
+launch_history_organizer_ui.bat
+restore_codex_sessions.py
+restore_codex_sessions.bat
