@@ -669,3 +669,53 @@ shipping (`payments.charged_inr`), matching the displayed Total.
 | Agent | Owns |
 |---|---|
 | payments | supabase/round6-razorpay-checkout.sql, supabase/functions/*, src/lib/payments.ts, src/lib/appState.tsx (`applyPaidOrder` only), src/pages/Bag.tsx, src/pages/bag.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, docs/launch/RAZORPAY.md, CONTRACT.md |
+
+## Round 7 — legible auth failures (partial backfill)
+
+Commit 6b47b83 shipped `friendlyAuthError` without a CONTRACT.md entry — this round
+backfills it and completes the fix its message promised. Supabase surfaces auth failures
+as raw API strings; the ones we expect are translated into copy a visitor can act on, and
+anything unrecognised passes through unchanged (with a `console.warn`) so a new error is
+never swallowed.
+
+`friendlyAuthError(error, provider?)` in `src/lib/auth.tsx` takes the `AuthError`-shaped
+object and matches on the stable `error.code` first (`invalid_credentials`,
+`email_not_confirmed`, `user_already_exists`, `over_email_send_rate_limit`,
+`validation_failed`, `email_address_invalid`), falling back to lowercased
+message substrings for older shapes. A network branch catches `Failed to fetch`
+(`AuthRetryableFetchError`) — the most common real-world failure on mobile data.
+
+The OAuth path needed more than translation, because `signInWithOAuth` never returns an
+error in a browser (auth-js builds the authorize URL client-side and navigates away
+before any server response):
+
+- **Provider gating.** `ENABLED_OAUTH_PROVIDERS` (`src/lib/auth.tsx`) reads
+  `VITE_OAUTH_PROVIDERS` (comma-separated), defaulting to `google`. Login/Welcome render
+  a social button only for enabled providers, so a disabled provider (Facebook today) can
+  no longer strand the visitor on Supabase's raw 400 JSON page.
+- **Callback error parsing.** GoTrue bounce-backs put `error` / `error_code` /
+  `error_description` in the query string or the URL fragment; HashRouter previously
+  swallowed the fragment as an unmatched route (silent bounce to `/`). App bootstrap now
+  parses both locations, cleans the URL, stashes the translated message in
+  `sessionStorage` (`spotted_oauth_error`), and routes to `/login`, which shows it once
+  in the existing `role="alert"` region.
+
+User-facing copy strings added this round (source of truth):
+
+- "That email and password do not match. Please check and try again."
+- "Please confirm your email address first — check your inbox for the link."
+- "An account with that email already exists. Try logging in instead."
+- "Too many emails have been sent to this address. Please wait a while before trying again."
+- "That email address doesn't look valid — please check it and try again."
+- "<Provider> sign-in isn't available yet. Please continue with email." (generic form:
+  "This sign-in method isn't available yet. Please continue with email.")
+- "Couldn't connect. Please check your internet connection and try again."
+
+`src/pages/Welcome.tsx` also derives its structured-data `url` from `SITE_ORIGIN` instead
+of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
+
+### File ownership — Round 7
+
+| Agent | Owns |
+|---|---|
+| auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
