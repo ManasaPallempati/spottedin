@@ -8,7 +8,11 @@ type CanonicalMeta = {
   canonical?: string
 }
 
-export const SITE_ORIGIN = 'https://spottedin.co'
+// Canonical origin for this deployment. It is also the OAuth `redirectTo`
+// target (see pages/Login.tsx), so it must match the origin actually being
+// served — otherwise a staging sign-in bounces the user to production.
+// Staging sets VITE_SITE_ORIGIN; production falls back to the apex.
+export const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN ?? 'https://spottedin.co'
 const META_ID = 'spotted-seo-meta'
 const SCRIPT_ID = 'spotted-jsonld'
 
