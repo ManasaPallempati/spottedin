@@ -24,7 +24,7 @@ export default function Welcome() {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       name: 'Spotted',
-      url: 'https://www.spottedin.co/',
+      url: `${SITE_ORIGIN}/`,
       description: 'Resale marketplace for pre-owned Indian fashion.',
     })
   }, [])

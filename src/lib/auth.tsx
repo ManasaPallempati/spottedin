@@ -96,6 +96,35 @@ async function ensureProfile(userId: string, meta: { handle?: string; name?: str
   return null
 }
 
+// Supabase surfaces provider and rate-limit failures as raw API strings such as
+// "Unsupported provider: provider is not enabled". Those name internal causes the
+// visitor cannot act on, so the ones we expect are translated here and anything
+// unrecognised is passed through unchanged rather than swallowed.
+export function friendlyAuthError(message: string, provider?: OAuthProvider): string {
+  const m = message.toLowerCase()
+  const name = provider ? provider[0].toUpperCase() + provider.slice(1) : 'That provider'
+
+  if (m.includes('provider is not enabled') || m.includes('unsupported provider')) {
+    return `${name} sign-in isn't available yet. Please continue with email.`
+  }
+  if (m.includes('email rate limit') || m.includes('over_email_send_rate_limit')) {
+    return 'Too many sign-up emails have been sent recently. Please try again in a few minutes.'
+  }
+  if (m.includes('invalid login credentials')) {
+    return 'That email and password do not match. Please check and try again.'
+  }
+  if (m.includes('email not confirmed')) {
+    return 'Please confirm your email address first — check your inbox for the link.'
+  }
+  if (m.includes('user already registered') || m.includes('already been registered')) {
+    return 'An account with that email already exists. Try logging in instead.'
+  }
+  if (m.includes('email address') && m.includes('invalid')) {
+    return 'That email address was rejected. Please use a different one.'
+  }
+  return message
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -153,12 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { data: { handle, name } },
     })
-    return { error: error?.message ?? null }
+    return { error: error ? friendlyAuthError(error.message) : null }
   }
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+    return { error: error ? friendlyAuthError(error.message) : null }
   }
 
   // Redirects the browser to the provider on success; only returns here when the request
@@ -171,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider,
       options: { redirectTo: options?.redirectTo },
     })
-    return { error: error?.message ?? null }
+    return { error: error ? friendlyAuthError(error.message, provider) : null }
   }
 
   async function signOut(): Promise<void> {
