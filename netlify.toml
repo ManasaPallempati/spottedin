@@ -1,9 +1,15 @@
-# Staging host configuration (www.staging.spottedin.co), built from `testing`.
+# Netlify hosts both environments from this one repository:
 #
-# Production stays on GitHub Pages at spottedin.co via
-# .github/workflows/deploy.yml. Staging lives here because GitHub Pages cannot
-# rewrite arbitrary paths to the SPA shell with an HTTP 200 — see
-# docs/launch/STAGING_ROUTING.md, which recommends a rewrite-capable host.
+#   main    -> production  -> spottedin.co
+#   testing -> staging     -> www.staging.spottedin.co
+#
+# Branch-to-environment mapping lives here rather than in GitHub because a
+# GitHub Pages site is one-per-repository and cannot serve two environments.
+#
+# Netlify is also a rewrite-capable host, which docs/launch/STAGING_ROUTING.md
+# records as a prerequisite for moving off HashRouter: dynamic routes such as
+# /listing/<id>/<slug> must return the app shell with HTTP 200, and GitHub
+# Pages can only return 404 for them.
 
 [build]
   command = "npm run build"
@@ -12,26 +18,54 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Deep links such as /listing/<id>/<slug> return the app shell with a 200
-# rather than a 404. This is the capability GitHub Pages lacks.
+# Serve the SPA shell for any path instead of 404ing.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Staging must not be indexed alongside production.
-[[headers]]
+# --- Production (main) ---------------------------------------------------
+# VITE_SITE_ORIGIN is the canonical URL and the OAuth redirectTo target
+# (src/lib/seo.ts, src/pages/Login.tsx), so it must match the origin served.
+
+[context.production.environment]
+  VITE_SITE_ORIGIN = "https://spottedin.co"
+
+# --- Staging (testing) ---------------------------------------------------
+
+[context.testing.environment]
+  VITE_SITE_ORIGIN = "https://www.staging.spottedin.co"
+
+# Staging must never compete with production in search results.
+[[context.testing.headers]]
   for = "/*"
-  [headers.values]
+  [context.testing.headers.values]
     X-Robots-Tag = "noindex, nofollow"
 
-# Set these in the Netlify UI (Site settings -> Environment variables), not
-# here, so they are never committed:
+# --- Any other branch, and pull-request previews --------------------------
+# These get a generated URL that cannot be known ahead of time, so
+# VITE_SITE_ORIGIN is left unset and falls back to production. Sign-in will
+# therefore redirect to production from a preview; previews are for reviewing
+# UI, not for testing the auth round-trip.
+
+[[context.branch-deploy.headers]]
+  for = "/*"
+  [context.branch-deploy.headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[context.deploy-preview.headers]]
+  for = "/*"
+  [context.deploy-preview.headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# Set per-context in the Netlify UI (Site configuration -> Environment
+# variables), scoped to the matching deploy context:
 #
-#   VITE_SITE_ORIGIN       https://www.staging.spottedin.co
-#   VITE_SUPABASE_URL      <staging project URL>
-#   VITE_SUPABASE_ANON_KEY <staging project anon key>
+#   VITE_SUPABASE_URL       production -> live project
+#                           testing    -> staging project
+#   VITE_SUPABASE_ANON_KEY  production -> live project
+#                           testing    -> staging project
 #
-# VITE_SUPABASE_* are required. src/lib/supabase.ts falls back to the
-# production project, so leaving them unset points staging at the live
-# database and its real user accounts.
+# src/lib/supabase.ts falls back to the live project when these are unset, so
+# an unconfigured staging deploy writes to production data and its real user
+# accounts.
