@@ -1,7 +1,7 @@
-# Netlify hosts both environments from this one repository:
+# Two Netlify sites build from this one repository:
 #
-#   main    -> production  -> spottedin.co
-#   testing -> staging     -> www.staging.spottedin.co
+#   production site -> main         -> www.spottedin.co (apex redirects here)
+#   staging site    -> TEST2026.01  -> www.staging.spottedin.co
 #
 # Branch-to-environment mapping lives here rather than in GitHub because a
 # GitHub Pages site is one-per-repository and cannot serve two environments.
@@ -10,6 +10,12 @@
 # records as a prerequisite for moving off HashRouter: dynamic routes such as
 # /listing/<id>/<slug> must return the app shell with HTTP 200, and GitHub
 # Pages can only return 404 for them.
+#
+# Note on deploy contexts: each site builds its own designated branch, so both
+# sites resolve to the `production` context. A `[context.<branch>]` block would
+# therefore never fire on the staging site. Anything that must differ between
+# the two is set as a site-level environment variable in the Netlify UI, not
+# here — see the list at the bottom of this file.
 
 [build]
   command = "npm run build"
@@ -24,29 +30,10 @@
   to = "/index.html"
   status = 200
 
-# --- Production (main) ---------------------------------------------------
-# VITE_SITE_ORIGIN is the canonical URL and the OAuth redirectTo target
-# (src/lib/seo.ts, src/pages/Login.tsx), so it must match the origin served.
-
-[context.production.environment]
-  VITE_SITE_ORIGIN = "https://spottedin.co"
-
-# --- Staging (testing) ---------------------------------------------------
-
-[context.testing.environment]
-  VITE_SITE_ORIGIN = "https://www.staging.spottedin.co"
-
-# Staging must never compete with production in search results.
-[[context.testing.headers]]
-  for = "/*"
-  [context.testing.headers.values]
-    X-Robots-Tag = "noindex, nofollow"
-
-# --- Any other branch, and pull-request previews --------------------------
-# These get a generated URL that cannot be known ahead of time, so
-# VITE_SITE_ORIGIN is left unset and falls back to production. Sign-in will
-# therefore redirect to production from a preview; previews are for reviewing
-# UI, not for testing the auth round-trip.
+# Non-production branches and pull-request previews on either site. These get a
+# generated URL that cannot be known ahead of time, so VITE_SITE_ORIGIN is left
+# unset and falls back to production: sign-in from a preview redirects to
+# production. Previews are for reviewing UI, not the auth round-trip.
 
 [[context.branch-deploy.headers]]
   for = "/*"
@@ -58,14 +45,24 @@
   [context.deploy-preview.headers.values]
     X-Robots-Tag = "noindex, nofollow"
 
-# Set per-context in the Netlify UI (Site configuration -> Environment
-# variables), scoped to the matching deploy context:
+# Per-site environment variables, set in the Netlify UI
+# (Site configuration -> Environment variables):
 #
-#   VITE_SUPABASE_URL       production -> live project
-#                           testing    -> staging project
-#   VITE_SUPABASE_ANON_KEY  production -> live project
-#                           testing    -> staging project
+#   production site
+#     VITE_SITE_ORIGIN        https://www.spottedin.co   (or leave unset)
+#     VITE_SUPABASE_URL       live project
+#     VITE_SUPABASE_ANON_KEY  live project
 #
-# src/lib/supabase.ts falls back to the live project when these are unset, so
-# an unconfigured staging deploy writes to production data and its real user
-# accounts.
+#   staging site
+#     VITE_SITE_ORIGIN        https://www.staging.spottedin.co
+#     VITE_NOINDEX            true
+#     VITE_SUPABASE_URL       staging project
+#     VITE_SUPABASE_ANON_KEY  staging project
+#
+# VITE_NOINDEX forces the robots meta tag to noindex (src/lib/seo.ts). It is
+# required on staging because a context-scoped header cannot reach a site whose
+# own branch builds as `production`.
+#
+# VITE_SUPABASE_* are required on staging. src/lib/supabase.ts falls back to the
+# live project when unset, so an unconfigured staging site writes to production
+# data and its real user accounts.
