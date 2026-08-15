@@ -1,34 +1,61 @@
-/* Global reset + shared layout/typography. Screen-specific styling belongs in
-   each screen's own file/CSS module — keep this file to cross-cutting rules
-   and the shared component classes (Avatar, PriceTag, TopBar, ListingCard,
-   EmptyState, bottom nav, buttons, inputs). */
+:root {
+  --bg: #000;              /* app background */
+  --surface: #1c1c1e;      /* pills, cards, nav */
+  --surface-2: #2c2c2e;    /* pressed / secondary surface */
+  --text: #fff;
+  --text-dim: #9c9c9c;
+  --hairline: #2a2a2a;
+  --accent: #ff2300;       /* Spotted red — promos, badges */
+  --promo-olive: #57492f;  /* home promo strip */
+  --success: #1f7a3d;      /* "New" pill */
+  --radius-pill: 999px;
+  --radius-card: 12px;
+}
 
-*, *::before, *::after {
+.light {
+  --bg: #fff;
+  --surface: #f2f2f2;
+  --surface-2: #e5e5e5;
+  --text: #1a1a1a;
+  --text-dim: #6b6b6b;
+  --hairline: #d9d9d9;
+}
+
+* {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
 }
 
 body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-sans);
+  background: #111;
+  color: var(--text);
+  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
-h1, h2, h3, h4 {
+h1, h2, h3, h4, p, ul, figure {
   margin: 0;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
 }
 
-p {
-  margin: 0;
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+button, input {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
 }
 
 a {
@@ -36,348 +63,75 @@ a {
   text-decoration: none;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
+img {
+  display: block;
+  max-width: 100%;
 }
 
-ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+#root {
+  min-height: 100dvh;
 }
-
-/* ---- App frame ------------------------------------------------------- */
 
 .app-shell {
-  min-height: 100vh;
+  max-width: 430px;
+  margin: 0 auto;
   min-height: 100dvh;
-  display: flex;
-  justify-content: center;
   background: var(--bg);
-}
-
-@media (min-width: 560px) {
-  .app-shell {
-    padding: 32px 16px;
-  }
-}
-
-.app-frame {
-  width: 100%;
-  max-width: var(--app-max-width);
-  min-height: 100vh;
-  min-height: 100dvh;
-  background: var(--surface);
+  color: var(--text);
   position: relative;
-  display: flex;
-  flex-direction: column;
+  overflow-x: hidden;
 }
 
-@media (min-width: 560px) {
-  .app-frame {
-    min-height: 90vh;
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: var(--shadow-frame);
-  }
+/* Public landing breaks out of the 430px marketplace column to a full-width layout. */
+.app-shell--full {
+  max-width: none;
 }
 
-.app-content {
-  flex: 1;
-  padding-bottom: var(--bottom-nav-height);
+h1, h2, h3 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
-
-.app-content--no-nav {
-  padding-bottom: 0;
-}
-
-/* ---- Bottom tab nav ---------------------------------------------------- */
-
-.bottom-nav {
-  position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: 0;
-  width: min(100%, var(--app-max-width));
-  transform: translateX(-50%);
-  height: var(--bottom-nav-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  z-index: 20;
-}
-
-.bottom-nav__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-}
-
-.bottom-nav__item.is-active {
-  color: var(--accent);
-}
-
-.bottom-nav__icon {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.bottom-nav__sell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 22px;
-  margin-top: -18px;
-  box-shadow: var(--shadow-md);
-  border: 3px solid var(--surface);
-}
-
-/* ---- Top bar ------------------------------------------------------------ */
-
-.top-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 10;
-  border-bottom: 1px solid var(--border);
-}
-
-.top-bar__back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bg);
-  border: none;
-  font-size: 16px;
-  color: var(--ink);
-  flex-shrink: 0;
-}
-
-.top-bar__title {
-  font-size: 17px;
-  font-weight: 700;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.top-bar__right {
-  flex-shrink: 0;
-}
-
-/* ---- Buttons & inputs ---------------------------------------------------- */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 13px 20px;
-  border-radius: var(--radius);
-  border: none;
-  font-size: 15px;
+  border-radius: var(--radius-pill);
   font-weight: 700;
-  transition: transform 0.08s ease, opacity 0.15s ease;
-}
-
-.btn:active {
-  transform: scale(0.98);
+  font-size: 17px;
+  padding: 14px 20px;
+  border: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+.btn-disabled {
+  background: var(--surface-2);
+  color: var(--text-dim);
 }
 
 .btn-outline {
   background: transparent;
-  color: var(--ink);
-  border: 1.5px solid var(--border);
+  color: var(--text);
+  border: 1px solid var(--hairline);
 }
 
-.btn-block {
-  width: 100%;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.input, .textarea, .select {
-  width: 100%;
-  padding: 13px 14px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border);
+.pill {
+  border-radius: var(--radius-pill);
   background: var(--surface);
-  color: var(--ink);
-  font-size: 15px;
-  font-family: inherit;
 }
 
-.input:focus, .textarea:focus, .select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.textarea {
-  resize: vertical;
-  min-height: 90px;
-}
-
-.field-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  margin-bottom: 6px;
-}
-
-/* ---- Shared components -------------------------------------------------- */
-
-.avatar {
-  display: flex;
+.icon-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: var(--bg);
-  flex-shrink: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  line-height: 1;
-}
-
-.price-tag {
-  color: var(--accent-2);
-  font-weight: 700;
-}
-
-.listing-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 12px 16px;
-}
-
-.listing-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  position: relative;
-}
-
-.listing-card__tile {
-  aspect-ratio: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  position: relative;
-}
-
-.listing-card__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.listing-card__like {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  backdrop-filter: blur(4px);
-}
-
-.listing-card__sold {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  background: var(--lime);
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.listing-card__body {
-  padding: 10px 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.listing-card__title {
-  font-size: 13px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.listing-card__meta {
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-  padding: 64px 32px;
-  color: var(--ink-soft);
-}
-
-.empty-state__emoji {
-  font-size: 40px;
-}
-
-.empty-state__title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.empty-state__subtitle {
-  font-size: 14px;
-  max-width: 280px;
+  color: var(--text);
 }

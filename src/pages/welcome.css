@@ -1,0 +1,134 @@
+/* Full-bleed signed-out entry gate. Layout language follows the approved reference
+   screen; palette, wordmark and copy are Spotted's own. */
+
+.welcome {
+  --welcome-red: var(--accent);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 20px clamp(20px, 6vw, 28px) calc(24px + env(safe-area-inset-bottom));
+  background: var(--welcome-red);
+  color: #fff;
+  text-align: center;
+}
+
+/* The reference leaves the entire top half empty; this is what creates that. */
+.welcome-spacer {
+  flex: 1 1 auto;
+  min-height: 48px;
+}
+
+.welcome-skip {
+  align-self: flex-end;
+  padding: 8px 4px;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.welcome-brand {
+  width: 100%;
+  max-width: 460px;
+}
+
+.welcome-wordmark {
+  font-size: clamp(2.75rem, 14vw, 3.75rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Sized so "Buy, sell, and rediscover" holds one line at 390px — the <br> in the
+   markup is the only break the tagline should take. */
+.welcome-tagline {
+  margin-top: 28px;
+  font-size: clamp(1.35rem, 5.9vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  margin-top: clamp(36px, 9vh, 64px);
+  gap: 12px;
+}
+
+.welcome-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.welcome-btn-solid {
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.welcome-btn-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #fff;
+}
+
+.welcome-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.welcome-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.welcome-or {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.welcome-error {
+  padding: 10px 14px;
+  border-radius: var(--radius-card);
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 0.9rem;
+}
+
+.welcome-legal {
+  max-width: 420px;
+  margin-top: clamp(28px, 5vh, 44px);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Below the fold on very short viewports the gate should scroll rather than crush. */
+@media (max-height: 620px) {
+  .welcome-tagline {
+    margin-top: 18px;
+  }
+
+  .welcome-actions {
+    margin-top: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .welcome-btn {
+    transition: transform 120ms ease, opacity 120ms ease;
+  }
+
+  .welcome-btn:not(:disabled):active {
+    transform: scale(0.985);
+  }
+}

@@ -1,0 +1,390 @@
+/* Profile screen styles — owned by the profile agent */
+
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 96px;
+}
+
+.profile-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 16px;
+}
+
+.profile-title {
+  grid-column: 2;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.profile-header-actions {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.profile-guest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 80px 24px 24px;
+  min-height: 50vh;
+}
+
+.profile-guest-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profile-guest-copy {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.profile-guest-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 20px;
+}
+
+.profile-guest-btn {
+  width: 100%;
+}
+
+.profile-tabs {
+  display: flex;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.profile-tab {
+  flex: 1;
+  padding: 14px 0;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+  border-bottom: 3px solid transparent;
+}
+
+.profile-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+}
+
+.profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.profile-stats {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+}
+
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+}
+
+.profile-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profile-stat-label {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.profile-earnings {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-promo {
+  position: relative;
+  display: flex;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.profile-promo-image {
+  width: 27%;
+  flex-shrink: 0;
+}
+
+.profile-promo-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-promo-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: var(--accent);
+  color: #fff;
+  padding: 16px;
+}
+
+.profile-promo-text p {
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.profile-promo-bold {
+  font-weight: 700;
+}
+
+.profile-promo-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+
+.profile-active-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-active-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.profile-active-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profile-active-count {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.profile-filter-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.profile-sold-item {
+  position: relative;
+}
+
+.profile-sold-item .product-card-image-wrap::after {
+  content: 'SOLD';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.profile-orders {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.profile-order-row:last-child {
+  border-bottom: none;
+}
+
+.profile-order-thumbs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.profile-order-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.profile-order-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-order-date {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-order-count {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.profile-order-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.profile-empty-simple {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 32px 20px 8px;
+}
+
+.profile-empty-simple-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profile-empty-simple-copy {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.profile-sort-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-sort-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 4px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.profile-sort-option:last-child {
+  border-bottom: none;
+}
+
+.profile-sort-check {
+  font-weight: 700;
+}
+
+.profile-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 32px 20px 8px;
+}
+
+.profile-rack {
+  width: 180px;
+  height: auto;
+  margin-bottom: 8px;
+}
+
+.profile-empty-title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.profile-empty-copy {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.profile-empty-btn {
+  margin-top: 12px;
+}

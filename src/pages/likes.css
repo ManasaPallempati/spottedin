@@ -1,0 +1,62 @@
+/* owned by the "likes-profile" agent — Round 1 */
+
+.likes-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 96px;
+}
+
+.likes-header {
+  padding: 20px 20px 16px;
+  text-align: center;
+}
+
+.likes-title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.likes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.likes-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 24px 72px;
+  text-align: center;
+}
+
+.likes-empty-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.likes-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.likes-empty-copy {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.likes-empty-btn {
+  margin-top: 12px;
+}

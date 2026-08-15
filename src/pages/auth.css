@@ -1,0 +1,189 @@
+/* Owned by auth-ui agent (Round 2). Styles for Login.tsx and Signup.tsx. */
+
+.auth-page {
+  min-height: 100dvh;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(255, 35, 0, 0.12), transparent 55%),
+    var(--bg);
+  color: var(--text);
+  padding: 40px 20px 48px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  font-size: 15px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+
+.auth-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.auth-oauth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.auth-oauth-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--text-dim);
+}
+
+.auth-oauth-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.oauth-mark {
+  flex-shrink: 0;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.auth-field input {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--text-dim);
+}
+
+.auth-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.auth-error {
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 35, 0, 0.4);
+  background: rgba(255, 35, 0, 0.08);
+}
+
+.auth-submit {
+  width: 100%;
+  height: 52px;
+  font-size: 17px;
+  margin-top: 4px;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-footer {
+  margin-top: 24px;
+  font-size: 15px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.auth-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 48px 0 8px;
+}
+
+.auth-confirm p {
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.auth-confirm a {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Visible keyboard focus on every interactive control */
+.auth-page a:focus-visible,
+.auth-oauth-btn:focus-visible,
+.auth-submit:focus-visible,
+.auth-field input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}

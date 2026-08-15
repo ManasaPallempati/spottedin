@@ -1,0 +1,118 @@
+/* owned by the "offers" agent — Round 3 */
+
+.offer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 20px 0;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.offer-card-listing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.offer-card-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.offer-card-listing-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.offer-card-brand {
+  font-size: 14px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.offer-card-price {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.offer-card-line {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.offer-card-line strong {
+  font-weight: 700;
+}
+
+.offer-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.offer-card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.offer-card-btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+.offer-card-pill {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.offer-card-pill-pending {
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+
+.offer-card-pill-accepted {
+  background: var(--success);
+  color: #fff;
+}
+
+.offer-card-pill-declined {
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+
+.offer-card-pill-success {
+  background: var(--success);
+  color: #fff;
+}
+
+.offer-card-pill-sold {
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+
+.offer-card-buy-btn {
+  width: 100%;
+}
+
+.offer-card-buy-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
