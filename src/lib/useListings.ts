@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { supabase } from './supabase'
+import { supabase, LISTING_IMAGE_BASE } from './supabase'
 import type { Listing } from '../data/listings'
 import { describeListing } from '../data/sellers'
 import { normalizeCategory } from '../data/taxonomy'
 import type { Profile } from './auth'
 
-const STORAGE_BASE = 'https://masdygvcssrtwseopfmj.supabase.co/storage/v1/object/public/listing-images/'
+const STORAGE_BASE = LISTING_IMAGE_BASE
 
 type SellerEmbed = { handle: string; name: string; bio: string | null; rating: number | null; sales: number | null }
 
