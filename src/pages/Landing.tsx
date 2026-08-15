@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, IndianRupee, Truck, ShieldCheck, ShoppingBag, Tag, Recycle } from 'lucide-react'
 import { FEATURED_CATEGORIES } from '../data/taxonomy'
-import { setPageMeta, setStructuredData } from '../lib/seo'
+import { setPageMeta, setStructuredData, SITE_ORIGIN } from '../lib/seo'
 import './landing.css'
 
 const HERO_TILES = ['Sarees', 'Lehengas', 'Suits', 'Sherwanis', 'Kidswear', 'Jewelry']
@@ -19,7 +19,7 @@ export default function Landing() {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       name: 'Spotted',
-      url: 'https://spottedin.co/',
+      url: `${SITE_ORIGIN}/`,
       description: 'Resale marketplace for pre-owned Indian fashion.',
     })
   }, [])

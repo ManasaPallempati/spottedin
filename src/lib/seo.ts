@@ -11,8 +11,14 @@ type CanonicalMeta = {
 // Canonical origin for this deployment. It is also the OAuth `redirectTo`
 // target (see pages/Login.tsx), so it must match the origin actually being
 // served — otherwise a staging sign-in bounces the user to production.
-// Staging sets VITE_SITE_ORIGIN; production falls back to the apex.
-export const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN ?? 'https://spottedin.co'
+// Staging sets VITE_SITE_ORIGIN; production falls back to the canonical www host.
+export const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN ?? 'https://www.spottedin.co'
+
+// Staging runs as its own Netlify site, so its builds use the `production`
+// deploy context and cannot be excluded from indexing by a context-scoped
+// header. VITE_NOINDEX is set on that site instead, and forces every page to
+// emit `noindex, nofollow` regardless of what a caller passes.
+const FORCE_NOINDEX = import.meta.env.VITE_NOINDEX === 'true'
 const META_ID = 'spotted-seo-meta'
 const SCRIPT_ID = 'spotted-jsonld'
 
@@ -69,11 +75,11 @@ export function setPageMeta(meta: CanonicalMeta): void {
     createOrUpdateMeta('twitter:image', 'name', meta.ogImage)
   }
 
-  createOrUpdateMeta('robots', 'name', meta.noIndex ? 'noindex' : 'index, follow')
+  createOrUpdateMeta('robots', 'name', FORCE_NOINDEX || meta.noIndex ? 'noindex, nofollow' : 'index, follow')
 }
 
 export function setPageIndexing(indexable: boolean): void {
-  createOrUpdateMeta('robots', 'name', indexable ? 'index, follow' : 'noindex, nofollow')
+  createOrUpdateMeta('robots', 'name', indexable && !FORCE_NOINDEX ? 'index, follow' : 'noindex, nofollow')
 }
 
 export function setStructuredData(data: unknown): void {
