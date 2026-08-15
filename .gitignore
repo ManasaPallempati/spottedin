@@ -2,6 +2,9 @@ node_modules
 dist
 *.tsbuildinfo
 
+# JetBrains IDE settings are per-developer, not project configuration.
+.idea/
+
 # Local AI-history tooling and its output. history_organizer_output/ is ~57MB of
 # private ChatGPT/Claude/Codex transcripts; this repo is public, and git history
 # is permanent, so these must never be committed here.

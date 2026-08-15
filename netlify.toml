@@ -1,0 +1,37 @@
+# Staging host configuration (www.staging.spottedin.co), built from `testing`.
+#
+# Production stays on GitHub Pages at spottedin.co via
+# .github/workflows/deploy.yml. Staging lives here because GitHub Pages cannot
+# rewrite arbitrary paths to the SPA shell with an HTTP 200 — see
+# docs/launch/STAGING_ROUTING.md, which recommends a rewrite-capable host.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Deep links such as /listing/<id>/<slug> return the app shell with a 200
+# rather than a 404. This is the capability GitHub Pages lacks.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Staging must not be indexed alongside production.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# Set these in the Netlify UI (Site settings -> Environment variables), not
+# here, so they are never committed:
+#
+#   VITE_SITE_ORIGIN       https://www.staging.spottedin.co
+#   VITE_SUPABASE_URL      <staging project URL>
+#   VITE_SUPABASE_ANON_KEY <staging project anon key>
+#
+# VITE_SUPABASE_* are required. src/lib/supabase.ts falls back to the
+# production project, so leaving them unset points staging at the live
+# database and its real user accounts.
