@@ -6,6 +6,11 @@ const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY ??
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hc2R5Z3Zjc3NydHdzZW9wZm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMDc0MzEsImV4cCI6MjEwMDg4MzQzMX0.3ysulv0P9TaYGehO6bEH72IRwfIZRzfwppcVkt6IlQQ'
 
+// Public bucket that listing photos are uploaded to and served from. It is
+// derived from SUPABASE_URL rather than hardcoded so that a staging build
+// reads its own storage instead of production's.
+export const LISTING_IMAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/listing-images/`
+
 // PKCE, not the library default `implicit`: this app uses HashRouter, and the implicit
 // flow returns its tokens in the URL fragment (`#access_token=…`) — the exact place the
 // router reads the route from, so the OAuth callback lands on an unmatched path. PKCE
