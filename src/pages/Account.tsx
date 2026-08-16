@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
-import { useAuth, suggestHandles } from '../lib/auth'
+import { useAuth, suggestHandles, type DeletionReason, type Interest } from '../lib/auth'
+import { COUNTRIES, DEFAULT_COUNTRY } from '../data/countries'
 import { setPageMeta } from '../lib/seo'
 import './account.css'
 
@@ -12,6 +13,18 @@ const BIO_MAX = 500
 const CITY_MAX = 80
 const NAME_MAX = 80
 const HANDLE_COOLDOWN_DAYS = 30
+
+// Values must match profiles_deletion_reason_valid in round10.
+const DELETION_REASONS: [DeletionReason, string][] = [
+  ['not_using', "I don't use Spotted anymore"],
+  ['new_account', 'I want to open a new account'],
+  ['not_selling', "My items aren't selling"],
+  ['transaction_issue', 'I had an issue with a transaction'],
+  ['policies', "I don't agree with Spotted's policies"],
+  ['fees', "I don't agree with Spotted's fees"],
+  ['safety_privacy', 'I have safety or privacy concerns'],
+  ['other', "My reason isn't listed"],
+]
 
 function daysUntilHandleChangeAllowed(handleChangedAt: string | null): number {
   if (!handleChangedAt) return 0
@@ -35,6 +48,12 @@ export default function Account() {
   const [avatarEmoji, setAvatarEmoji] = useState('')
   const [bio, setBio] = useState('')
   const [city, setCity] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [country, setCountry] = useState(DEFAULT_COUNTRY)
+  const [interest, setInterest] = useState<Interest | ''>('')
+  const [deleteReason, setDeleteReason] = useState<DeletionReason | ''>('')
 
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -59,6 +78,11 @@ export default function Account() {
     setAvatarEmoji(profile.avatarEmoji ?? '🙂')
     setBio(profile.bio ?? '')
     setCity(profile.city ?? '')
+    setFirstName(profile.firstName ?? '')
+    setLastName(profile.lastName ?? '')
+    setDateOfBirth(profile.dateOfBirth ?? '')
+    setCountry(profile.country ?? DEFAULT_COUNTRY)
+    setInterest(profile.interest ?? '')
   }, [profile])
 
   const cooldownDays = useMemo(
@@ -97,6 +121,14 @@ export default function Account() {
       avatarEmoji: avatarEmoji.trim(),
       bio: bio.trim(),
       city: city.trim(),
+      firstName: firstName.trim() || null,
+      lastName: lastName.trim() || null,
+      // Not editable yet — carried through so saving other fields does not
+      // clear a picture set elsewhere.
+      avatarUrl: profile?.avatarUrl ?? null,
+      dateOfBirth: dateOfBirth || null,
+      country,
+      interest: interest || null,
     })
     setSaving(false)
 
@@ -210,7 +242,72 @@ export default function Account() {
         <h2 className="account-section">About me</h2>
 
         <div className="account-field">
-          <label htmlFor="account-name">Name</label>
+          <label htmlFor="account-first-name">First name</label>
+          <input
+            id="account-first-name"
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            maxLength={40}
+            autoComplete="given-name"
+          />
+        </div>
+
+        <div className="account-field">
+          <label htmlFor="account-last-name">Last name</label>
+          <input
+            id="account-last-name"
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            maxLength={40}
+            autoComplete="family-name"
+          />
+        </div>
+
+        <div className="account-field">
+          <label htmlFor="account-dob">Date of birth</label>
+          <input
+            id="account-dob"
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+          />
+          <p className="account-hint">
+            You need to be 13 or over to use Spotted. Under 18s can buy, but cannot list items to
+            sell.
+          </p>
+        </div>
+
+        <div className="account-field">
+          <label htmlFor="account-interest">Interest</label>
+          <select
+            id="account-interest"
+            value={interest}
+            onChange={(e) => setInterest(e.target.value as Interest | '')}
+          >
+            <option value="">No preference</option>
+            <option value="womenswear">Womenswear</option>
+            <option value="menswear">Menswear</option>
+            <option value="both">Womenswear &amp; Menswear</option>
+          </select>
+          <p className="account-hint">We use this to decide which items to show you first.</p>
+        </div>
+
+        <div className="account-field">
+          <label htmlFor="account-country">Country</label>
+          <select id="account-country" value={country} onChange={(e) => setCountry(e.target.value)}>
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="account-field">
+          <label htmlFor="account-name">Display name</label>
           <input
             id="account-name"
             type="text"
@@ -310,6 +407,23 @@ export default function Account() {
             other people have already made.
           </p>
 
+          <fieldset className="account-reasons">
+            <legend className="account-hint">Before you go — why are you leaving?</legend>
+            {DELETION_REASONS.map(([value, label]) => (
+              <label key={value} className="account-reason">
+                <input
+                  type="radio"
+                  name="delete-reason"
+                  value={value}
+                  checked={deleteReason === value}
+                  onChange={() => setDeleteReason(value)}
+                  disabled={deleting}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
+
           {deleteError && (
             <p className="account-error" role="alert">
               {deleteError}
@@ -319,12 +433,12 @@ export default function Account() {
           <button
             type="button"
             className="account-danger-link"
-            disabled={deleting}
+            disabled={deleting || deleteReason === ''}
             aria-busy={deleting}
             onClick={async () => {
               setDeleting(true)
               setDeleteError(null)
-              const { error: delError } = await deleteAccount()
+              const { error: delError } = await deleteAccount(deleteReason || undefined)
               setDeleting(false)
               if (delError) {
                 setDeleteError(delError)

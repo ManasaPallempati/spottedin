@@ -228,9 +228,17 @@ type ProfileRow = {
 
 function mapProfileRow(row: ProfileRow): Profile {
   return {
-    // This maps a seller's public profile, which never needs the cooldown
-    // timestamp — only the account owner's own edit screen reads it.
+    // This maps a seller's public profile as shown on a listing. The account
+    // fields below are not selected by that query and are not displayed there,
+    // so they are null rather than fetched — only the owner's own Account
+    // screen reads them.
     handleChangedAt: null,
+    firstName: null,
+    lastName: null,
+    avatarUrl: null,
+    dateOfBirth: null,
+    country: null,
+    interest: null,
     id: row.id,
     handle: row.handle,
     name: row.name,

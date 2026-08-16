@@ -123,6 +123,46 @@
   font-size: 14px;
 }
 
+.account-field select {
+  width: 100%;
+  font-size: 16px;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+/* The option list is rendered by the OS, which does not inherit the page
+   theme — without this, dark-on-dark makes it unreadable on some browsers. */
+.account-field select option {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.account-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.account-reason {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 15px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.account-reason input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
 .account-hint-warn {
   color: var(--warn, #e6b800);
 }
