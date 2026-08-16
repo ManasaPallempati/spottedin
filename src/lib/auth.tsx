@@ -11,6 +11,45 @@ export type Profile = {
   city: string | null
   rating: number | null
   sales: number | null
+  handleChangedAt: string | null
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string | null
+  interest: Interest | null
+  guardianEmail: string | null
+  guardianConsentAt: string | null
+}
+
+export type Interest = 'womenswear' | 'menswear' | 'both'
+
+// Mirrors profiles_deletion_reason_valid. Free text is deliberately not an
+// option: the list is fixed so it can be counted, and so nothing identifying
+// ends up attached to a row that has just been anonymised.
+export type DeletionReason =
+  | 'not_using'
+  | 'new_account'
+  | 'not_selling'
+  | 'transaction_issue'
+  | 'policies'
+  | 'fees'
+  | 'safety_privacy'
+  | 'other'
+
+export type ProfileEdit = {
+  handle: string
+  name: string
+  avatarEmoji: string
+  bio: string
+  city: string
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string
+  interest: Interest | null
+  guardianEmail: string | null
 }
 
 export type AuthContextValue = {
@@ -18,11 +57,18 @@ export type AuthContextValue = {
   profile: Profile | null
   isAuthed: boolean
   loading: boolean
-  signUp: (email: string, password: string, handle: string, name: string) => Promise<{ error: string | null }>
+  signUp: (
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
-  deleteAccount: () => Promise<{ error: string | null }>
+  updateProfile: (edit: ProfileEdit) => Promise<{ error: string | null }>
+  deleteAccount: (reason?: DeletionReason) => Promise<{ error: string | null }>
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -36,6 +82,15 @@ type ProfileRow = {
   city: string | null
   rating: number | null
   sales: number | null
+  handle_changed_at?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  avatar_url?: string | null
+  date_of_birth?: string | null
+  country?: string | null
+  interest?: Interest | null
+  guardian_email?: string | null
+  guardian_consent_at?: string | null
 }
 
 function mapProfile(row: ProfileRow): Profile {
@@ -48,6 +103,15 @@ function mapProfile(row: ProfileRow): Profile {
     city: row.city,
     rating: row.rating,
     sales: row.sales,
+    handleChangedAt: row.handle_changed_at ?? null,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
+    avatarUrl: row.avatar_url ?? null,
+    dateOfBirth: row.date_of_birth ?? null,
+    country: row.country ?? null,
+    interest: row.interest ?? null,
+    guardianEmail: row.guardian_email ?? null,
+    guardianConsentAt: row.guardian_consent_at ?? null,
   }
 }
 
@@ -68,9 +132,14 @@ function randomDigits(len: number): string {
   return out
 }
 
-const PROFILE_COLUMNS = 'id,handle,name,avatar_emoji,bio,city,rating,sales'
+const PROFILE_COLUMNS =
+  'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,guardian_email,guardian_consent_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
-async function ensureProfile(userId: string, meta: { handle?: string; name?: string }, email: string): Promise<Profile | null> {
+async function ensureProfile(
+  userId: string,
+  meta: { handle?: string; name?: string; date_of_birth?: string },
+  email: string,
+): Promise<Profile | null> {
   const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
   if (existing) return mapProfile(existing as ProfileRow)
 
@@ -79,7 +148,10 @@ async function ensureProfile(userId: string, meta: { handle?: string; name?: str
 
   const { data: inserted, error } = await supabase
     .from('profiles')
-    .insert({ id: userId, handle: baseHandle, name })
+    // date_of_birth rides along from signup metadata. Without it the row is
+    // created with a null date, which is_adult() treats as an adult — so an
+    // OAuth signup, which has no date, is an adult until they set one.
+    .insert({ id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null })
     .select(PROFILE_COLUMNS)
     .single()
 
@@ -194,6 +266,30 @@ export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
         .map((p) => p.trim().toLowerCase())
         .filter((p): p is OAuthProvider => p === 'google' || p === 'facebook')
 
+// Offered when a username is already taken. Candidates are checked against the
+// table in one query rather than one-at-a-time, and only free ones are shown —
+// suggesting a name that is also taken is worse than suggesting nothing.
+// Nothing here reserves a name: two people can still be offered the same
+// suggestion, and whoever saves second gets the taken error again. The unique
+// index is the only real arbiter.
+export async function suggestHandles(base: string, wanted = 3): Promise<string[]> {
+  const root = base.replace(/_+$/, '').slice(0, 24) || 'user'
+  const candidates = new Set<string>()
+  while (candidates.size < wanted * 3) {
+    candidates.add(`${root}_${Math.floor(Math.random() * 9000) + 1000}`)
+    candidates.add(`${root}${Math.floor(Math.random() * 90) + 10}`)
+  }
+  const list = [...candidates].filter((h) => /^[a-z0-9][a-z0-9_]{2,29}$/.test(h))
+
+  const { data, error } = await supabase.from('profiles').select('handle').in('handle', list)
+  if (error) {
+    console.warn('[auth] handle suggestion lookup failed:', error)
+    return list.slice(0, wanted)
+  }
+  const taken = new Set((data ?? []).map((r: { handle: string }) => r.handle.replace(/^@/, '')))
+  return list.filter((h) => !taken.has(h)).slice(0, wanted)
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -256,11 +352,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function signUp(email: string, password: string, handle: string, name: string): Promise<{ error: string | null }> {
+  async function signUp(
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { handle, name } },
+      options: { data: { handle, name, date_of_birth: dateOfBirth } },
     })
     return { error: error ? friendlyAuthError(error) : null }
   }
@@ -291,13 +393,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // Two failures here come from the database rather than from validation, and
+  // neither can be prevented client-side: another person can take a username
+  // between the form rendering and the save, and the 30-day limit is enforced by
+  // a trigger (round9) precisely so it cannot be bypassed. Both are translated
+  // rather than surfaced raw.
+  async function updateProfile(edit: ProfileEdit): Promise<{ error: string | null }> {
+    if (!session) return { error: 'You need to be signed in to change your profile.' }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        handle: edit.handle,
+        name: edit.name,
+        avatar_emoji: edit.avatarEmoji,
+        bio: edit.bio,
+        city: edit.city,
+        first_name: edit.firstName,
+        last_name: edit.lastName,
+        avatar_url: edit.avatarUrl,
+        date_of_birth: edit.dateOfBirth,
+        country: edit.country,
+        interest: edit.interest,
+        guardian_email: edit.guardianEmail,
+      })
+      .eq('id', session.user.id)
+      .select(PROFILE_COLUMNS)
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return { error: 'That username is already taken. Please choose another.' }
+      }
+      if (error.message.includes('handle_change_too_soon')) {
+        // The trigger puts the date the next change is allowed in the hint.
+        const next = (error as { hint?: string }).hint
+        return {
+          error: next
+            ? `You can change your username once every 30 days. You can change it again on ${next}.`
+            : 'You can change your username once every 30 days.',
+        }
+      }
+      if (error.message.includes('under_minimum_age')) {
+        return { error: 'You need to be 18 or over to use Spotted.' }
+      }
+      if (error.message.includes('date_of_birth_in_future')) {
+        return { error: 'Please enter a valid date of birth.' }
+      }
+      if (error.code === '23514') {
+        return { error: 'Some of those details are not valid. Please check and try again.' }
+      }
+      console.warn('[auth] profile update failed:', error)
+      return { error: 'We could not save your changes just now. Please try again.' }
+    }
+
+    setProfile(mapProfile(data as ProfileRow))
+    return { error: null }
+  }
+
   // Anonymises the account rather than erasing its rows — orders and payments
   // are retained records, and the other side of a completed sale still needs
   // their history. The work happens in the delete-account Edge Function, which
   // holds the service-role key; the browser only proves who is asking.
   // Signs out locally afterwards because the server-side ban does not by itself
   // clear the session already stored in this tab.
-  async function deleteAccount(): Promise<{ error: string | null }> {
+  // The reason is recorded before the account is closed, because the Edge
+  // Function anonymises the row and the client loses its session immediately
+  // afterwards — there is no later opportunity to write it.
+  async function deleteAccount(reason?: DeletionReason): Promise<{ error: string | null }> {
+    if (reason && session) {
+      const { error: reasonError } = await supabase
+        .from('profiles')
+        .update({ deletion_reason: reason })
+        .eq('id', session.user.id)
+      // Losing the reason is not worth blocking someone from leaving.
+      if (reasonError) console.warn('[auth] could not record deletion reason:', reasonError)
+    }
+
     const { error } = await supabase.functions.invoke('delete-account', { body: {} })
     if (error) {
       console.warn('[auth] delete-account failed:', error)
@@ -316,6 +488,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInWithOAuth,
     signOut,
+    updateProfile,
     deleteAccount,
   }
 
