@@ -18,6 +18,8 @@ export type Profile = {
   dateOfBirth: string | null
   country: string | null
   interest: Interest | null
+  guardianEmail: string | null
+  guardianConsentAt: string | null
 }
 
 export type Interest = 'womenswear' | 'menswear' | 'both'
@@ -47,6 +49,7 @@ export type ProfileEdit = {
   dateOfBirth: string | null
   country: string
   interest: Interest | null
+  guardianEmail: string | null
 }
 
 export type AuthContextValue = {
@@ -54,7 +57,13 @@ export type AuthContextValue = {
   profile: Profile | null
   isAuthed: boolean
   loading: boolean
-  signUp: (email: string, password: string, handle: string, name: string) => Promise<{ error: string | null }>
+  signUp: (
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -80,6 +89,8 @@ type ProfileRow = {
   date_of_birth?: string | null
   country?: string | null
   interest?: Interest | null
+  guardian_email?: string | null
+  guardian_consent_at?: string | null
 }
 
 function mapProfile(row: ProfileRow): Profile {
@@ -99,6 +110,8 @@ function mapProfile(row: ProfileRow): Profile {
     dateOfBirth: row.date_of_birth ?? null,
     country: row.country ?? null,
     interest: row.interest ?? null,
+    guardianEmail: row.guardian_email ?? null,
+    guardianConsentAt: row.guardian_consent_at ?? null,
   }
 }
 
@@ -120,9 +133,13 @@ function randomDigits(len: number): string {
 }
 
 const PROFILE_COLUMNS =
-  'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
+  'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,guardian_email,guardian_consent_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
-async function ensureProfile(userId: string, meta: { handle?: string; name?: string }, email: string): Promise<Profile | null> {
+async function ensureProfile(
+  userId: string,
+  meta: { handle?: string; name?: string; date_of_birth?: string },
+  email: string,
+): Promise<Profile | null> {
   const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
   if (existing) return mapProfile(existing as ProfileRow)
 
@@ -131,7 +148,10 @@ async function ensureProfile(userId: string, meta: { handle?: string; name?: str
 
   const { data: inserted, error } = await supabase
     .from('profiles')
-    .insert({ id: userId, handle: baseHandle, name })
+    // date_of_birth rides along from signup metadata. Without it the row is
+    // created with a null date, which is_adult() treats as an adult — so an
+    // OAuth signup, which has no date, is an adult until they set one.
+    .insert({ id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null })
     .select(PROFILE_COLUMNS)
     .single()
 
@@ -332,11 +352,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function signUp(email: string, password: string, handle: string, name: string): Promise<{ error: string | null }> {
+  async function signUp(
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { handle, name } },
+      options: { data: { handle, name, date_of_birth: dateOfBirth } },
     })
     return { error: error ? friendlyAuthError(error) : null }
   }
@@ -389,6 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         date_of_birth: edit.dateOfBirth,
         country: edit.country,
         interest: edit.interest,
+        guardian_email: edit.guardianEmail,
       })
       .eq('id', session.user.id)
       .select(PROFILE_COLUMNS)

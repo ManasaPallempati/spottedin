@@ -13,6 +13,21 @@ import './auth.css'
 // Mirrors sanitizeHandle in lib/auth.tsx, which is what an OAuth signup goes
 // through. Periods become underscores rather than vanishing, so the suggested
 // handle still reads like the person's name.
+// Mirrors ageFrom in Account.tsx and the database trigger, so the form, the
+// account screen and the server all agree on who is a minor.
+function ageFromDate(dateOfBirth: string): number | null {
+  if (!dateOfBirth) return null
+  const dob = new Date(`${dateOfBirth}T00:00:00`)
+  if (Number.isNaN(dob.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - dob.getFullYear()
+  const beforeBirthday =
+    now.getMonth() < dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())
+  if (beforeBirthday) age -= 1
+  return age
+}
+
 function handleFromEmail(email: string): string {
   const local = email.split('@')[0]?.toLowerCase() ?? ''
   return local.replace(/[.-]/g, '_').replace(/[^a-z0-9_]/g, '').replace(/^_+/, '').slice(0, 30)
@@ -29,6 +44,7 @@ export default function Signup() {
   const [handle, setHandle] = useState('')
   const [handleEdited, setHandleEdited] = useState(false)
   const [name, setName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState<'form' | 'checking' | 'confirm'>('form')
@@ -49,6 +65,20 @@ export default function Signup() {
       return
     }
 
+    // Required, not optional. is_adult() treats an unknown date of birth as an
+    // adult so that profiles predating the column keep working — which means a
+    // new account that never supplies one would bypass the minor restrictions
+    // entirely. Asking here is what closes that.
+    const age = ageFromDate(dateOfBirth)
+    if (age === null) {
+      setError('Please enter your date of birth.')
+      return
+    }
+    if (age < 13) {
+      setError('You need to be 13 or over to use Spotted.')
+      return
+    }
+
     if (!/^[a-z0-9][a-z0-9_]{2,29}$/.test(handle)) {
       setError('Username can use letters, numbers and underscores only, and must be 3–30 characters')
       return
@@ -62,7 +92,7 @@ export default function Signup() {
     }
 
     setLoading(true)
-    const { error: signUpError } = await signUp(email, password, handle, name)
+    const { error: signUpError } = await signUp(email, password, handle, name, dateOfBirth)
     if (signUpError) {
       setLoading(false)
       setError(signUpError)
@@ -164,6 +194,21 @@ export default function Signup() {
             autoComplete="name"
             required
           />
+        </div>
+
+        <div className="auth-field">
+          <label htmlFor="signup-dob">Date of birth</label>
+          <input
+            id="signup-dob"
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+            required
+          />
+          <p className="auth-hint">
+            You need to be 13 or over. Under 18s can buy, but cannot list items to sell.
+          </p>
         </div>
 
         {error && (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useAuth, suggestHandles, type DeletionReason, type Interest } from '../lib/auth'
 import { COUNTRIES, DEFAULT_COUNTRY } from '../data/countries'
+import { supabase, LISTING_IMAGE_BASE } from '../lib/supabase'
 import { setPageMeta } from '../lib/seo'
 import './account.css'
 
@@ -25,6 +26,21 @@ const DELETION_REASONS: [DeletionReason, string][] = [
   ['safety_privacy', 'I have safety or privacy concerns'],
   ['other', "My reason isn't listed"],
 ]
+
+// Age from a yyyy-mm-dd string, computed the same way the database trigger does
+// so the form and the server agree on who is a minor.
+function ageFrom(dateOfBirth: string): number | null {
+  if (!dateOfBirth) return null
+  const dob = new Date(`${dateOfBirth}T00:00:00`)
+  if (Number.isNaN(dob.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - dob.getFullYear()
+  const beforeBirthday =
+    now.getMonth() < dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())
+  if (beforeBirthday) age -= 1
+  return age
+}
 
 function daysUntilHandleChangeAllowed(handleChangedAt: string | null): number {
   if (!handleChangedAt) return 0
@@ -54,11 +70,51 @@ export default function Account() {
   const [country, setCountry] = useState(DEFAULT_COUNTRY)
   const [interest, setInterest] = useState<Interest | ''>('')
   const [deleteReason, setDeleteReason] = useState<DeletionReason | ''>('')
+  const [guardianEmail, setGuardianEmail] = useState('')
 
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  // Storage policy allows a write only under the person's own uuid folder, so
+  // the path is derived from the session rather than anything user-supplied.
+  // A fixed filename means re-uploading replaces the old picture instead of
+  // accumulating orphans, which upsert makes safe.
+  async function handlePictureChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const uid = session?.user.id
+    if (!file || !uid) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError('That image is over 8MB. Please choose a smaller one.')
+      return
+    }
+
+    setError(null)
+    setUploading(true)
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `${uid}/avatar.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('listing-images')
+      .upload(path, file, { upsert: true })
+    setUploading(false)
+
+    if (uploadError) {
+      console.warn('[account] avatar upload failed:', uploadError)
+      setError('We could not upload that picture. Please try again.')
+      return
+    }
+    // Cache-busted: the path never changes, so without this the browser keeps
+    // showing the previous picture after a replacement.
+    setAvatarUrl(`${LISTING_IMAGE_BASE}${path}?v=${Date.now()}`)
+  }
 
   useEffect(() => {
     setPageMeta({
@@ -83,6 +139,8 @@ export default function Account() {
     setDateOfBirth(profile.dateOfBirth ?? '')
     setCountry(profile.country ?? DEFAULT_COUNTRY)
     setInterest(profile.interest ?? '')
+    setAvatarUrl(profile.avatarUrl ?? null)
+    setGuardianEmail(profile.guardianEmail ?? '')
   }, [profile])
 
   const cooldownDays = useMemo(
@@ -90,6 +148,8 @@ export default function Account() {
     [profile?.handleChangedAt],
   )
   const handleLocked = cooldownDays > 0
+  const enteredAge = ageFrom(dateOfBirth)
+  const isMinor = enteredAge !== null && enteredAge < 18
   const handleChanged = profile ? handle !== profile.handle.replace(/^@/, '') : false
 
   async function handleSubmit(e: FormEvent) {
@@ -114,6 +174,18 @@ export default function Account() {
       return
     }
 
+    const age = ageFrom(dateOfBirth)
+    if (age !== null && age < 13) {
+      setError('You need to be 13 or over to use Spotted.')
+      return
+    }
+    // Under the DPDP Act a child's data may not be processed without a
+    // guardian's consent, so the address to seek it from is not optional.
+    if (age !== null && age < 18 && !guardianEmail.trim()) {
+      setError("Please add a parent or guardian's email address so we can ask for their consent.")
+      return
+    }
+
     setSaving(true)
     const { error: saveError } = await updateProfile({
       handle,
@@ -125,10 +197,11 @@ export default function Account() {
       lastName: lastName.trim() || null,
       // Not editable yet — carried through so saving other fields does not
       // clear a picture set elsewhere.
-      avatarUrl: profile?.avatarUrl ?? null,
+      avatarUrl,
       dateOfBirth: dateOfBirth || null,
       country,
       interest: interest || null,
+      guardianEmail: guardianEmail.trim() || null,
     })
     setSaving(false)
 
@@ -239,6 +312,32 @@ export default function Account() {
           <span className="account-row-value">{session?.user.email ?? '—'}</span>
         </div>
 
+        <div className="account-field">
+          <label htmlFor="account-picture">Picture</label>
+          <div className="account-picture-row">
+            {avatarUrl ? (
+              <img className="account-picture" src={avatarUrl} alt="" />
+            ) : (
+              <span className="account-picture account-picture-empty" aria-hidden="true">
+                {avatarEmoji || '🙂'}
+              </span>
+            )}
+            <input
+              id="account-picture"
+              type="file"
+              accept="image/*"
+              onChange={handlePictureChange}
+              disabled={uploading}
+            />
+          </div>
+          {uploading && <p className="account-hint">Uploading…</p>}
+          {avatarUrl && (
+            <button type="button" className="account-remove-link" onClick={() => setAvatarUrl(null)}>
+              Remove picture
+            </button>
+          )}
+        </div>
+
         <h2 className="account-section">About me</h2>
 
         <div className="account-field">
@@ -279,6 +378,27 @@ export default function Account() {
             sell.
           </p>
         </div>
+
+        {isMinor && (
+          <div className="account-field">
+            <label htmlFor="account-guardian">Parent or guardian's email</label>
+            <input
+              id="account-guardian"
+              type="email"
+              value={guardianEmail}
+              onChange={(e) => setGuardianEmail(e.target.value)}
+              autoComplete="off"
+              required
+            />
+            <p className="account-callout">
+              Because you're under 18, we need a parent or guardian to confirm they're happy for you
+              to use Spotted. We'll email them to ask.
+              {profile?.guardianConsentAt
+                ? ' Their consent has been received.'
+                : ' Their consent has not been received yet.'}
+            </p>
+          </div>
+        )}
 
         <div className="account-field">
           <label htmlFor="account-interest">Interest</label>

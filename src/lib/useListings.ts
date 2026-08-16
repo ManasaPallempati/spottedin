@@ -239,6 +239,8 @@ function mapProfileRow(row: ProfileRow): Profile {
     dateOfBirth: null,
     country: null,
     interest: null,
+    guardianEmail: null,
+    guardianConsentAt: null,
     id: row.id,
     handle: row.handle,
     name: row.name,
