@@ -15,9 +15,13 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/razorpay.ts'
 
-// profiles.avatar_emoji, bio and city are NOT NULL, so they are blanked with an
-// empty string rather than null.
+// profiles enforces char_length(avatar_emoji) >= 1 and char_length(city) >= 1,
+// so those two cannot be blanked with an empty string — doing so fails the check
+// constraint and the whole deletion errors out. They are replaced with neutral
+// placeholders instead. bio only has an upper bound, so it can be emptied.
 const DELETED_NAME = 'Deleted user'
+const DELETED_AVATAR = '👤'
+const DELETED_CITY = '—'
 
 // Handle is unique and shown wherever a seller is credited. Deriving it from the
 // user id keeps it collision-free without a lookup, and short enough for the
@@ -55,9 +59,9 @@ async function anonymise(admin: SupabaseClient, uid: string): Promise<Response> 
       .update({
         handle: anonymisedHandle(uid),
         name: DELETED_NAME,
-        avatar_emoji: '',
+        avatar_emoji: DELETED_AVATAR,
         bio: '',
-        city: '',
+        city: DELETED_CITY,
         deleted_at: new Date().toISOString(),
       })
       .eq('id', uid)
