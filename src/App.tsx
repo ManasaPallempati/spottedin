@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import { supabase } from './lib/supabase'
-import { AuthProvider, useAuth } from './lib/auth'
+import { AuthProvider, useAuth, friendlyOAuthCallbackError } from './lib/auth'
 import { AppStateProvider } from './lib/appState'
 import { safeNext } from './lib/safeNext'
 import Welcome from './pages/Welcome'
@@ -44,6 +44,63 @@ function RouteIndexingPolicy() {
   }, [location.pathname])
 
   return null
+}
+
+// GoTrue rejects a bad OAuth attempt (disabled provider, consent denied, etc.) by
+// redirecting the browser back to `redirectTo` (== SITE_ORIGIN, no path — see
+// lib/seo.ts) with `error`/`error_code`/`error_description` in the query string
+// *or* the URL fragment, depending on where in the flow the rejection happened.
+// Both land on us before HashRouter ever gets a chance to route.
+type OAuthCallbackErrorFields = { error?: string; error_code?: string; error_description?: string }
+
+function readParams(raw: string): OAuthCallbackErrorFields | null {
+  const params = new URLSearchParams(raw)
+  const error = params.get('error') ?? undefined
+  const error_code = params.get('error_code') ?? undefined
+  const error_description = params.get('error_description') ?? undefined
+  if (!error && !error_code && !error_description) return null
+  return { error, error_code, error_description }
+}
+
+function extractOAuthCallbackError(): OAuthCallbackErrorFields | null {
+  const fromSearch = readParams(window.location.search)
+  if (fromSearch) return fromSearch
+
+  // A normal in-app hash route always starts with '#/' (see HashRouter's Routes below).
+  // Only a bare '#error=...&error_description=...' fragment — which is NOT one of our
+  // routes — is a GoTrue error payload. A successful implicit-flow token fragment
+  // (`#access_token=...`) also doesn't start with '#/' but contains none of the error
+  // keys, so readParams correctly leaves it alone for supabase-js to consume.
+  const hash = window.location.hash
+  if (hash && !hash.startsWith('#/')) {
+    return readParams(hash.slice(1))
+  }
+  return null
+}
+
+// Runs synchronously during App's render, before <HashRouter> below reads
+// window.location to establish its initial route. Rewriting the URL here — rather
+// than in an effect — means HashRouter never sees the bad '#error=...' fragment, so
+// there's no flash of the catch-all "*" route redirecting to '/' first (that catch-all
+// is exactly how this used to fail silently: an unmatched hash route just bounces home
+// with no explanation). Idempotent: once the error params are stripped, a second call
+// (e.g. React.StrictMode's dev double-render) finds nothing and no-ops.
+function resolveOAuthCallbackError(): void {
+  const callbackError = extractOAuthCallbackError()
+  if (!callbackError) return
+
+  const message = friendlyOAuthCallbackError(callbackError)
+  if (message) {
+    sessionStorage.setItem('spotted_oauth_error', message)
+  }
+  // This attempt failed, so any pending redirect target from Login/Welcome must not
+  // be honored by whatever sign-in the visitor tries next.
+  sessionStorage.removeItem('spotted_oauth_next')
+
+  const url = new URL(window.location.href)
+  url.search = ''
+  url.hash = '#/login'
+  window.history.replaceState(null, '', url.toString())
 }
 
 // After an OAuth round-trip the browser reloads at the app root with a fresh session but
@@ -131,6 +188,10 @@ function AppShell() {
 }
 
 export default function App() {
+  // Must run before HashRouter (below) is rendered — see resolveOAuthCallbackError's
+  // own comment for why this can't be an effect.
+  resolveOAuthCallbackError()
+
   return (
     <HashRouter>
       <AuthProvider>

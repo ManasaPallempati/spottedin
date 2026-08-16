@@ -96,34 +96,97 @@ async function ensureProfile(userId: string, meta: { handle?: string; name?: str
   return null
 }
 
-// Supabase surfaces provider and rate-limit failures as raw API strings such as
-// "Unsupported provider: provider is not enabled". Those name internal causes the
-// visitor cannot act on, so the ones we expect are translated here and anything
-// unrecognised is passed through unchanged rather than swallowed.
-export function friendlyAuthError(message: string, provider?: OAuthProvider): string {
-  const m = message.toLowerCase()
-  const name = provider ? provider[0].toUpperCase() + provider.slice(1) : 'That provider'
+// Shape covers both the AuthError instances supabase-js rejects with (which carry a
+// stable `code` such as 'invalid_credentials' plus a `name` like 'AuthRetryableFetchError'
+// for network failures) and the plain { message, code? } we synthesise from a GoTrue
+// OAuth bounce-back query string in App.tsx, where there is no AuthError to unwrap.
+export type AuthErrorLike = { message: string; code?: string; name?: string }
 
-  if (m.includes('provider is not enabled') || m.includes('unsupported provider')) {
-    return `${name} sign-in isn't available yet. Please continue with email.`
-  }
-  if (m.includes('email rate limit') || m.includes('over_email_send_rate_limit')) {
-    return 'Too many sign-up emails have been sent recently. Please try again in a few minutes.'
-  }
-  if (m.includes('invalid login credentials')) {
+// Supabase surfaces provider, validation, and rate-limit failures as raw API strings such
+// as "Unsupported provider: provider is not enabled". Those name internal causes the
+// visitor cannot act on, so the ones we expect are translated here. `error.code` is stable
+// across GoTrue releases and is checked first; the message substring checks are a fallback
+// for the cases (older SDKs, synthesised OAuth-callback errors) where no code is present.
+// Anything unrecognised is passed through unchanged rather than swallowed — see the
+// console.warn below, which is what we grep for to add a new case.
+export function friendlyAuthError(error: AuthErrorLike, provider?: OAuthProvider): string {
+  const { code } = error
+  const m = error.message.toLowerCase()
+  const name = provider ? provider[0].toUpperCase() + provider.slice(1) : null
+
+  if (code === 'invalid_credentials' || m.includes('invalid login credentials')) {
     return 'That email and password do not match. Please check and try again.'
   }
-  if (m.includes('email not confirmed')) {
+  if (code === 'email_not_confirmed' || m.includes('email not confirmed')) {
     return 'Please confirm your email address first — check your inbox for the link.'
   }
-  if (m.includes('user already registered') || m.includes('already been registered')) {
+  if (code === 'user_already_exists' || m.includes('user already registered') || m.includes('already been registered')) {
     return 'An account with that email already exists. Try logging in instead.'
   }
-  if (m.includes('email address') && m.includes('invalid')) {
-    return 'That email address was rejected. Please use a different one.'
+  if (code === 'over_email_send_rate_limit' || m.includes('email rate limit')) {
+    // Shared by signUp and signIn (password-reset / magic-link paths hit the same limiter),
+    // so this can't say "sign-up emails". GoTrue's default window is ~1h, not "a few minutes".
+    return 'Too many emails have been sent to this address. Please wait a while before trying again.'
   }
-  return message
+  if (code === 'email_address_invalid' || (m.includes('email address') && m.includes('invalid'))) {
+    return "That email address doesn't look valid — please check it and try again."
+  }
+  // Checked before the generic validation_failed branch: GoTrue files the disabled-provider
+  // rejection under error_code 'validation_failed', and field-validation copy would be
+  // nonsense on a page where no fields were submitted.
+  if (m.includes('provider is not enabled') || m.includes('unsupported provider')) {
+    return name
+      ? `${name} sign-in isn't available yet. Please continue with email.`
+      : "This sign-in method isn't available yet. Please continue with email."
+  }
+  if (code === 'validation_failed') {
+    return 'There was a problem with the information you entered. Please check the fields and try again.'
+  }
+  // Network failures never reach GoTrue, so they carry no `code`. auth-js labels them
+  // AuthRetryableFetchError; the message is usually the fetch() rejection text verbatim
+  // (e.g. "Failed to fetch" in Chrome).
+  if (m.includes('failed to fetch') || (!code && error.name === 'AuthRetryableFetchError')) {
+    return "Couldn't connect. Please check your internet connection and try again."
+  }
+
+  console.warn('[auth] untranslated error:', error)
+  return error.message
 }
+
+// Turns a GoTrue OAuth bounce-back's error params (present in either the query string or
+// the URL fragment — see App.tsx) into the same copy used for in-app auth failures.
+// Returns null when none of the three params are present, so callers can use this as
+// both the "was there an error" check and the message lookup in one call.
+export function friendlyOAuthCallbackError(params: {
+  error?: string | null
+  error_code?: string | null
+  error_description?: string | null
+}): string | null {
+  if (!params.error && !params.error_code && !params.error_description) return null
+  // error_description is GoTrue's human-readable text (URL-decoded by URLSearchParams
+  // already); error is the short machine code (e.g. 'access_denied') used only if that's
+  // all we got.
+  const message = params.error_description || params.error || 'OAuth sign-in failed'
+  return friendlyAuthError({ message, code: params.error_code ?? undefined })
+}
+
+// Which OAuth providers to render buttons for. Only Google is enabled in the Supabase
+// projects today — Facebook's app is still pending review, and an unlisted provider 400s
+// in place on the supabase.co domain (no redirectTo, so the visitor is stranded off-site)
+// rather than failing gracefully in the app. Same VITE_-prefixed, comma-separated env
+// pattern as SITE_ORIGIN in lib/seo.ts; staging/prod can widen this via Netlify env without
+// a code change once Facebook is approved.
+// Distinguish "unset" (env var not defined at all — default to Google) from an explicit
+// empty/garbage value (operator's choice, honored as-is even if that means no buttons).
+const rawOAuthProviders: string | undefined = import.meta.env.VITE_OAUTH_PROVIDERS
+
+export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
+  rawOAuthProviders === undefined
+    ? ['google']
+    : rawOAuthProviders
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .filter((p): p is OAuthProvider => p === 'google' || p === 'facebook')
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
@@ -182,16 +245,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: { data: { handle, name } },
     })
-    return { error: error ? friendlyAuthError(error.message) : null }
+    return { error: error ? friendlyAuthError(error) : null }
   }
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error ? friendlyAuthError(error.message) : null }
+    return { error: error ? friendlyAuthError(error) : null }
   }
 
-  // Redirects the browser to the provider on success; only returns here when the request
-  // is rejected before the redirect (e.g. the provider isn't enabled in Supabase).
+  // In the browser, signInWithOAuth's _handleProviderSignIn always hardcodes error: null
+  // and navigates away (it builds the provider URL client-side; it never calls GoTrue to
+  // validate the provider first) — so this branch is effectively dead there, but harmless
+  // to keep for non-browser/SSR callers of this client. Rejections that actually happen
+  // server-side (disabled provider, consent denial, etc.) instead come back as query/hash
+  // params on the redirect back to us; see resolveOAuthCallbackError in App.tsx.
   async function signInWithOAuth(
     provider: OAuthProvider,
     options?: { redirectTo?: string },
@@ -200,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider,
       options: { redirectTo: options?.redirectTo },
     })
-    return { error: error ? friendlyAuthError(error.message, provider) : null }
+    return { error: error ? friendlyAuthError(error, provider) : null }
   }
 
   async function signOut(): Promise<void> {

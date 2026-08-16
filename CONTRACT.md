@@ -709,6 +709,9 @@ User-facing copy strings added this round (source of truth):
 - "That email address doesn't look valid — please check it and try again."
 - "<Provider> sign-in isn't available yet. Please continue with email." (generic form:
   "This sign-in method isn't available yet. Please continue with email.")
+- "There was a problem with the information you entered. Please check the fields and try again."
+  (generic `validation_failed` fallback; the provider-not-enabled substring check runs first,
+  since GoTrue files that rejection under the same code)
 - "Couldn't connect. Please check your internet connection and try again."
 
 `src/pages/Welcome.tsx` also derives its structured-data `url` from `SITE_ORIGIN` instead

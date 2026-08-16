@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { useAuth, type OAuthProvider } from '../lib/auth'
+import { useAuth, ENABLED_OAUTH_PROVIDERS, type OAuthProvider } from '../lib/auth'
 import { GoogleMark, FacebookMark } from '../components/OAuthMarks'
 import { setPageMeta, setStructuredData, SITE_ORIGIN } from '../lib/seo'
 import './welcome.css'
@@ -75,29 +75,33 @@ export default function Welcome() {
           </p>
         )}
 
-        <button
-          type="button"
-          className="welcome-btn welcome-btn-solid"
-          onClick={() => handleOAuth('google')}
-          disabled={busy}
-          aria-busy={pending === 'google'}
-        >
-          <GoogleMark />
-          <span>{pending === 'google' ? 'Redirecting…' : 'Continue with Google'}</span>
-        </button>
+        {ENABLED_OAUTH_PROVIDERS.includes('google') && (
+          <button
+            type="button"
+            className="welcome-btn welcome-btn-solid"
+            onClick={() => handleOAuth('google')}
+            disabled={busy}
+            aria-busy={pending === 'google'}
+          >
+            <GoogleMark />
+            <span>{pending === 'google' ? 'Redirecting…' : 'Continue with Google'}</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          className="welcome-btn welcome-btn-solid"
-          onClick={() => handleOAuth('facebook')}
-          disabled={busy}
-          aria-busy={pending === 'facebook'}
-        >
-          <FacebookMark />
-          <span>{pending === 'facebook' ? 'Redirecting…' : 'Continue with Facebook'}</span>
-        </button>
+        {ENABLED_OAUTH_PROVIDERS.includes('facebook') && (
+          <button
+            type="button"
+            className="welcome-btn welcome-btn-solid"
+            onClick={() => handleOAuth('facebook')}
+            disabled={busy}
+            aria-busy={pending === 'facebook'}
+          >
+            <FacebookMark />
+            <span>{pending === 'facebook' ? 'Redirecting…' : 'Continue with Facebook'}</span>
+          </button>
+        )}
 
-        <p className="welcome-or">or</p>
+        {ENABLED_OAUTH_PROVIDERS.length > 0 && <p className="welcome-or">or</p>}
 
         <Link to={`/login?next=${encodeURIComponent(NEXT)}`} className="welcome-btn welcome-btn-ghost">
           Continue with email
