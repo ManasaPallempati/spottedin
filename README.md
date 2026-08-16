@@ -37,20 +37,28 @@ npm run build    # production build (base './', GitHub Pages ready)
 
 ## Auth
 
-`/login` offers Google, Facebook, and email/password sign-in; `/signup` keeps email
-sign-up. Social sign-in uses Supabase OAuth (`supabase.auth.signInWithOAuth`) — no
-provider secrets live in the app. The `next` redirect target is validated as an internal
-path (`src/lib/safeNext.ts`) and preserved across the OAuth round-trip via sessionStorage.
+`/login` offers social and email/password sign-in; `/signup` keeps email sign-up. Social
+sign-in uses Supabase OAuth (`supabase.auth.signInWithOAuth`) — no provider secrets live
+in the app. A social button renders only for providers listed in `VITE_OAUTH_PROVIDERS`
+(comma-separated; defaults to `google`), so a provider that is not enabled in the Supabase
+dashboard is hidden rather than shown as a button that cannot work. The `next` redirect
+target is validated as an internal path (`src/lib/safeNext.ts`) and preserved across the
+OAuth round-trip via sessionStorage.
 
 The Supabase client sets `flowType: 'pkce'` because the app uses `HashRouter`: the default
 implicit flow returns the session in the URL fragment, which is where the router reads the
 route from, so the callback would land on an unmatched path. PKCE returns `?code=…` in the
 query string instead.
 
-Google and Facebook must be enabled in the Supabase dashboard (Authentication →
-Providers), with each provider's client ID/secret and the redirect/callback URL
-configured there. That dashboard step is external to this repo and is **not** performed by
-the app — until it is done, the social buttons surface the provider's "not enabled" error.
+A provider must be enabled in the Supabase dashboard (Authentication → Providers), with
+its client ID/secret and the redirect/callback URL configured there, **before** it is
+added to `VITE_OAUTH_PROVIDERS`. That dashboard step is external to this repo and is
+**not** performed by the app. Note that `signInWithOAuth` never returns an error in the
+browser — a disabled provider fails as a raw 400 JSON response on the Supabase domain
+after the redirect, which is why unavailable providers are hidden instead of handled.
+OAuth failures that bounce back to the app (for example a denied consent screen) arrive
+as `error_description` URL params; the app parses these on boot and shows a translated
+message on `/login` (see CONTRACT.md Round 7).
 
 ## Environments
 
