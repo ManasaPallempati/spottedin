@@ -11,6 +11,15 @@ export type Profile = {
   city: string | null
   rating: number | null
   sales: number | null
+  handleChangedAt: string | null
+}
+
+export type ProfileEdit = {
+  handle: string
+  name: string
+  avatarEmoji: string
+  bio: string
+  city: string
 }
 
 export type AuthContextValue = {
@@ -22,6 +31,7 @@ export type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  updateProfile: (edit: ProfileEdit) => Promise<{ error: string | null }>
   deleteAccount: () => Promise<{ error: string | null }>
 }
 
@@ -36,6 +46,7 @@ type ProfileRow = {
   city: string | null
   rating: number | null
   sales: number | null
+  handle_changed_at?: string | null
 }
 
 function mapProfile(row: ProfileRow): Profile {
@@ -48,6 +59,7 @@ function mapProfile(row: ProfileRow): Profile {
     city: row.city,
     rating: row.rating,
     sales: row.sales,
+    handleChangedAt: row.handle_changed_at ?? null,
   }
 }
 
@@ -68,7 +80,7 @@ function randomDigits(len: number): string {
   return out
 }
 
-const PROFILE_COLUMNS = 'id,handle,name,avatar_emoji,bio,city,rating,sales'
+const PROFILE_COLUMNS = 'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at'
 
 async function ensureProfile(userId: string, meta: { handle?: string; name?: string }, email: string): Promise<Profile | null> {
   const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
@@ -291,6 +303,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // Two failures here come from the database rather than from validation, and
+  // neither can be prevented client-side: another person can take a username
+  // between the form rendering and the save, and the 30-day limit is enforced by
+  // a trigger (round9) precisely so it cannot be bypassed. Both are translated
+  // rather than surfaced raw.
+  async function updateProfile(edit: ProfileEdit): Promise<{ error: string | null }> {
+    if (!session) return { error: 'You need to be signed in to change your profile.' }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        handle: edit.handle,
+        name: edit.name,
+        avatar_emoji: edit.avatarEmoji,
+        bio: edit.bio,
+        city: edit.city,
+      })
+      .eq('id', session.user.id)
+      .select(PROFILE_COLUMNS)
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        return { error: 'That username is already taken. Please choose another.' }
+      }
+      if (error.message.includes('handle_change_too_soon')) {
+        // The trigger puts the date the next change is allowed in the hint.
+        const next = (error as { hint?: string }).hint
+        return {
+          error: next
+            ? `You can change your username once every 30 days. You can change it again on ${next}.`
+            : 'You can change your username once every 30 days.',
+        }
+      }
+      if (error.code === '23514') {
+        return { error: 'Some of those details are not valid. Please check and try again.' }
+      }
+      console.warn('[auth] profile update failed:', error)
+      return { error: 'We could not save your changes just now. Please try again.' }
+    }
+
+    setProfile(mapProfile(data as ProfileRow))
+    return { error: null }
+  }
+
   // Anonymises the account rather than erasing its rows — orders and payments
   // are retained records, and the other side of a completed sale still needs
   // their history. The work happens in the delete-account Edge Function, which
@@ -316,6 +373,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInWithOAuth,
     signOut,
+    updateProfile,
     deleteAccount,
   }
 

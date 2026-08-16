@@ -228,6 +228,9 @@ type ProfileRow = {
 
 function mapProfileRow(row: ProfileRow): Profile {
   return {
+    // This maps a seller's public profile, which never needs the cooldown
+    // timestamp — only the account owner's own edit screen reads it.
+    handleChangedAt: null,
     id: row.id,
     handle: row.handle,
     name: row.name,
