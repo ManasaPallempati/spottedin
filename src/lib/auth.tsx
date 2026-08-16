@@ -24,7 +24,7 @@ export type AuthContextValue = {
   signOut: () => Promise<void>
 }
 
-export type OAuthProvider = 'google' | 'facebook'
+export type OAuthProvider = 'google' | 'facebook' | 'apple'
 
 type ProfileRow = {
   id: string
@@ -171,14 +171,17 @@ export function friendlyOAuthCallbackError(params: {
 }
 
 // Which OAuth providers to render buttons for. Only Google is enabled in the Supabase
-// projects today — Facebook's app is still pending review, and an unlisted provider 400s
-// in place on the supabase.co domain (no redirectTo, so the visitor is stranded off-site)
-// rather than failing gracefully in the app. Same VITE_-prefixed, comma-separated env
-// pattern as SITE_ORIGIN in lib/seo.ts; staging/prod can widen this via Netlify env without
-// a code change once Facebook is approved.
+// projects today — Facebook's app is still pending review, Apple needs a paid Apple
+// Developer Program membership before its Services ID and signing key can exist — and an
+// unlisted provider 400s in place on the supabase.co domain (no redirectTo, so the visitor
+// is stranded off-site) rather than failing gracefully in the app. Same VITE_-prefixed,
+// comma-separated env pattern as SITE_ORIGIN in lib/seo.ts; staging/prod can widen this via
+// Netlify env without a code change once a provider is approved.
 // Distinguish "unset" (env var not defined at all — default to Google) from an explicit
 // empty/garbage value (operator's choice, honored as-is even if that means no buttons).
 const rawOAuthProviders: string | undefined = import.meta.env.VITE_OAUTH_PROVIDERS
+
+const KNOWN_OAUTH_PROVIDERS: readonly OAuthProvider[] = ['google', 'facebook', 'apple']
 
 export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
   rawOAuthProviders === undefined
@@ -186,7 +189,7 @@ export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
     : rawOAuthProviders
         .split(',')
         .map((p) => p.trim().toLowerCase())
-        .filter((p): p is OAuthProvider => p === 'google' || p === 'facebook')
+        .filter((p): p is OAuthProvider => (KNOWN_OAUTH_PROVIDERS as readonly string[]).includes(p))
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 

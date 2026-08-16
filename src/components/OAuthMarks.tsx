@@ -23,6 +23,20 @@ export function GoogleMark() {
   )
 }
 
+// currentColor, not a fixed black: Apple's guidelines require the mark to match the
+// button's label colour, and these buttons are white-on-dark on Welcome but dark-on-white
+// on Login.
+export function AppleMark() {
+  return (
+    <svg className="oauth-mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M17.05 12.54c-.02-2.09 1.7-3.09 1.78-3.14-.97-1.42-2.48-1.61-3.02-1.63-1.29-.13-2.51.76-3.16.76-.65 0-1.66-.74-2.73-.72-1.4.02-2.7.82-3.42 2.07-1.46 2.53-.37 6.27 1.05 8.32.7 1 1.52 2.13 2.6 2.09 1.05-.04 1.44-.68 2.71-.68 1.26 0 1.62.68 2.73.66 1.13-.02 1.84-1.02 2.53-2.03.8-1.16 1.13-2.29 1.15-2.35-.03-.01-2.2-.84-2.22-3.35zM15.0 6.38c.57-.7.96-1.66.85-2.63-.83.03-1.83.55-2.42 1.24-.53.62-1 1.6-.87 2.55.92.07 1.87-.47 2.44-1.16z"
+      />
+    </svg>
+  )
+}
+
 export function FacebookMark() {
   return (
     <svg className="oauth-mark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">

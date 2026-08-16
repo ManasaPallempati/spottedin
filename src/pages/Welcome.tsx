@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth, ENABLED_OAUTH_PROVIDERS, type OAuthProvider } from '../lib/auth'
-import { GoogleMark, FacebookMark } from '../components/OAuthMarks'
+import { GoogleMark, FacebookMark, AppleMark } from '../components/OAuthMarks'
 import { setPageMeta, setStructuredData, SITE_ORIGIN } from '../lib/seo'
 import './welcome.css'
 
