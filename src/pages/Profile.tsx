@@ -41,13 +41,16 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, signOut } = useAuth()
+  const { isAuthed, profile, signOut, deleteAccount } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
   const [showPromo, setShowPromo] = useState(true)
   const [sortOpen, setSortOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [sort, setSort] = useState<Sort>('newest')
   const [followerCount, setFollowerCount] = useState(0)
 
@@ -106,6 +109,27 @@ export default function Profile() {
   async function handleLogout() {
     setMenuOpen(false)
     await signOut()
+    navigate('/')
+  }
+
+  // Two-step by design: deletion is irreversible for the person doing it, so the
+  // menu only opens the confirmation sheet and the second sheet does the work.
+  function handleDeleteRequest() {
+    setMenuOpen(false)
+    setDeleteError(null)
+    setConfirmDeleteOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    setDeleting(true)
+    setDeleteError(null)
+    const { error } = await deleteAccount()
+    setDeleting(false)
+    if (error) {
+      setDeleteError(error)
+      return
+    }
+    setConfirmDeleteOpen(false)
     navigate('/')
   }
 
@@ -319,6 +343,56 @@ export default function Profile() {
         <div className="profile-sort-list">
           <button type="button" className="profile-sort-option" onClick={handleLogout}>
             Log out
+          </button>
+          {isAuthed && (
+            <button
+              type="button"
+              className="profile-sort-option profile-sort-option-danger"
+              onClick={handleDeleteRequest}
+            >
+              Delete my account
+            </button>
+          )}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={confirmDeleteOpen}
+        onClose={() => (deleting ? undefined : setConfirmDeleteOpen(false))}
+        title="Delete your account?"
+      >
+        <div className="profile-delete-confirm">
+          <p>
+            You will be signed out and will not be able to sign in again. Your profile and anything
+            still for sale will no longer appear on Spotted.
+          </p>
+          <p className="profile-delete-note">
+            Completed orders and payments are kept, because they are the record of purchases you and
+            other people have already made.
+          </p>
+
+          {deleteError && (
+            <p className="profile-delete-error" role="alert">
+              {deleteError}
+            </p>
+          )}
+
+          <button
+            type="button"
+            className="profile-sort-option profile-sort-option-danger"
+            onClick={handleDeleteConfirm}
+            disabled={deleting}
+            aria-busy={deleting}
+          >
+            {deleting ? 'Deleting…' : 'Yes, delete my account'}
+          </button>
+          <button
+            type="button"
+            className="profile-sort-option"
+            onClick={() => setConfirmDeleteOpen(false)}
+            disabled={deleting}
+          >
+            Cancel
           </button>
         </div>
       </BottomSheet>
