@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useAuth } from '../lib/auth'
@@ -6,6 +6,9 @@ import { supabase } from '../lib/supabase'
 import { listingPath } from '../lib/listingUrls'
 import { CONDITIONS } from '../data/sellers'
 import './sellnew.css'
+
+const MAX_PHOTOS = 8
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const CATEGORIES = ['Menswear', 'Womenswear', 'Kids', 'Everything else']
@@ -37,8 +40,11 @@ export default function SellNew() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [condition, setCondition] = useState<string>(CONDITIONS[0])
   const [description, setDescription] = useState('')
-  const [imagePath, setImagePath] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // One entry per photo, in display order. `path` is the storage key that goes
+  // into listing_images; `preview` is a local object URL shown until the listing
+  // exists. Position in this array is the position in the gallery, so removing
+  // one renumbers the rest rather than leaving a gap the unique index rejects.
+  const [photos, setPhotos] = useState<{ path: string; preview: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,38 +55,70 @@ export default function SellNew() {
     }
   }, [authLoading, isAuthed, navigate])
 
+  // Revoked on unmount only. A dependency on `photos` would revoke the previous
+  // array's URLs on every add, breaking the thumbnails still on screen.
+  const photosRef = useRef(photos)
+  photosRef.current = photos
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      for (const photo of photosRef.current) URL.revokeObjectURL(photo.preview)
     }
-  }, [previewUrl])
+  }, [])
 
   if (authLoading || !isAuthed) {
     return <div className="sellnew-page" />
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !uid) {
-      setImagePath(null)
+    const files = Array.from(e.target.files ?? [])
+    // Clearing the input lets the same file be picked again after removing it;
+    // without this the change event never fires a second time.
+    e.target.value = ''
+    if (files.length === 0 || !uid) return
+
+    const room = MAX_PHOTOS - photos.length
+    if (room <= 0) {
+      setError(`You can add up to ${MAX_PHOTOS} photos.`)
       return
     }
-
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(URL.createObjectURL(file))
+    const accepted = files.slice(0, room)
+    if (files.length > room) {
+      setError(`Only the first ${room} of those were added — the limit is ${MAX_PHOTOS} photos.`)
+    } else {
+      setError(null)
+    }
 
     setUploading(true)
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const path = `${uid}/${listingId}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
-    setUploading(false)
-
-    if (uploadError) {
-      console.warn(uploadError)
-      setImagePath(null)
-      return
+    for (const file of accepted) {
+      if (file.size > MAX_PHOTO_BYTES) {
+        setError(`"${file.name}" is over 8MB and was skipped.`)
+        continue
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      // The storage policy and the listing_images owner-path trigger both
+      // require the seller's own uuid folder. crypto.randomUUID keeps repeat
+      // uploads of the same filename from overwriting each other.
+      const path = `${uid}/${listingId}-${crypto.randomUUID()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('listing-images')
+        .upload(path, file, { upsert: true })
+      if (uploadError) {
+        console.warn(uploadError)
+        setError('One of those photos could not be uploaded.')
+        continue
+      }
+      setPhotos((current) => [...current, { path, preview: URL.createObjectURL(file) }])
     }
-    setImagePath(path)
+    setUploading(false)
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((current) => {
+      const next = [...current]
+      const [removed] = next.splice(index, 1)
+      if (removed) URL.revokeObjectURL(removed.preview)
+      return next
+    })
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -115,17 +153,37 @@ export default function SellNew() {
       category: CATEGORY_DB[category] ?? 'vintage',
       size,
       condition: CONDITION_DB[condition] ?? 'good',
-      image_path: imagePath,
+      // Position 0 is written here as well as into listing_images so the row is
+      // never briefly without a thumbnail; the sync trigger keeps it correct
+      // from then on.
+      image_path: photos[0]?.path ?? null,
     })
 
-    setSubmitting(false)
-
     if (insertError) {
+      setSubmitting(false)
       console.warn(insertError)
       setError(insertError.message)
       return
     }
 
+    // After the listing, because listing_images references it. A failure here
+    // leaves a listing with fewer photos rather than no listing, which is the
+    // better of the two — the seller can add the rest by editing.
+    if (photos.length > 0) {
+      const { error: imagesError } = await supabase.from('listing_images').insert(
+        photos.map((photo, index) => ({
+          listing_id: listingId,
+          path: photo.path,
+          position: index,
+        })),
+      )
+      if (imagesError) {
+        console.warn(imagesError)
+        setError('Your listing was created, but some photos could not be attached.')
+      }
+    }
+
+    setSubmitting(false)
     navigate(listingPath(listingId, title))
   }
 
@@ -139,21 +197,49 @@ export default function SellNew() {
       </div>
 
       <form className="sellnew-form" onSubmit={handleSubmit}>
-        <label className="sellnew-photo-label" htmlFor="sellnew-photo">
-          {previewUrl ? (
-            <img className="sellnew-photo-preview" src={previewUrl} alt="Selected item" />
-          ) : (
-            <span className="sellnew-photo-placeholder">Add a photo</span>
+        <div className="sellnew-photos-head">
+          <span className="sellnew-photos-title">Add photos</span>
+          <span className="sellnew-hint">
+            {photos.length}/{MAX_PHOTOS}
+          </span>
+        </div>
+
+        <div className="sellnew-photo-grid">
+          {photos.map((photo, index) => (
+            <div key={photo.path} className="sellnew-photo-tile">
+              <img className="sellnew-photo-preview" src={photo.preview} alt="" />
+              {index === 0 && <span className="sellnew-photo-badge">Cover</span>}
+              <button
+                type="button"
+                className="sellnew-photo-remove"
+                aria-label={`Remove photo ${index + 1}`}
+                onClick={() => removePhoto(index)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+
+          {photos.length < MAX_PHOTOS && (
+            <label className="sellnew-photo-add" htmlFor="sellnew-photo">
+              <span aria-hidden="true">+</span>
+              <span className="sellnew-photo-add-text">Add</span>
+            </label>
           )}
-        </label>
+        </div>
+
         <input
           id="sellnew-photo"
           type="file"
           accept="image/*"
+          multiple
           className="sellnew-photo-input"
           onChange={handlePhotoChange}
         />
-        {uploading && <p className="sellnew-hint">Uploading photo…</p>}
+        <p className="sellnew-hint">
+          The first photo is the cover buyers see. Show the label, the fabric and any flaws.
+        </p>
+        {uploading && <p className="sellnew-hint">Uploading…</p>}
 
         <div className="sellnew-field">
           <label htmlFor="sellnew-title">Title</label>
