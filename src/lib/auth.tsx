@@ -12,7 +12,28 @@ export type Profile = {
   rating: number | null
   sales: number | null
   handleChangedAt: string | null
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string | null
+  interest: Interest | null
 }
+
+export type Interest = 'womenswear' | 'menswear' | 'both'
+
+// Mirrors profiles_deletion_reason_valid. Free text is deliberately not an
+// option: the list is fixed so it can be counted, and so nothing identifying
+// ends up attached to a row that has just been anonymised.
+export type DeletionReason =
+  | 'not_using'
+  | 'new_account'
+  | 'not_selling'
+  | 'transaction_issue'
+  | 'policies'
+  | 'fees'
+  | 'safety_privacy'
+  | 'other'
 
 export type ProfileEdit = {
   handle: string
@@ -20,6 +41,12 @@ export type ProfileEdit = {
   avatarEmoji: string
   bio: string
   city: string
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string
+  interest: Interest | null
 }
 
 export type AuthContextValue = {
@@ -32,7 +59,7 @@ export type AuthContextValue = {
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   updateProfile: (edit: ProfileEdit) => Promise<{ error: string | null }>
-  deleteAccount: () => Promise<{ error: string | null }>
+  deleteAccount: (reason?: DeletionReason) => Promise<{ error: string | null }>
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -47,6 +74,12 @@ type ProfileRow = {
   rating: number | null
   sales: number | null
   handle_changed_at?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  avatar_url?: string | null
+  date_of_birth?: string | null
+  country?: string | null
+  interest?: Interest | null
 }
 
 function mapProfile(row: ProfileRow): Profile {
@@ -60,6 +93,12 @@ function mapProfile(row: ProfileRow): Profile {
     rating: row.rating,
     sales: row.sales,
     handleChangedAt: row.handle_changed_at ?? null,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
+    avatarUrl: row.avatar_url ?? null,
+    dateOfBirth: row.date_of_birth ?? null,
+    country: row.country ?? null,
+    interest: row.interest ?? null,
   }
 }
 
@@ -80,7 +119,8 @@ function randomDigits(len: number): string {
   return out
 }
 
-const PROFILE_COLUMNS = 'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at'
+const PROFILE_COLUMNS =
+  'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
 async function ensureProfile(userId: string, meta: { handle?: string; name?: string }, email: string): Promise<Profile | null> {
   const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
@@ -343,6 +383,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar_emoji: edit.avatarEmoji,
         bio: edit.bio,
         city: edit.city,
+        first_name: edit.firstName,
+        last_name: edit.lastName,
+        avatar_url: edit.avatarUrl,
+        date_of_birth: edit.dateOfBirth,
+        country: edit.country,
+        interest: edit.interest,
       })
       .eq('id', session.user.id)
       .select(PROFILE_COLUMNS)
@@ -361,6 +407,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : 'You can change your username once every 30 days.',
         }
       }
+      if (error.message.includes('under_minimum_age')) {
+        return { error: 'You need to be 18 or over to use Spotted.' }
+      }
+      if (error.message.includes('date_of_birth_in_future')) {
+        return { error: 'Please enter a valid date of birth.' }
+      }
       if (error.code === '23514') {
         return { error: 'Some of those details are not valid. Please check and try again.' }
       }
@@ -378,7 +430,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // holds the service-role key; the browser only proves who is asking.
   // Signs out locally afterwards because the server-side ban does not by itself
   // clear the session already stored in this tab.
-  async function deleteAccount(): Promise<{ error: string | null }> {
+  // The reason is recorded before the account is closed, because the Edge
+  // Function anonymises the row and the client loses its session immediately
+  // afterwards — there is no later opportunity to write it.
+  async function deleteAccount(reason?: DeletionReason): Promise<{ error: string | null }> {
+    if (reason && session) {
+      const { error: reasonError } = await supabase
+        .from('profiles')
+        .update({ deletion_reason: reason })
+        .eq('id', session.user.id)
+      // Losing the reason is not worth blocking someone from leaving.
+      if (reasonError) console.warn('[auth] could not record deletion reason:', reasonError)
+    }
+
     const { error } = await supabase.functions.invoke('delete-account', { body: {} })
     if (error) {
       console.warn('[auth] delete-account failed:', error)
