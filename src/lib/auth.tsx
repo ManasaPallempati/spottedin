@@ -206,6 +206,30 @@ export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
         .map((p) => p.trim().toLowerCase())
         .filter((p): p is OAuthProvider => p === 'google' || p === 'facebook')
 
+// Offered when a username is already taken. Candidates are checked against the
+// table in one query rather than one-at-a-time, and only free ones are shown —
+// suggesting a name that is also taken is worse than suggesting nothing.
+// Nothing here reserves a name: two people can still be offered the same
+// suggestion, and whoever saves second gets the taken error again. The unique
+// index is the only real arbiter.
+export async function suggestHandles(base: string, wanted = 3): Promise<string[]> {
+  const root = base.replace(/_+$/, '').slice(0, 24) || 'user'
+  const candidates = new Set<string>()
+  while (candidates.size < wanted * 3) {
+    candidates.add(`${root}_${Math.floor(Math.random() * 9000) + 1000}`)
+    candidates.add(`${root}${Math.floor(Math.random() * 90) + 10}`)
+  }
+  const list = [...candidates].filter((h) => /^[a-z0-9][a-z0-9_]{2,29}$/.test(h))
+
+  const { data, error } = await supabase.from('profiles').select('handle').in('handle', list)
+  if (error) {
+    console.warn('[auth] handle suggestion lookup failed:', error)
+    return list.slice(0, wanted)
+  }
+  const taken = new Set((data ?? []).map((r: { handle: string }) => r.handle.replace(/^@/, '')))
+  return list.filter((h) => !taken.has(h)).slice(0, wanted)
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {

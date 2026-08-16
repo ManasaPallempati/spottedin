@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth, suggestHandles } from '../lib/auth'
 import { setPageMeta } from '../lib/seo'
 import './account.css'
 
@@ -39,6 +39,7 @@ export default function Account() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
 
   useEffect(() => {
     setPageMeta({
@@ -101,8 +102,15 @@ export default function Account() {
 
     if (saveError) {
       setError(saveError)
+      // Only a name clash has an alternative worth offering. Every other
+      // failure needs the person to change something else, and a list of
+      // usernames would just be noise.
+      if (saveError.includes('already taken')) {
+        setSuggestions(await suggestHandles(handle))
+      }
       return
     }
+    setSuggestions([])
     setSaved(true)
   }
 
@@ -167,6 +175,28 @@ export default function Account() {
               Changing this will break existing links to your shop.
             </p>
           )}
+
+          {suggestions.length > 0 && (
+            <div className="account-suggestions">
+              <p className="account-hint">Here are some that are free:</p>
+              <div className="account-suggestion-row">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="account-suggestion"
+                    onClick={() => {
+                      setHandle(s)
+                      setSuggestions([])
+                      setError(null)
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Read-only. Changing an email is an auth operation with a
@@ -220,6 +250,13 @@ export default function Account() {
 
         <div className="account-field">
           <label htmlFor="account-bio">Bio</label>
+          {/* A bio is public on every listing. Contact details posted here are
+              what move a sale off the platform, where there is no payment
+              protection and no record if it goes wrong. */}
+          <p className="account-callout">
+            Never share personal details like your email address or phone number in your bio. Keep
+            conversations in Spotted so your purchases stay protected.
+          </p>
           <textarea
             id="account-bio"
             value={bio}
