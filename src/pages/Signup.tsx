@@ -4,9 +4,12 @@ import { useAuth } from '../lib/auth'
 import { safeNext } from '../lib/safeNext'
 import './auth.css'
 
+// Mirrors sanitizeHandle in lib/auth.tsx, which is what an OAuth signup goes
+// through. Periods become underscores rather than vanishing, so the suggested
+// handle still reads like the person's name.
 function handleFromEmail(email: string): string {
   const local = email.split('@')[0]?.toLowerCase() ?? ''
-  return local.replace(/[^a-z0-9._]/g, '').slice(0, 20)
+  return local.replace(/[.-]/g, '_').replace(/[^a-z0-9_]/g, '').replace(/^_+/, '').slice(0, 30)
 }
 
 export default function Signup() {
@@ -36,6 +39,18 @@ export default function Signup() {
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters')
+      return
+    }
+
+    if (!/^[a-z0-9][a-z0-9_]{2,29}$/.test(handle)) {
+      setError('Username can use letters, numbers and underscores only, and must be 3–30 characters')
+      return
+    }
+
+    // Depop's rule, and a sensible one: a handle is public on every listing and
+    // shop page, so letting it be the email address leaks it to everyone.
+    if (handle === email.trim().toLowerCase()) {
+      setError('Username cannot be the same as your email address')
       return
     }
 
@@ -113,20 +128,23 @@ export default function Signup() {
         </div>
 
         <div className="auth-field">
-          <label htmlFor="signup-handle">Handle</label>
+          <label htmlFor="signup-handle">Username</label>
           <input
             id="signup-handle"
             type="text"
             value={handle}
             onChange={(e) => {
               setHandleEdited(true)
-              setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ''))
+              setHandle(e.target.value.toLowerCase().replace(/[.-]/g, '_').replace(/[^a-z0-9_]/g, ''))
             }}
-            pattern="^[a-z0-9._]{3,20}$"
+            pattern="^[a-z0-9][a-z0-9_]{2,29}$"
             minLength={3}
-            maxLength={20}
+            maxLength={30}
             required
           />
+          <p className="auth-hint">
+            Letters, numbers and underscores. This is your shop name on Spotted.
+          </p>
         </div>
 
         <div className="auth-field">

@@ -51,10 +51,15 @@ function mapProfile(row: ProfileRow): Profile {
   }
 }
 
+// Underscore is the only permitted separator (see round8-handle-rules.sql), so a
+// period in an email local part becomes one rather than being dropped —
+// manasa.pallempati arrives as manasa_pallempati instead of manasapallempati.
+// A handle must also start alphanumeric, hence the leading trim.
 function sanitizeHandle(email: string): string {
   const local = email.split('@')[0]?.toLowerCase() ?? 'user'
-  const cleaned = local.replace(/[^a-z0-9._]/g, '')
-  return cleaned.slice(0, 20) || 'user'
+  const cleaned = local.replace(/[.-]/g, '_').replace(/[^a-z0-9_]/g, '').replace(/^_+/, '')
+  const trimmed = cleaned.slice(0, 30)
+  return trimmed.length >= 3 ? trimmed : 'user'
 }
 
 function randomDigits(len: number): string {
