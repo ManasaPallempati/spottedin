@@ -359,6 +359,37 @@
   font-weight: 700;
 }
 
+/* Destructive actions. Colour alone would fail WCAG 1.4.1, so the confirmation
+   sheet also states the consequence in words before the button is reachable. */
+.profile-sort-option-danger {
+  color: var(--danger, #ff5a5a);
+}
+
+.profile-sort-option-danger:disabled {
+  opacity: 0.6;
+}
+
+.profile-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-delete-confirm p {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.profile-delete-note {
+  color: var(--muted, #9a9a9a);
+  font-size: 14px;
+}
+
+.profile-delete-error {
+  color: var(--danger, #ff5a5a);
+  font-size: 14px;
+}
+
 .profile-empty {
   display: flex;
   flex-direction: column;

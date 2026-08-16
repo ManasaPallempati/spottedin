@@ -22,6 +22,7 @@ export type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  deleteAccount: () => Promise<{ error: string | null }>
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -274,6 +275,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // Anonymises the account rather than erasing its rows — orders and payments
+  // are retained records, and the other side of a completed sale still needs
+  // their history. The work happens in the delete-account Edge Function, which
+  // holds the service-role key; the browser only proves who is asking.
+  // Signs out locally afterwards because the server-side ban does not by itself
+  // clear the session already stored in this tab.
+  async function deleteAccount(): Promise<{ error: string | null }> {
+    const { error } = await supabase.functions.invoke('delete-account', { body: {} })
+    if (error) {
+      console.warn('[auth] delete-account failed:', error)
+      return { error: 'We could not close your account just now. Please try again.' }
+    }
+    await supabase.auth.signOut()
+    return { error: null }
+  }
+
   const value: AuthContextValue = {
     session,
     profile,
@@ -283,6 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInWithOAuth,
     signOut,
+    deleteAccount,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
