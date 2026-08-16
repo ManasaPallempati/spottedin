@@ -70,11 +70,17 @@ environments, and it cannot return the SPA shell with HTTP 200 for dynamic route
 | | Branch | URL | Supabase project |
 |---|---|---|---|
 | Production | `main` | `www.spottedin.co` (apex 301s here) | `masdygvcssrtwseopfmj` |
-| Staging | `TEST2026.01` | `www.staging.spottedin.co` | `uxqumkfbchyiupwhddqw` |
+| Staging | `TEST2026.02` | `www.staging.spottedin.co` | `uxqumkfbchyiupwhddqw` |
 
-Feature branches merge into `TEST2026.01`, are verified on staging, then merge
-into `main` for release. Both branches require a pull request and a passing
-`test` check. Every pull request also gets its own Netlify deploy preview.
+Feature branches merge into the current `TEST2026.xx` branch, are verified on
+staging, then merge into `main` for release. Both branches require a pull
+request and a passing `test` check. Every pull request also gets its own
+Netlify deploy preview.
+
+When a new test cycle opens a new `TEST2026.xx` branch, four things move with
+it: the Netlify staging site's build branch, the branch-protection rule, the
+`ci.yml` trigger list, and the references in this file and `netlify.toml`.
+Miss any one and staging silently deploys an unprotected, untested branch.
 
 Per-site environment variables are set in the Netlify UI, not in `netlify.toml`
 — each site builds its own branch under the `production` deploy context, so a

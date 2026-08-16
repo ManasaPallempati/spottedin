@@ -1,7 +1,7 @@
 # Two Netlify sites build from this one repository:
 #
 #   production site -> main         -> www.spottedin.co (apex redirects here)
-#   staging site    -> TEST2026.01  -> www.staging.spottedin.co
+#   staging site    -> TEST2026.02  -> www.staging.spottedin.co
 #
 # Branch-to-environment mapping lives here rather than in GitHub because a
 # GitHub Pages site is one-per-repository and cannot serve two environments.
