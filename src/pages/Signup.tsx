@@ -2,6 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { safeNext } from '../lib/safeNext'
+import {
+  PASSWORD_HINT,
+  PASSWORD_MIN_LENGTH,
+  describePasswordProblems,
+  passwordProblems,
+} from '../lib/password'
 import './auth.css'
 
 // Mirrors sanitizeHandle in lib/auth.tsx, which is what an OAuth signup goes
@@ -37,8 +43,9 @@ export default function Signup() {
     e.preventDefault()
     setError(null)
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+    const passwordMessage = describePasswordProblems(passwordProblems(password))
+    if (passwordMessage) {
+      setError(passwordMessage)
       return
     }
 
@@ -121,10 +128,10 @@ export default function Signup() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             required
           />
-          <p className="auth-hint">At least 8 characters</p>
+          <p className="auth-hint">{PASSWORD_HINT}</p>
         </div>
 
         <div className="auth-field">
