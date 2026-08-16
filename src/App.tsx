@@ -13,6 +13,7 @@ import Sell from './pages/Sell'
 import Inbox from './pages/Inbox'
 import Profile from './pages/Profile'
 import Account from './pages/Account'
+import Settings from './pages/Settings'
 import Product from './pages/Product'
 import Shop from './pages/Shop'
 import Search from './pages/Search'
@@ -167,6 +168,7 @@ function AppShell() {
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/listing/:id/:slug" element={<Product />} />
         <Route path="/listing/:id" element={<Product />} />
         <Route path="/p/:id" element={<Product />} />

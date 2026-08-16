@@ -332,10 +332,10 @@ export default function Profile() {
               className="profile-sort-option"
               onClick={() => {
                 setMenuOpen(false)
-                navigate('/account')
+                navigate('/settings')
               }}
             >
-              Account details
+              My account
             </button>
           )}
           <button type="button" className="profile-sort-option" onClick={handleLogout}>
