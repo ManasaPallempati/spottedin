@@ -41,7 +41,7 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, signOut, deleteAccount } = useAuth()
+  const { isAuthed, profile, loading, signOut, deleteAccount } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
@@ -150,7 +150,15 @@ export default function Profile() {
         </div>
       </header>
 
-      {!isAuthed || !profile ? (
+      {/* `loading` is checked before the guest view because a signed-in visitor
+          whose profile has not resolved yet is not a guest. Without this, the
+          signed-out prompt flashes on every OAuth return, and stays put if the
+          profile lookup is slow. */}
+      {loading ? (
+        <div className="profile-guest">
+          <p className="profile-guest-copy">Loading your closet…</p>
+        </div>
+      ) : !isAuthed || !profile ? (
         <div className="profile-guest">
           <h2 className="profile-guest-title">Your closet lives here</h2>
           <p className="profile-guest-copy">Log in to see your likes, orders and listings</p>

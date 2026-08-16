@@ -219,11 +219,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(newSession)
         setLoading(true)
         const meta = (newSession.user.user_metadata ?? {}) as { handle?: string; name?: string }
-        ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((p) => {
+        // Deferred out of the callback deliberately. supabase-js holds an internal
+        // lock while it runs auth-state listeners, and ensureProfile calls
+        // supabase.from(), so invoking it here directly can deadlock — the promise
+        // never settles and setProfile is never reached. Line 219 above has already
+        // set the session synchronously, so isAuthed flips true while profile stays
+        // null, which renders the signed-out view to someone who is signed in.
+        // Password sign-in hid this because bootstrap() had already loaded the
+        // profile; OAuth reloads the page, so the listener is the only path.
+        setTimeout(() => {
           if (cancelled) return
-          setProfile(p)
-          setLoading(false)
-        })
+          ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((p) => {
+            if (cancelled) return
+            setProfile(p)
+            setLoading(false)
+          })
+        }, 0)
       } else if (event === 'SIGNED_OUT') {
         setSession(null)
         setProfile(null)
