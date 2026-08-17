@@ -117,3 +117,66 @@
   padding-left: 28px;
   padding-right: 28px;
 }
+
+/* People results. Placed above the item grid because a name query has no
+   useful item results — burying the seller under an empty grid is the reason
+   searching for a person felt broken. */
+.search-people {
+  padding: 8px 16px 4px;
+}
+
+.search-people-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.search-people-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  color: inherit;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.search-person-avatar {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.search-person-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.search-person-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-person-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-person-handle {
+  font-size: 14px;
+  color: var(--text-dim);
+}

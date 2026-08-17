@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import SearchBar from '../components/SearchBar'
 import Chip from '../components/Chip'
 import FilterBar from '../components/FilterBar'
@@ -7,6 +7,7 @@ import ProductCard from '../components/ProductCard'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { useListings, searchListings } from '../lib/useListings'
 import { applyFilters, emptyFilters, type Filters, type Sort } from '../lib/filters'
+import { usePeopleSearch, personAvatarUrl, personInitials } from '../lib/people'
 import './search.css'
 
 const POPULAR_BRANDS = ['Nike', 'Adidas', "Levi's", 'Zara', 'Carhartt', 'H&M']
@@ -19,6 +20,9 @@ export default function Search() {
   const category = INDIAN_CATEGORIES.find((item) => item.slug === categorySlug)
 
   const { listings, loading } = useListings()
+  // Only when there is a text query: browsing a category is looking for items,
+  // not sellers.
+  const { people } = usePeopleSearch(category ? '' : q)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [sort, setSort] = useState<Sort>('newest')
 
@@ -70,6 +74,37 @@ export default function Search() {
           <h2 className="search-page-browse">Browse all</h2>
         )}
       </div>
+
+      {/* People before filters, because a name query has no useful item results
+          to filter — someone searching "manasa" wants the seller, and burying
+          that under an empty item grid is why the search felt broken. */}
+      {people.length > 0 && (
+        <section className="search-people">
+          <h2 className="search-people-title">People</h2>
+          <ul className="search-people-list">
+            {people.map((person) => {
+              const avatar = personAvatarUrl(person)
+              return (
+                <li key={person.handle}>
+                  <Link to={`/shop/${person.handle}`} className="search-person">
+                    {avatar ? (
+                      <img className="search-person-avatar" src={avatar} alt="" />
+                    ) : (
+                      <span className="search-person-avatar search-person-avatar-fallback">
+                        {person.avatarEmoji || personInitials(person.name)}
+                      </span>
+                    )}
+                    <span className="search-person-text">
+                      <span className="search-person-name">{person.name}</span>
+                      <span className="search-person-handle">@{person.handle}</span>
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       <div className="search-page-filters">
         <FilterBar listings={searched} filters={filters} onChange={setFilters} sort={sort} onSort={setSort} />
