@@ -35,29 +35,85 @@
   padding: 0 20px;
 }
 
-.sellnew-photo-label {
+.sellnew-photos-head {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  border: 1px dashed var(--hairline);
-  overflow: hidden;
-  cursor: pointer;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.sellnew-photo-placeholder {
+.sellnew-photos-title {
   font-size: 15px;
-  font-weight: 600;
-  color: var(--text-dim);
+  font-weight: 700;
+}
+
+/* Fixed columns rather than auto-fill: photo order is meaningful here — the
+   first is the cover — so the tiles must not reflow into a different visual
+   order at different widths. */
+.sellnew-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.sellnew-photo-tile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface);
 }
 
 .sellnew-photo-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.sellnew-photo-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.sellnew-photo-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.sellnew-photo-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px dashed var(--hairline);
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--text-dim);
+}
+
+.sellnew-photo-add-text {
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .sellnew-photo-input {
@@ -145,4 +201,31 @@
 .sellnew-submit:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* The category control opens a drill-down rather than being a <select>: the
+   tree is three levels and 221 leaves, which a native select cannot express. */
+.sellnew-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  font-size: 16px;
+  text-align: left;
+  color: inherit;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sellnew-picker-button:disabled {
+  opacity: 0.6;
+}
+
+.sellnew-picker-value {
+  font-weight: 600;
+}
+
+.sellnew-picker-placeholder {
+  color: var(--text-dim);
 }
