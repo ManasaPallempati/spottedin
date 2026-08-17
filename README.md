@@ -1,4 +1,4 @@
-# Spotted (spottedin-c)
+# Spottedin
 
 Depop-style resale marketplace UI for India — mobile-first web app, dark visual system,
 ₹ pricing, mock data. Built to match the reference screen set in [CONTRACT.md](CONTRACT.md),

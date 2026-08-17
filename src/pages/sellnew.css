@@ -202,3 +202,30 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* The category control opens a drill-down rather than being a <select>: the
+   tree is three levels and 221 leaves, which a native select cannot express. */
+.sellnew-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  font-size: 16px;
+  text-align: left;
+  color: inherit;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sellnew-picker-button:disabled {
+  opacity: 0.6;
+}
+
+.sellnew-picker-value {
+  font-weight: 600;
+}
+
+.sellnew-picker-placeholder {
+  color: var(--text-dim);
+}

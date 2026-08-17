@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
+import CategoryPicker from '../components/CategoryPicker'
+import { useCategories, categoryPath, legacyCategoryFor } from '../lib/categories'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { listingPath } from '../lib/listingUrls'
@@ -11,16 +13,11 @@ const MAX_PHOTOS = 8
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
-const CATEGORIES = ['Menswear', 'Womenswear', 'Kids', 'Everything else']
-
-// Maps this form's Spotted-facing labels to the listings table's DB-level
-// category/condition columns (narrower vocabularies fixed by CHECK constraints).
-const CATEGORY_DB: Record<string, string> = {
-  Menswear: 'men',
-  Womenswear: 'women',
-  Kids: 'kids',
-  'Everything else': 'everything-else',
-}
+// Categories now come from the database (round 14) via the picker, so the old
+// four-value list is gone. The legacy listings.category column is still written,
+// derived from the chosen department by legacyCategoryFor.
+//
+// Condition remains a fixed vocabulary fixed by a CHECK constraint.
 const CONDITION_DB: Record<string, string> = {
   'Brand new': 'new',
   'Like new': 'like-new',
@@ -33,11 +30,16 @@ export default function SellNew() {
   const { isAuthed, loading: authLoading, session } = useAuth()
   const uid = session?.user.id
 
+  const { categories, loading: categoriesLoading } = useCategories()
   const [listingId] = useState(() => crypto.randomUUID())
+  // Recomputed from the tree rather than stored alongside the id, so the label
+  // cannot go stale if a category is renamed.
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [size, setSize] = useState(SIZES[0])
-  const [category, setCategory] = useState(CATEGORIES[0])
+  const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const selectedPath = categoryPath(categories, categoryId)
   const [condition, setCondition] = useState<string>(CONDITIONS[0])
   const [description, setDescription] = useState('')
   // One entry per photo, in display order. `path` is the storage key that goes
@@ -132,6 +134,10 @@ export default function SellNew() {
       setError('Title is required.')
       return
     }
+    if (!categoryId) {
+      setError('Please choose a category.')
+      return
+    }
     const priceNum = Number.parseInt(price, 10)
     if (!Number.isFinite(priceNum) || priceNum <= 0 || String(priceNum) !== price.trim()) {
       setError('Enter a valid price.')
@@ -150,7 +156,11 @@ export default function SellNew() {
       title: title.trim(),
       description: description.trim(),
       price_inr: priceNum,
-      category: CATEGORY_DB[category] ?? 'vintage',
+      // Both columns are written: category_id is the real one, and the legacy
+      // category column is NOT NULL and still read by the feed and filters, so
+      // it is derived from the chosen department rather than left to drift.
+      category: legacyCategoryFor(categories, categoryId),
+      category_id: categoryId,
       size,
       condition: CONDITION_DB[condition] ?? 'good',
       // Position 0 is written here as well as into listing_images so the row is
@@ -285,13 +295,24 @@ export default function SellNew() {
 
           <div className="sellnew-field">
             <label htmlFor="sellnew-category">Category</label>
-            <select id="sellnew-category" value={category} onChange={(e) => setCategory(e.target.value)}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <button
+              type="button"
+              id="sellnew-category"
+              className="sellnew-picker-button"
+              onClick={() => setPickerOpen(true)}
+              disabled={categoriesLoading}
+            >
+              {selectedPath.length > 0 ? (
+                <span className="sellnew-picker-value">
+                  {selectedPath.map((c) => c.name).join(' › ')}
+                </span>
+              ) : (
+                <span className="sellnew-picker-placeholder">
+                  {categoriesLoading ? 'Loading…' : 'Choose a category'}
+                </span>
+              )}
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
 
@@ -323,6 +344,16 @@ export default function SellNew() {
           {submitting ? 'Listing…' : 'List item'}
         </button>
       </form>
+
+      <CategoryPicker
+        open={pickerOpen}
+        categories={categories}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(leafId) => {
+          setCategoryId(leafId)
+          setError(null)
+        }}
+      />
     </div>
   )
 }
