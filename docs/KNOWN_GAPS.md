@@ -13,6 +13,21 @@ Last updated: 2026-08-17
 
 ## Auth and accounts
 
+### Per-column grants are easy to half-add — and fail silently
+`profiles` grants privileges per column, so a new column is invisible to the
+client until named. That is the right default, but it means adding a column is
+two decisions, not one.
+
+Round 10 granted `UPDATE` on `date_of_birth` and not `INSERT`. When
+`ensureProfile` later began carrying that column from signup metadata, **every
+profile insert started failing** with `permission denied`, and the person was
+left signed in with no profile — which the app rendered as the signed-out view.
+Nobody noticed until a user reported it. Fixed in round 15, and the failure is
+now surfaced rather than swallowed.
+
+When adding a column to `profiles`, check whether the client needs to insert it
+as well as update it, and confirm with a real signup rather than a build.
+
 ### Guardian consent is captured but never actually obtained
 `guardian_email` is collected when someone enters a date of birth under 18, and
 `guardian_consent_at` can only be written by the service role (round 12). But
