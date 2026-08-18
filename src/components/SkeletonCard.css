@@ -15,6 +15,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Real cards render three text lines (2-line brand + size + price, ~80px);
+     the two bars alone fall short, so pin the block height to match. */
+  min-height: 80px;
   font-size: 14px;
 }
 
