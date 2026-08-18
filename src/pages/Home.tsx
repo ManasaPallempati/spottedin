@@ -242,10 +242,11 @@ export default function Home() {
                 ))
               : listings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
           </div>
-        ) : loading || (isAuthed && !ready) ? (
-          // Wait for both the listings query and follows hydration — branching
-          // on follows before hydrate would flash the "follow sellers" empty
-          // state at every signed-in user who already follows people.
+        ) : loading || !ready ? (
+          // Wait for the listings query AND auth restore + follows hydration
+          // (ready = !authLoading && !hydrating) — branching earlier would
+          // flash "Sign in" during session restore, or the "follow sellers"
+          // empty state at signed-in users who already follow people.
           <div className="home-grid">
             {Array.from({ length: 4 }).map((_, i) => (
               <div className="home-skeleton" key={i} />
