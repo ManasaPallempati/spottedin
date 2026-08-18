@@ -7,7 +7,7 @@ why it was not fixed at the time, and what closing it involves.
 This is not the same as `docs/launch/BLOCKERS.md`, which is an older launch
 tracker from a previous iteration and is now stale in places.
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
 ---
 
@@ -27,14 +27,8 @@ Resend, a route that records the timestamp when they follow it, and a check that
 gates minor accounts until it is set.
 
 ### OAuth signups have no date of birth
-Google sign-in provides no date of birth, so the profile row is created with
-null. `is_adult()` treats null as an adult, which means **an OAuth account is
-never subject to the minor restrictions**.
-
-Email signup now requires the date, so this is specific to social sign-in.
-
-To close: an onboarding step after first OAuth sign-in that asks for it before
-the account can be used.
+**Closed (Round 8):** any signed-in account with a null date of birth is now
+redirected to `/onboarding/birthday` and blocked until it supplies one.
 
 ### `is_adult()` treats unknown as adult by design
 Profiles created before the column existed have no date of birth. Treating

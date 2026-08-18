@@ -722,3 +722,52 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — date-of-birth gate for OAuth signups
+
+Closes docs/KNOWN_GAPS.md "OAuth signups have no date of birth". Google supplies no date
+of birth, so an OAuth signup's profile row is created with `date_of_birth` null — and
+`is_adult()` deliberately treats null as adult, so such an account was never subject to
+the minor restrictions. Email signup already requires the date (Signup.tsx); this round
+makes the app unusable for a signed-in account until it has one.
+
+- **Gate.** `DobGate` (`src/App.tsx`) wraps `<Routes>`: when auth has settled
+  (`!loading`), the visitor is signed in, the profile row loaded, and
+  `profile.dateOfBirth` is null, every route except an exempt set redirects to
+  `/onboarding/birthday?next=<intended path>` (`replace`, `encodeURIComponent`d,
+  consumed through `safeNext`). Exempt: `/`, `/about`, `/login`, `/signup`,
+  `/account` (the deletion flow lives there, so someone can close their account
+  instead of answering; it is also the other screen that can set the date), and the
+  birthday screen itself. A failed profile fetch (`profile === null`) does not gate.
+  Pre-existing accounts with a null date (e.g. `spotted.demo`, which predates round 10)
+  are gated once too, deliberately — that is the third KNOWN_GAPS entry closing itself.
+- **Screen.** `src/pages/onboarding/Birthday.tsx` (new route `/onboarding/birthday`;
+  BottomNav already hidden by the `/onboarding` prefix rule). Reuses `auth.css` and
+  Signup's date-of-birth field and validation (required, 13+, `max` today, local
+  `ageFromDate` mirroring the round 11 trigger) plus Account's guardian rule: under 18
+  the parent/guardian email is required. Saves through `updateProfile`, carrying every
+  other profile field through unchanged (writing the same handle back does not start
+  the round 9 cooldown — its trigger no-ops on an unchanged handle), then navigates to
+  `next`. Errors render in the existing `role="alert"` region. A link-styled "Log out"
+  button (`.auth-linklike`, auth.css) is the exit for someone signed into the wrong
+  account. No schema change: `date_of_birth` UPDATE was granted in round 10,
+  `guardian_email` in round 11.
+
+User-facing copy strings added this round (source of truth):
+
+- "Add your date of birth" (title)
+- "Your account doesn't have a date of birth yet. Add it once and you can carry on."
+- "Save and continue" (submit; "Saving…" while pending)
+
+Reused verbatim, not new: "Date of birth", "You need to be 13 or over. Under 18s can
+buy, but cannot list items to sell." and "Please enter your date of birth." /
+"You need to be 13 or over to use Spotted." (Signup); "Parent or guardian's email",
+"Because you're under 18, we need a parent or guardian to confirm they're happy for you
+to use Spotted. We'll email them to ask." and "Please add a parent or guardian's email
+address so we can ask for their consent." (Account); "Log out" (Profile).
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| oauth-dob-gate | src/pages/onboarding/Birthday.tsx (new), src/App.tsx (DobGate + route), src/pages/auth.css (`.auth-linklike`), docs/KNOWN_GAPS.md (OAuth-DOB entry), CONTRACT.md |

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import { supabase } from './lib/supabase'
@@ -21,6 +21,7 @@ import Bag from './pages/Bag'
 import Thread from './pages/Thread'
 import Sizes from './pages/onboarding/Sizes'
 import Brands from './pages/onboarding/Brands'
+import Birthday from './pages/onboarding/Birthday'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import SellNew from './pages/SellNew'
@@ -122,6 +123,40 @@ function OAuthReturn() {
   return null
 }
 
+// Routes reachable while a signed-in account still has no date of birth: the
+// auth screens (signing in/up is how the state arises in the first place), the
+// public/static pages, the birthday screen itself, and /account — the deletion
+// flow lives there, so someone must be able to close their account instead of
+// answering, and it is the one other screen where the date can be set.
+const DOB_GATE_EXEMPT = new Set([
+  '/',
+  '/about',
+  '/login',
+  '/signup',
+  '/account',
+  '/onboarding/birthday',
+])
+
+// OAuth providers supply no date of birth, so a Google signup's profile row is
+// created with date_of_birth null — and is_adult() deliberately treats null as
+// an adult (docs/KNOWN_GAPS.md), which would exempt the account from the minor
+// restrictions for good. This blocks the app until the date is supplied on
+// /onboarding/birthday, carrying the intended destination in ?next= so saving
+// continues where the person was headed. Waits for `loading` so it cannot fire
+// mid-OAuth-return, and for a non-null profile so a failed profile fetch does
+// not trap someone on a screen that could never save.
+function DobGate({ children }: { children: ReactNode }) {
+  const { isAuthed, profile, loading } = useAuth()
+  const location = useLocation()
+
+  const needsDob = !loading && isAuthed && profile !== null && profile.dateOfBirth === null
+  if (needsDob && !DOB_GATE_EXEMPT.has(location.pathname)) {
+    const dest = `${location.pathname}${location.search}`
+    return <Navigate to={`/onboarding/birthday?next=${encodeURIComponent(dest)}`} replace />
+  }
+  return <>{children}</>
+}
+
 function AppShell() {
   const location = useLocation()
   // The sign-in gate and marketing page own the full viewport rather than the
@@ -156,6 +191,7 @@ function AppShell() {
     <div className={isFullBleed ? 'app-shell app-shell--full' : 'app-shell'}>
       <RouteIndexingPolicy />
       <OAuthReturn />
+      <DobGate>
       <Routes>
         <Route path="/" element={<Welcome />} />
         {/* The marketing page kept its metadata and category links; it is the only
@@ -178,12 +214,14 @@ function AppShell() {
         <Route path="/inbox/t/:handle" element={<Thread />} />
         <Route path="/onboarding/sizes" element={<Sizes />} />
         <Route path="/onboarding/brands" element={<Brands />} />
+        <Route path="/onboarding/birthday" element={<Birthday />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/sell/new" element={<SellNew />} />
         {/* Without this an unmatched hash renders an empty shell rather than a page. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </DobGate>
       {!hideNav && <BottomNav />}
     </div>
   )

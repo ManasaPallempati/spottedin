@@ -157,6 +157,19 @@
   text-decoration: underline;
 }
 
+/* Round 8: the birthday gate's "Log out" is a button (it calls signOut rather
+   than navigating), styled like the footer links around it. */
+.auth-footer .auth-linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .auth-confirm {
   display: flex;
   flex-direction: column;
@@ -181,6 +194,7 @@
 
 /* Visible keyboard focus on every interactive control */
 .auth-page a:focus-visible,
+.auth-footer .auth-linklike:focus-visible,
 .auth-oauth-btn:focus-visible,
 .auth-submit:focus-visible,
 .auth-field input:focus-visible {
