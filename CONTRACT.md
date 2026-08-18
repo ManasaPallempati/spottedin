@@ -722,3 +722,38 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — defect sweep (small fixes only)
+
+A hardening pass over the recently merged account/photos/categories/search work. No new
+features; each change is a small, high-confidence fix.
+
+- **Profile creation:** the handle-collision retry insert in `ensureProfile`
+  (`src/lib/auth.tsx`) now carries `date_of_birth` like the first attempt, so a minor
+  whose sanitised handle collides no longer gets a null-DOB profile that `is_adult()`
+  treats as an adult.
+- **Listing form (`src/pages/SellNew.tsx`):** insert failures are translated instead of
+  showing the raw PostgREST message; the error region gained `role="alert"`; the photo
+  input is disabled while an upload is in flight so the 8-photo limit cannot be
+  overshot from a stale count.
+- **Category picker (`src/components/CategoryPicker.tsx`):** the sheet is now
+  `role="dialog"` + `aria-modal`, labelled by its heading, and Escape dismisses it.
+- **README** re-synced with the code (no mock fallback, `/` vs `/about`, current route
+  table, no GitHub Pages).
+
+User-facing copy strings added or corrected this round (source of truth):
+
+- "We could not publish your listing just now. Please try again." (generic listing
+  insert failure)
+- "Under 18s can buy on Spotted, but cannot list items to sell." (listing insert
+  rejected by RLS, code 42501 — the round11 `is_adult()` gate; wording matches the
+  existing date-of-birth hint)
+- "You need to be 13 or over to use Spotted." — corrected translation of the
+  `under_minimum_age` trigger error in `updateProfile`, which previously said 18. The
+  round11 trigger fires below 13; this reuses the Signup form's existing string.
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| hardening | src/lib/auth.tsx, src/pages/SellNew.tsx, src/components/CategoryPicker.tsx, README.md, CONTRACT.md |
