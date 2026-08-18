@@ -191,6 +191,67 @@
   scroll-snap-align: start;
 }
 
+.home-feed-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 14px;
+}
+
+.home-feed-tab {
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home-feed-tab[aria-selected='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.home-feed-tab:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.home-feed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px 24px;
+}
+
+.home-feed-empty-icon {
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+.home-feed-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.home-feed-empty-copy {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 280px;
+}
+
+.home-feed-empty-btn {
+  margin-top: 16px;
+  min-width: 160px;
+}
+
 .home-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
