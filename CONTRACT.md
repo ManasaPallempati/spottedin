@@ -722,3 +722,38 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — Following feed on Home
+
+Home's bottom listings grid gains a two-tab toggle: **For you** (the existing grid,
+unchanged) and **Following** — live listings whose seller the signed-in user follows,
+newest first. It is a pure client-side filter over the 40 newest live listings
+`useListings` already fetches (no new query, no schema change), so an older item from an
+inactive followee that has fallen out of that window will not appear. Seller matching
+uses `sellerFor(listing).handle` — the same resolution the follow button on Shop.tsx
+uses — so followed hash-derived demo sellers match too, not just listings with a real
+profile embed.
+
+The tabs are a WAI-ARIA tablist (roving tabindex, ArrowLeft/ArrowRight/Home/End,
+automatic activation; `role="tab"` / `aria-selected` / `role="tabpanel"`). The
+Following panel waits for both the listings query and follows hydration (`ready`)
+before branching, so signed-in followers never flash the "not following anyone" state.
+Empty states, in precedence order: signed out → sign-in prompt linking to `/login`;
+following no one → follow prompt linking to `/search`; followed sellers have nothing
+live in the window → gentle copy, no CTA.
+
+User-facing copy strings added this round (source of truth):
+
+- Tab labels: "For you" / "Following"
+- "See sellers you follow" / "Sign in to catch the newest listings from sellers you
+  follow." / button "Sign in"
+- "You're not following anyone yet" / "Follow sellers to see their latest here." /
+  button "Find sellers"
+- "Nothing new from your sellers" / "The sellers you follow haven't listed anything
+  recently. Check back soon."
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| following-feed | src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |
