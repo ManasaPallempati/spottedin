@@ -6,26 +6,10 @@ import type { Listing } from '../data/listings'
 import { FEATURED_CATEGORIES, listingMatchesCategory } from '../data/taxonomy'
 import { useListings } from '../lib/useListings'
 import { useAuth } from '../lib/auth'
+import { readStoredPrefs, personalizeFeed, type StoredPrefs as Prefs } from '../lib/forYou'
 import { setPageMeta } from '../lib/seo'
 import { trackEvent } from '../lib/analytics'
 import './home.css'
-
-const PREFS_KEY = 'spotted_prefs_v1'
-
-type Prefs = { sizes: string[]; brands: string[] }
-
-function readPrefs(): Prefs {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY)
-    if (!raw) return { sizes: [], brands: [] }
-    const parsed = JSON.parse(raw)
-    const sizes = Array.isArray(parsed?.sizes) ? parsed.sizes.filter((s: unknown) => typeof s === 'string') : []
-    const brands = Array.isArray(parsed?.brands) ? parsed.brands.filter((b: unknown) => typeof b === 'string') : []
-    return { sizes, brands }
-  } catch {
-    return { sizes: [], brands: [] }
-  }
-}
 
 function stripUsPrefix(size: string): string {
   return size.replace(/^US\s+/i, '').trim().toLowerCase()
@@ -53,8 +37,13 @@ export default function Home() {
   const { isAuthed, profile } = useAuth()
   const showShopLink = true
 
-  const prefs = useMemo(() => readPrefs(), [])
+  const prefs = useMemo(() => readStoredPrefs(), [])
   const picks = useMemo(() => computePicks(listings, prefs), [listings, prefs])
+  const interest = profile?.interest ?? null
+  const { listings: feedListings, personalized } = useMemo(
+    () => personalizeFeed(listings, { ...prefs, interest }),
+    [listings, prefs, interest],
+  )
   const categoryCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -168,13 +157,27 @@ export default function Home() {
         </div>
       )}
 
-      <div className={`home-grid${loading ? '' : ' fade-in'}`}>
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <div className="home-skeleton" key={i} />
-            ))
-          : listings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
-      </div>
+      {personalized && !loading ? (
+        <section aria-labelledby="home-foryou-title">
+          <div className="home-foryou-header">
+            <h2 id="home-foryou-title" className="home-foryou-title">For You</h2>
+            <p className="home-foryou-sub">Sorted by your sizes, brands and style — everything's still here.</p>
+          </div>
+          <div className="home-grid fade-in">
+            {feedListings.map((listing) => (
+              <ProductCard key={listing.id} listing={listing} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <div className={`home-grid${loading ? '' : ' fade-in'}`}>
+          {loading
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <div className="home-skeleton" key={i} />
+              ))
+            : feedListings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
+        </div>
+      )}
     </div>
   )
 }
