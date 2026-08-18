@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { childrenOf, isLeaf, type Category } from '../lib/categories'
 import './category-picker.css'
@@ -19,6 +19,21 @@ export default function CategoryPicker({ open, categories, onClose, onSelect }: 
   // department level. Kept as a stack rather than a single id so Back can walk
   // up one level at a time instead of resetting to the top.
   const [stack, setStack] = useState<Category[]>([])
+
+  // Escape dismisses the sheet like tapping the scrim — keyboard users
+  // otherwise have no way out except tabbing to the close button. Sits above
+  // the early return because hooks cannot be conditional.
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setStack([])
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   if (!open) return null
 
@@ -42,7 +57,13 @@ export default function CategoryPicker({ open, categories, onClose, onSelect }: 
 
   return (
     <div className="catpick-overlay" onClick={close}>
-      <div className="catpick-sheet" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="catpick-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="catpick-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="catpick-head">
           {stack.length > 0 ? (
             <button
@@ -56,7 +77,9 @@ export default function CategoryPicker({ open, categories, onClose, onSelect }: 
           ) : (
             <span className="catpick-icon" />
           )}
-          <h2 className="catpick-title">{current ? current.name : 'Category'}</h2>
+          <h2 className="catpick-title" id="catpick-title">
+            {current ? current.name : 'Category'}
+          </h2>
           <button type="button" className="catpick-icon" aria-label="Close" onClick={close}>
             <X size={20} />
           </button>

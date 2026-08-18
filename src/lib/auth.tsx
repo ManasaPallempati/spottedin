@@ -162,7 +162,10 @@ async function ensureProfile(
     const retryHandle = `${baseHandle}${randomDigits(2)}`
     const { data: retried, error: retryError } = await supabase
       .from('profiles')
-      .insert({ id: userId, handle: retryHandle, name })
+      // Carries date_of_birth like the first attempt — dropping it here would
+      // create the row with null, which is_adult() treats as an adult, so a
+      // minor whose handle collided would skip the minor restrictions.
+      .insert({ id: userId, handle: retryHandle, name, date_of_birth: meta.date_of_birth ?? null })
       .select(PROFILE_COLUMNS)
       .single()
     if (!retryError && retried) return mapProfile(retried as ProfileRow)
@@ -435,7 +438,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       if (error.message.includes('under_minimum_age')) {
-        return { error: 'You need to be 18 or over to use Spotted.' }
+        // The trigger (round11) raises this below 13, not 18 — under-18s are
+        // allowed with restrictions. Same copy as the Signup form's own check.
+        return { error: 'You need to be 13 or over to use Spotted.' }
       }
       if (error.message.includes('date_of_birth_in_future')) {
         return { error: 'Please enter a valid date of birth.' }
