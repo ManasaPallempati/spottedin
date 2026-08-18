@@ -23,6 +23,8 @@ import Sizes from './pages/onboarding/Sizes'
 import Brands from './pages/onboarding/Brands'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
 import { setPageIndexing } from './lib/seo'
@@ -122,6 +124,29 @@ function OAuthReturn() {
   return null
 }
 
+// A password-reset email link lands back at SITE_ORIGIN with a PKCE ?code= and no
+// hash, so HashRouter reads route '/' (Welcome) while supabase-js exchanges the code
+// during client init. When that exchange's verifier was written by
+// resetPasswordForEmail, auth-js emits PASSWORD_RECOVERY *instead of* SIGNED_IN —
+// that event is the only signal distinguishing a recovery return from an OAuth one,
+// hence a subscription rather than URL parsing. Timing works for the same reason
+// OAuthReturn's does: this effect subscribes during the first commit, before the
+// exchange's network round-trip can possibly resolve.
+function RecoveryReturn() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/reset-password', { replace: true })
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [navigate])
+
+  return null
+}
+
 function AppShell() {
   const location = useLocation()
   // The sign-in gate and marketing page own the full viewport rather than the
@@ -131,6 +156,8 @@ function AppShell() {
     isFullBleed ||
     location.pathname === '/login' ||
     location.pathname === '/signup' ||
+    location.pathname === '/forgot' ||
+    location.pathname === '/reset-password' ||
     location.pathname === '/sell' ||
     location.pathname === '/sell/new' ||
     location.pathname.startsWith('/onboarding')
@@ -156,6 +183,7 @@ function AppShell() {
     <div className={isFullBleed ? 'app-shell app-shell--full' : 'app-shell'}>
       <RouteIndexingPolicy />
       <OAuthReturn />
+      <RecoveryReturn />
       <Routes>
         <Route path="/" element={<Welcome />} />
         {/* The marketing page kept its metadata and category links; it is the only
@@ -180,6 +208,8 @@ function AppShell() {
         <Route path="/onboarding/brands" element={<Brands />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sell/new" element={<SellNew />} />
         {/* Without this an unmatched hash renders an empty shell rather than a page. */}
         <Route path="*" element={<Navigate to="/" replace />} />

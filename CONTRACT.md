@@ -722,3 +722,69 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — password reset
+
+Adds the forgot/reset-password flow the app previously had none of: a locked-out
+account's only recourse was to email support. No schema changes; everything rides on
+GoTrue's built-in recovery flow.
+
+- **Routes:** `/forgot` (`src/pages/ForgotPassword.tsx`, new) and `/reset-password`
+  (`src/pages/ResetPassword.tsx`, new). Both are auth screens: `BottomNav` hidden,
+  `auth.css` styling, non-indexable (RouteIndexingPolicy already covers any
+  non-allowlisted path). Login's password field gains a "Forgot password?" link to
+  `/forgot`.
+- **Request:** `/forgot` takes an email and calls
+  `supabase.auth.resetPasswordForEmail(email, { redirectTo: SITE_ORIGIN })` (wrapped as
+  `requestPasswordReset` in `src/lib/auth.tsx`). Success copy is deliberately neutral —
+  it must not reveal whether an account exists (GoTrue's enumeration protection returns
+  200 either way, so any error shown is a real, actionable one: rate limit, bad address,
+  no network).
+- **Return:** the emailed link verifies at GoTrue and bounces back to `SITE_ORIGIN` with
+  a PKCE `?code=` — same shape as an OAuth return, so HashRouter is unaffected.
+  supabase-js exchanges the code during client init; because the stored verifier was
+  written by `resetPasswordForEmail`, auth-js emits **`PASSWORD_RECOVERY` instead of
+  `SIGNED_IN`**. `AuthProvider` treats the event like SIGNED_IN (real session, same
+  deferred profile load), and a new `RecoveryReturn` component in `App.tsx` — the OAuth
+  `OAuthReturn` pattern — subscribes to the event and routes to `/reset-password`.
+- **Reset:** `/reset-password` gates on the session (no session → "link has expired"
+  state with a link to `/forgot`; still-loading → blank, not a flash of that state).
+  The form is new password + confirm, validated by the shared `src/lib/password.ts`
+  policy, submitted via `supabase.auth.updateUser({ password })` (wrapped as
+  `updatePassword`). On success it stashes a notice in sessionStorage
+  (`spotted_reset_success`, read-once like `spotted_oauth_error`), signs out — staying
+  silently signed in after a reset is surprising, and logging in confirms the new
+  password works — and lands on `/login`, which shows the notice in a `role="status"`
+  `.auth-success` box (new in `auth.css`).
+- **Failure paths:** an expired/reused link bounces back with `error_code=otp_expired`,
+  which the existing Round 7 callback-error path already catches and routes to `/login`;
+  `friendlyAuthError` now translates it (and `same_password` from `updateUser`). PKCE
+  caveat inherited from Round 5: the link only completes in the browser that requested
+  it (the verifier lives in that browser's storage); elsewhere the exchange fails
+  client-side and `/reset-password` shows the request-a-new-link state.
+- **Unexecuted external gate:** none required — recovery email sending is on by default
+  in Supabase auth (subject to the free-tier email rate limits Round 7's copy already
+  covers). The "Reset Password" email template in the dashboard is stock; rewording it
+  is dashboard-only and out of repo scope.
+
+User-facing copy strings added this round (source of truth):
+
+- "Forgot password?" (Login link)
+- "Reset your password" / "Enter your email and we'll send you a reset link" / "Send
+  reset link" / "Remembered it? Log in" (/forgot)
+- "If an account exists for that email, we've sent a link to reset your password. Check
+  your inbox." (neutral /forgot success; "Back to login" link)
+- "Choose a new password" / "Almost done — pick something new" / "New password" /
+  "Confirm new password" / "Update password" (/reset-password)
+- "Those passwords do not match. Please check and try again."
+- "That link has expired or has already been used. Please request a new one." (both the
+  /reset-password no-session state — with a "Send a new reset link" link — and
+  `friendlyAuthError`'s `otp_expired` translation)
+- "Your new password must be different from your old one." (`same_password`)
+- "Your password has been updated. Please log in." (/login notice after a reset)
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| password-reset | src/pages/ForgotPassword.tsx (new), src/pages/ResetPassword.tsx (new), src/pages/Login.tsx, src/pages/auth.css, src/lib/auth.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
