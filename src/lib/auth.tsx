@@ -66,6 +66,8 @@ export type AuthContextValue = {
   ) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
+  requestPasswordReset: (email: string, redirectTo: string) => Promise<{ error: string | null }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   updateProfile: (edit: ProfileEdit) => Promise<{ error: string | null }>
   deleteAccount: (reason?: DeletionReason) => Promise<{ error: string | null }>
@@ -209,6 +211,16 @@ export function friendlyAuthError(error: AuthErrorLike, provider?: OAuthProvider
   if (code === 'email_address_invalid' || (m.includes('email address') && m.includes('invalid'))) {
     return "That email address doesn't look valid — please check it and try again."
   }
+  // A recovery/confirmation link that was already used or sat too long. GoTrue bounces
+  // these back as error_code 'otp_expired' with "Email link is invalid or has expired",
+  // so this reaches us via the same callback-error path as OAuth failures (App.tsx).
+  if (code === 'otp_expired' || (m.includes('email link') && (m.includes('invalid') || m.includes('expired')))) {
+    return 'That link has expired or has already been used. Please request a new one.'
+  }
+  // updateUser({ password }) with the password unchanged.
+  if (code === 'same_password' || m.includes('different from the old password')) {
+    return 'Your new password must be different from your old one.'
+  }
   // Checked before the generic validation_failed branch: GoTrue files the disabled-provider
   // rejection under error_code 'validation_failed', and field-validation copy would be
   // nonsense on a page where no fields were submitted.
@@ -316,7 +328,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     bootstrap()
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (event === 'SIGNED_IN' && newSession) {
+      // PASSWORD_RECOVERY is what auth-js emits *instead of* SIGNED_IN when the PKCE
+      // code it just exchanged came from a resetPasswordForEmail link — the session it
+      // carries is a real session and needs the same handling. Routing the person to
+      // the new-password form is not done here; RecoveryReturn in App.tsx subscribes
+      // to the same event for that.
+      if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && newSession) {
         setSession(newSession)
         setLoading(true)
         const meta = (newSession.user.user_metadata ?? {}) as { handle?: string; name?: string }
@@ -387,6 +404,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { redirectTo: options?.redirectTo },
     })
     return { error: error ? friendlyAuthError(error, provider) : null }
+  }
+
+  // GoTrue answers /recover with 200 whether or not the address has an account
+  // (enumeration protection), so a returned error here is a real failure the visitor
+  // can act on — a rate limit, a malformed address, no network — never "no such user".
+  // The neutral "if an account exists…" success copy lives in ForgotPassword.tsx.
+  async function requestPasswordReset(email: string, redirectTo: string): Promise<{ error: string | null }> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    return { error: error ? friendlyAuthError(error) : null }
+  }
+
+  // Only meaningful with a session — for the reset flow that is the recovery session
+  // established when the emailed link's ?code= was exchanged (see PASSWORD_RECOVERY
+  // above). ResetPassword.tsx gates on isAuthed before offering the form.
+  async function updatePassword(password: string): Promise<{ error: string | null }> {
+    const { error } = await supabase.auth.updateUser({ password })
+    return { error: error ? friendlyAuthError(error) : null }
   }
 
   async function signOut(): Promise<void> {
@@ -487,6 +521,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signIn,
     signInWithOAuth,
+    requestPasswordReset,
+    updatePassword,
     signOut,
     updateProfile,
     deleteAccount,
