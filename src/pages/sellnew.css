@@ -229,3 +229,37 @@
 .sellnew-picker-placeholder {
   color: var(--text-dim);
 }
+
+/* Draft-restored bar (Round 8): dismiss keeps the draft, discard deletes it. */
+.sellnew-draft-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.sellnew-draft-text {
+  flex: 1;
+}
+
+.sellnew-draft-discard {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.sellnew-draft-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
