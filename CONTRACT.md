@@ -722,3 +722,27 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — sell-form draft autosave
+
+The create-listing form (`src/pages/SellNew.tsx`) autosaves its text/select values —
+title, price, size, category, condition, description — to localStorage under
+`spotted_sell_draft`, debounced 500ms. Photos are deliberately excluded (storage
+uploads and object URLs, too big and too stateful for localStorage). An untouched
+form never writes a draft, and clearing every field by hand removes it again.
+
+On mount, an existing draft is restored into the fields and a dismissible bar
+(`aria-live="polite"`) appears; a corrupt or non-object draft is silently ignored.
+The draft is cleared on successful publish and on explicit discard, which also
+resets the form. Dismissing the bar keeps the draft.
+
+User-facing copy strings added this round (source of truth):
+
+- "Draft restored"
+- "Discard draft"
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| sell-draft-autosave | src/pages/SellNew.tsx, src/pages/sellnew.css, CONTRACT.md |
