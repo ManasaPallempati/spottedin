@@ -5,6 +5,15 @@ import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 // Must match SHIPPING_INR in src/pages/Bag.tsx and src/components/OfferCheckout.tsx.
 export const SHIPPING_INR = 49
 
+// Boost price tiers — the server-side source of truth. Amounts are recomputed
+// here in paise for every order; the client's mirrored BOOST_TIERS in
+// src/lib/payments.ts is display-only and never trusted.
+export const BOOST_TIERS = {
+  '3d': { days: 3, amountInr: 29 },
+  '7d': { days: 7, amountInr: 79 },
+} as const
+export type BoostTierId = keyof typeof BOOST_TIERS
+
 export type Gate = { enabled: boolean; keyId: string; keySecret: string }
 
 // Fail-closed activation gate: live payments require ALL of RAZORPAY_ENABLED
@@ -57,7 +66,7 @@ export type PaymentItem = { listing_id: string; price_inr: number; title: string
 export type PaymentRow = {
   id: string
   user_id: string
-  context: 'bag' | 'offer'
+  context: 'bag' | 'offer' | 'boost'
   items: PaymentItem[]
   item_total_inr: number
   charged_inr: number
@@ -145,5 +154,83 @@ export async function finalizePaidPayment(
     totalInr: payment.item_total_inr,
     placedAt: orderRow?.placed_at ?? new Date().toISOString(),
     items: payment.items.map((it) => ({ listingId: it.listing_id, priceInr: it.price_inr })),
+  }
+}
+
+// Boost payments store their subject in payments.items as a single
+// { listing_id, tier } entry (plus the PaymentItem fields so admin tooling
+// renders them like any other payment).
+export type BoostFinalized = {
+  listingId: string
+  tier: BoostTierId
+  amountInr: number
+  startsAt: string
+  expiresAt: string
+  paymentStatus: 'demo' | 'paid'
+}
+
+// Turn a verified-paid boost payment into a boosts row. Idempotent like
+// finalizePaidPayment: safe from the client verify path, the
+// payment.captured webhook, or both — boosts.payment_id is unique and the
+// insert is an upsert-ignore, so the first writer wins and expires_at is
+// recomputed from the server tier table, never trusted from the caller.
+export async function finalizeBoostPayment(
+  admin: SupabaseClient,
+  payment: PaymentRow,
+  razorpayPaymentId: string
+): Promise<BoostFinalized> {
+  const subject = payment.items[0] as unknown as { listing_id?: string; tier?: string } | undefined
+  const tier = subject?.tier as BoostTierId | undefined
+  const listingId = subject?.listing_id
+  if (!listingId || !tier || !(tier in BOOST_TIERS)) {
+    throw new Error(`boost payment ${payment.id} has no valid boost subject`)
+  }
+
+  await admin
+    .from('payments')
+    .update({ status: 'paid', razorpay_payment_id: razorpayPaymentId, updated_at: new Date().toISOString() })
+    .eq('id', payment.id)
+    .in('status', ['created', 'failed'])
+
+  const { data: fresh, error: freshError } = await admin
+    .from('payments')
+    .select('status')
+    .eq('id', payment.id)
+    .single()
+  if (freshError || fresh?.status !== 'paid') {
+    throw new Error(`payment ${payment.id} not in paid state (${fresh?.status ?? 'missing'})`)
+  }
+
+  const startsAt = new Date()
+  const expiresAt = new Date(startsAt.getTime() + BOOST_TIERS[tier].days * 24 * 60 * 60 * 1000)
+  const { error: boostError } = await admin.from('boosts').upsert(
+    {
+      listing_id: listingId,
+      seller_id: payment.user_id,
+      tier,
+      amount_inr: payment.item_total_inr,
+      starts_at: startsAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      payment_id: payment.id,
+      payment_status: 'paid',
+    },
+    { onConflict: 'payment_id', ignoreDuplicates: true }
+  )
+  if (boostError) throw new Error(`boost insert failed: ${boostError.message}`)
+
+  const { data: boost, error: boostReadError } = await admin
+    .from('boosts')
+    .select('starts_at, expires_at')
+    .eq('payment_id', payment.id)
+    .single()
+  if (boostReadError || !boost) throw new Error(`boost read-back failed for payment ${payment.id}`)
+
+  return {
+    listingId,
+    tier,
+    amountInr: payment.item_total_inr,
+    startsAt: boost.starts_at,
+    expiresAt: boost.expires_at,
+    paymentStatus: 'paid',
   }
 }
