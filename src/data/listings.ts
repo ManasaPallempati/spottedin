@@ -15,4 +15,7 @@ export type Listing = {
   sellerRating?: number | null
   sellerSales?: number | null
   status?: 'live' | 'sold'
+  // Epoch ms until which a paid/demo boost promotes this listing. Absent for
+  // mock listings and whenever the active_boosts view is unavailable.
+  boostedUntil?: number
 }

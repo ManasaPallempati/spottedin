@@ -130,6 +130,25 @@
   color: var(--text-dim);
 }
 
+.product-boosted-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.product-boost-note {
+  margin: 0;
+  text-align: center;
+  padding: 14px 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
 .product-ctas {
   display: flex;
   flex-direction: column;

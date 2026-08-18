@@ -18,6 +18,21 @@
   object-fit: cover;
 }
 
+/* Honest ads labeling: paid-boosted listings are always marked as such. */
+.product-card-boosted {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+
 .product-card-like {
   position: absolute;
   top: 8px;

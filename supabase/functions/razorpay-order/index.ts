@@ -202,6 +202,9 @@ async function verifyPayment(
 
   const { data: payment } = await admin.from('payments').select('*').eq('id', paymentId).maybeSingle()
   if (!payment || payment.user_id !== uid) return json(404, { error: 'payment_not_found' })
+  // Boost payments (Round 16) finalize through boost-order — running one
+  // through here would fabricate an order and mark the listing sold.
+  if (payment.context !== 'bag' && payment.context !== 'offer') return json(400, { error: 'wrong_context' })
   if (payment.razorpay_order_id !== razorpayOrderId) return json(400, { error: 'order_mismatch' })
   if (payment.status === 'refunded') return json(409, { error: 'payment_refunded' })
 

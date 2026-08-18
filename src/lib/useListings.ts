@@ -82,7 +82,18 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
         return
       }
 
-      setListings((data as unknown as ListingRow[]).map(mapRow))
+      // Boosted-and-unexpired listings rank first (Round 16). The sort is
+      // stable, so within each group the created_at ordering above holds;
+      // when no boosts resolve (view unapplied, none active) the map is
+      // empty and the feed is exactly the pre-boost feed.
+      const mapped = (data as unknown as ListingRow[]).map(mapRow)
+      const boosts = await fetchBoostedUntil(mapped.map((listing) => listing.id))
+      if (cancelled) return
+      const ranked = mapped
+        .map((listing) => (boosts.has(listing.id) ? { ...listing, boostedUntil: boosts.get(listing.id) } : listing))
+        .sort((a, b) => Number(b.boostedUntil != null) - Number(a.boostedUntil != null))
+
+      setListings(ranked)
       setLoading(false)
     }
 
@@ -100,6 +111,29 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
   return { listings, loading }
 }
 
+// Which of these listings are boosted right now (Round 16). Reads the public
+// active_boosts view; any error — including the view not existing because the
+// round16 migration is unapplied, or mock ids with no rows — resolves to an
+// empty map so every caller behaves exactly as before boosts existed.
+export async function fetchBoostedUntil(ids: string[]): Promise<Map<string, number>> {
+  if (ids.length === 0) return new Map()
+  try {
+    const { data, error } = await supabase
+      .from('active_boosts')
+      .select('listing_id,boosted_until')
+      .in('listing_id', ids)
+    if (error || !data) return new Map()
+    const map = new Map<string, number>()
+    for (const row of data as { listing_id: string; boosted_until: string }[]) {
+      const until = Date.parse(row.boosted_until)
+      if (!Number.isNaN(until) && until > Date.now()) map.set(row.listing_id, until)
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
 export function useListing(id: string): { listing: Listing | null; loading: boolean } {
   const [listing, setListing] = useState<Listing | null>(null)
   const [loading, setLoading] = useState(true)
@@ -109,14 +143,17 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
     setLoading(true)
 
     async function load() {
-      const { data, error } = await supabase.from('listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle()
+      const [{ data, error }, boosts] = await Promise.all([
+        supabase.from('listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle(),
+        fetchBoostedUntil([id]),
+      ])
 
       if (cancelled) return
 
       if (error || !data) {
         setListing(null)
       } else {
-        setListing(mapRow(data as unknown as ListingRow))
+        setListing({ ...mapRow(data as unknown as ListingRow), boostedUntil: boosts.get(id) })
       }
       setLoading(false)
     }

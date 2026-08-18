@@ -722,3 +722,83 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 16 — paid listing boosts (server-gated; demo remains the default)
+
+Numbered to match `supabase/round16-listing-boosts.sql` (the sql round numbering is the
+live one). Sellers pay the platform to promote one of their own live listings; boosted
+listings rank first in the Home feed with an always-visible "Boosted" label (honest ads
+labeling — a paid placement is never presented as organic).
+
+Tiers (server-side source of truth: `BOOST_TIERS` in
+`supabase/functions/_shared/razorpay.ts`; mirrored display-only in `src/lib/payments.ts`):
+
+| Tier | Duration | Price |
+|---|---|---|
+| `3d` | 3 days | ₹29 |
+| `7d` | 7 days | ₹79 |
+
+Fail-closed gates, exactly Round 6's chain: live mode requires the same `RAZORPAY_*`
+Edge Function secrets; the client only leaves demo mode when `boost-order`'s `config`
+action reports `enabled: true`, and any error resolves to demo. Amounts are recomputed
+server-side in paise from the tier — client prices are never trusted. Demo boosts are
+recorded server-side with `payment_status 'demo'` and are only accepted while the gate
+is CLOSED; once live payments are on, every boost must be paid for. The `boosts` table
+is service-role-write-only at the grant layer (no client write grants, no write
+policies), so a client cannot forge a boost; sellers can SELECT their own rows, and
+feeds read the owner-rights `active_boosts` view, which exposes only
+`listing_id` + `boosted_until` for unexpired boosts.
+
+Server (`supabase/functions/boost-order`: config / demo / create / verify): mirrors
+`razorpay-order` — HMAC signature verification, idempotent finalization
+(`finalizeBoostPayment` in `_shared/razorpay.ts`, upsert-ignore on the unique
+`boosts.payment_id`, `expires_at` recomputed from the server tier table). Boost payments
+reuse the Round 6 `payments` table with `context 'boost'`
+(`round16-listing-boosts.sql`, UNAPPLIED at merge time), so both finalization paths
+dispatch on context: `razorpay-order` verify refuses boost rows (finalizing one there
+would fabricate an order and mark the seller's listing sold), `boost-order` verify
+refuses bag/offer rows, and `razorpay-webhook` routes `payment.captured` /
+`refund.processed` to the right finalizer. A refunded boost stops promoting immediately
+(`expires_at` set to now).
+
+Client: `src/lib/payments.ts` adds `fetchBoostConfig` / `startBoostPayment` /
+`BOOST_TIERS` / `BoostResult` on the shared checkout plumbing. The product page
+recognises its owner (`profile.id === listing.sellerId`; mock listings have no
+`sellerId` and can never look owned) and swaps the buyer CTAs for "Boost listing",
+opening `BoostSheet` (tier radios, demo/live payment row, `role="alert"` error region,
+"Pay ₹N" only when live). `useListings` ranks boosted-and-unexpired listings first
+(stable sort — the fallback path is byte-identical when the `active_boosts` view is
+missing or empty, so mock/demo data keeps working); `useListing` resolves
+`boostedUntil` for the product page.
+
+User-facing copy strings added this round (source of truth; `<date>` is
+`toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })`):
+
+- "Boost listing" (owner CTA) and "Boost this listing" (sheet title)
+- "Boosted listings appear at the top of the Home feed with a "Boosted" label until the
+  boost expires."
+- "Choose a duration"; tier options "3 days ₹29" / "7 days ₹79"
+- "Boost listing (demo)" / "Boosting…" (demo button); "Pay ₹N" / "Processing…" (live
+  button); "Checking payment options…" while the config probe is in flight
+- "Listing boosted!" with "This is a demo — no payment was taken. Boosted until
+  <date>." (demo) or "₹N paid via Razorpay. Boosted until <date>." (live); "Done"
+- "Boosted" (card + product page label); "Boosted until <date> — this listing appears
+  at the top of the Home feed." (owner status)
+- "Could not boost the listing. Please try again."
+- "We could not confirm the payment yet. If you were charged, your boost will activate
+  automatically."
+- Server messages: "Only your own listings can be boosted."; "Only live listings can be
+  boosted."; "This listing is already boosted."; "This listing can't be boosted.";
+  "Online payments are enabled — boosts require payment."
+
+Activation steps (human, in order): run `supabase/round16-listing-boosts.sql` in the
+SQL editor; `supabase functions deploy boost-order`; redeploy `razorpay-order` and
+`razorpay-webhook` (they gained the context dispatch). Demo boosts work from that point
+with no Razorpay secrets; live boosts additionally need the Round 6 `RAZORPAY_*`
+secrets already in place.
+
+### File ownership — Round 16
+
+| Agent | Owns |
+|---|---|
+| boosts | supabase/round16-listing-boosts.sql, supabase/functions/boost-order/*, supabase/functions/_shared/razorpay.ts (boost additions), supabase/functions/razorpay-order/index.ts (context guard), supabase/functions/razorpay-webhook/index.ts (context dispatch), src/lib/payments.ts (boost additions), src/lib/useListings.ts (boost ranking), src/data/listings.ts (`boostedUntil`), src/components/BoostSheet.tsx, src/components/BoostSheet.css, src/components/ProductCard.tsx, src/components/ProductCard.css, src/pages/Product.tsx, src/pages/product.css, CONTRACT.md |
