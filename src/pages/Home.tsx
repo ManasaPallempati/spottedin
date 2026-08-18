@@ -4,7 +4,9 @@ import SearchBar from '../components/SearchBar'
 import ProductCard from '../components/ProductCard'
 import type { Listing } from '../data/listings'
 import { FEATURED_CATEGORIES, listingMatchesCategory } from '../data/taxonomy'
-import { useListings } from '../lib/useListings'
+import { useListings, useListingsByIds } from '../lib/useListings'
+import { listingPath } from '../lib/listingUrls'
+import { readRecentlyViewed } from '../lib/recentlyViewed'
 import { useAuth } from '../lib/auth'
 import { setPageMeta } from '../lib/seo'
 import { trackEvent } from '../lib/analytics'
@@ -54,6 +56,8 @@ export default function Home() {
   const showShopLink = true
 
   const prefs = useMemo(() => readPrefs(), [])
+  const recentIds = useMemo(() => readRecentlyViewed(), [])
+  const { listings: recentListings } = useListingsByIds(recentIds)
   const picks = useMemo(() => computePicks(listings, prefs), [listings, prefs])
   const categoryCounts = useMemo(
     () =>
@@ -166,6 +170,30 @@ export default function Home() {
             ))}
           </div>
         </div>
+      )}
+
+      {recentListings.length >= 1 && (
+        <section className="home-recent" aria-labelledby="home-recent-title">
+          <h2 id="home-recent-title" className="home-recent-title">
+            Recently viewed
+          </h2>
+          <div className="home-recent-row">
+            {recentListings.map((listing) => (
+              <Link
+                key={listing.id}
+                to={listingPath(listing.id, listing.brand)}
+                className="home-recent-card"
+                onClick={() => trackEvent('home_recent_click', { listing: listing.id })}
+              >
+                <div className="home-recent-image-wrap">
+                  <img src={listing.img} alt={listing.brand} loading="lazy" />
+                  {listing.status === 'sold' && <span className="home-recent-sold">Sold</span>}
+                </div>
+                <span className="home-recent-price">₹{listing.price.toLocaleString('en-IN')}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       <div className={`home-grid${loading ? '' : ' fade-in'}`}>

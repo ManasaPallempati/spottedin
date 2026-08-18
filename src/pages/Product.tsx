@@ -9,6 +9,7 @@ import BottomSheet from '../components/BottomSheet'
 import Chip from '../components/Chip'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { listingPath } from '../lib/listingUrls'
+import { recordRecentlyViewed } from '../lib/recentlyViewed'
 import { setPageMeta } from '../lib/seo'
 import './product.css'
 
@@ -78,6 +79,13 @@ export default function Product() {
       navigate(canonicalPath, { replace: true })
     }
   }, [id, listing, loading, location.pathname, navigate])
+
+  // Record the view only once the listing resolves — the resolved id is
+  // canonical, unlike the URL param, and unresolvable ids never enter history.
+  const viewedId = listing?.id
+  useEffect(() => {
+    if (viewedId) recordRecentlyViewed(viewedId)
+  }, [viewedId])
 
   useEffect(() => {
     return () => {

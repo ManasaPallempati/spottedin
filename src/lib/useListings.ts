@@ -135,6 +135,57 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
   return { listing, loading }
 }
 
+// Resolves an explicit id list (e.g. the recently-viewed history) against the
+// same columns + row mapping the grids use. No status filter — sold listings
+// resolve with status 'sold' so callers can badge them. Ids that no longer
+// resolve (deleted listings) are simply absent; results are re-ordered to
+// match the input ids, since `.in()` guarantees no order.
+export function useListingsByIds(ids: string[]): { listings: Listing[]; loading: boolean } {
+  const [listings, setListings] = useState<Listing[]>([])
+  const [loading, setLoading] = useState(ids.length > 0)
+  // Stable dependency: a caller passing a fresh array each render must not
+  // retrigger the fetch. Ids are uuids, so ',' never appears in one.
+  const idsKey = ids.join(',')
+
+  useEffect(() => {
+    if (!idsKey) {
+      setListings([])
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+
+    async function load() {
+      const wanted = idsKey.split(',')
+      const { data, error } = await supabase.from('listings').select(LISTING_COLUMNS).in('id', wanted)
+
+      if (cancelled) return
+
+      if (error || !data) {
+        setListings([])
+      } else {
+        const byId = new Map((data as unknown as ListingRow[]).map((row) => [row.id, mapRow(row)]))
+        setListings(wanted.flatMap((id) => byId.get(id) ?? []))
+      }
+      setLoading(false)
+    }
+
+    load().catch(() => {
+      if (cancelled) return
+      setListings([])
+      setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [idsKey])
+
+  return { listings, loading }
+}
+
 export function useMyListings(status: 'live' | 'sold'): { listings: Listing[]; loading: boolean } {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
