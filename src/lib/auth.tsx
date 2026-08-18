@@ -162,7 +162,10 @@ async function ensureProfile(
     const retryHandle = `${baseHandle}${randomDigits(2)}`
     const { data: retried, error: retryError } = await supabase
       .from('profiles')
-      .insert({ id: userId, handle: retryHandle, name })
+      // Carries date_of_birth like the first attempt — dropping it here would
+      // create the row with null, which is_adult() treats as an adult, so a
+      // minor whose handle collided would skip the minor restrictions.
+      .insert({ id: userId, handle: retryHandle, name, date_of_birth: meta.date_of_birth ?? null })
       .select(PROFILE_COLUMNS)
       .single()
     if (!retryError && retried) return mapProfile(retried as ProfileRow)
