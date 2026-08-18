@@ -82,7 +82,18 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
         return
       }
 
-      setListings((data as unknown as ListingRow[]).map(mapRow))
+      // Boosted-and-unexpired listings rank first (Round 16). The sort is
+      // stable, so within each group the created_at ordering above holds;
+      // when no boosts resolve (view unapplied, none active) the map is
+      // empty and the feed is exactly the pre-boost feed.
+      const mapped = (data as unknown as ListingRow[]).map(mapRow)
+      const boosts = await fetchBoostedUntil(mapped.map((listing) => listing.id))
+      if (cancelled) return
+      const ranked = mapped
+        .map((listing) => (boosts.has(listing.id) ? { ...listing, boostedUntil: boosts.get(listing.id) } : listing))
+        .sort((a, b) => Number(b.boostedUntil != null) - Number(a.boostedUntil != null))
+
+      setListings(ranked)
       setLoading(false)
     }
 
