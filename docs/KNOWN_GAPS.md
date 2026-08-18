@@ -27,8 +27,9 @@ Resend, a route that records the timestamp when they follow it, and a check that
 gates minor accounts until it is set.
 
 ### OAuth signups have no date of birth
-**Closed (Round 8):** any signed-in account with a null date of birth is now
-redirected to `/onboarding/birthday` and blocked until it supplies one.
+**Closed (CONTRACT Round 8, branch claude/oauth-dob-gate — not the SQL round 8
+below):** any signed-in account with a null date of birth is now redirected to
+`/onboarding/birthday` and blocked until it supplies one.
 
 ### `is_adult()` treats unknown as adult by design
 Profiles created before the column existed have no date of birth. Treating
@@ -57,7 +58,11 @@ had to fix.
 ### Legacy handles containing periods
 `prudhvi.pallempati` and `spotted.demo` in production, and any others predating
 round 8, do not match the current handle rules. The constraint is `NOT VALID`, so
-they are grandfathered and keep working.
+they are grandfathered and keep working — but the CHECK is re-evaluated on any
+UPDATE of the row, so no profile save succeeds for these accounts, and since the
+date-of-birth gate (CONTRACT Round 8) they are also null-DOB accounts blocked
+app-wide until they rename; the birthday screen detects this and links to Account
+details for exactly that.
 
 Deliberate: renaming a live seller breaks the `/shop/:handle` URLs buyers use to
 find them. The chosen path is that people rename themselves on the Account
