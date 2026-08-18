@@ -245,6 +245,12 @@
   position: relative;
 }
 
+/* The Sold tab already stamps a full-card SOLD overlay (below); hide the
+   card's own small sold chip so the state isn't shown twice. */
+.profile-sold-item .product-card-sold {
+  display: none;
+}
+
 .profile-sold-item .product-card-image-wrap::after {
   content: 'SOLD';
   position: absolute;

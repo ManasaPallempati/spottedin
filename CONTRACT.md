@@ -722,3 +722,41 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — sold listings in search/browse
+
+(CONTRACT round numbering, unrelated to `supabase/round8-handle-rules.sql` — the SQL round
+sequence ran ahead of this document. No schema change this round; round 4's additive
+`listings_select_sold` policy already makes sold rows readable by everyone.)
+
+Search (`/search`, text queries, category drill-ins and Browse all alike) now includes sold
+listings so results reflect the whole market, Depop-style, instead of silently dropping items
+that have sold.
+
+- `useListings(options?: { includeSold?: boolean })` (`src/lib/useListings.ts`): default is
+  unchanged (`status = 'live'` — Home, Discover, Likes, Category, Shop, Product remain
+  live-only). With `includeSold: true` the query filters `status in ('live','sold')` rather
+  than dropping the filter entirely, because round 7 added a `'removed'` status and the
+  owner-select RLS policy would otherwise let a seller meet their own removed rows in search.
+  Only `Search.tsx` passes it.
+- **Sold chip** (`src/components/ProductCard.tsx`): cards whose listing has `status === 'sold'`
+  (the Round 4 contract test — undefined means live) render a small "Sold" pill overlaid
+  bottom-left on the card image (`.product-card-sold`, `ProductCard.css`). The Profile Sold
+  tab keeps its full-card SOLD overlay and hides the chip (`.profile-sold-item
+  .product-card-sold`, `profile.css`) so the state isn't stamped twice.
+- **Hide sold toggle**: `Filters` gains `hideSold: boolean` (default `false` — sold shown;
+  `src/lib/filters.ts`), applied in `applyFilters` via `=== 'sold'`. `FilterBar` gains a
+  `showSoldToggle?: boolean` prop rendering a "Hide sold" chip (with `aria-pressed`) between
+  "On sale" and Sort; only Search passes it — on Shop the chip would be a no-op since that
+  page fetches live rows only. Session-scoped state like the other filters; nothing persisted.
+
+User-facing copy strings added this round (source of truth):
+
+- "Sold" (card overlay chip)
+- "Hide sold" (filter row toggle chip)
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| sold-items-search | src/lib/useListings.ts (`useListings` options), src/lib/filters.ts, src/components/FilterBar.tsx, src/components/ProductCard.tsx, src/components/ProductCard.css, src/pages/profile.css (chip suppression), src/pages/Search.tsx, CONTRACT.md |

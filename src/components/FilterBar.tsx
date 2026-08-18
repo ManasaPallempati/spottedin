@@ -13,6 +13,9 @@ type FilterBarProps = {
   onChange: (f: Filters) => void
   sort: Sort
   onSort: (s: Sort) => void
+  /** Show the "Hide sold" toggle. Only pages whose listings include sold rows
+      (search/browse) pass this — elsewhere the chip would be a no-op. */
+  showSoldToggle?: boolean
 }
 
 type SheetKind = 'brand' | 'size' | 'price' | 'condition' | 'sort' | null
@@ -39,7 +42,7 @@ function chipLabel(base: string, count: number): string {
   return count > 0 ? `${base} · ${count}` : base
 }
 
-export default function FilterBar({ listings, filters, onChange, sort, onSort }: FilterBarProps) {
+export default function FilterBar({ listings, filters, onChange, sort, onSort, showSoldToggle }: FilterBarProps) {
   const [openSheet, setOpenSheet] = useState<SheetKind>(null)
 
   const brandOptions = Array.from(new Set(listings.map((l) => l.brand))).sort()
@@ -83,6 +86,16 @@ export default function FilterBar({ listings, filters, onChange, sort, onSort }:
       >
         On sale
       </button>
+      {showSoldToggle && (
+        <button
+          type="button"
+          className={'filter-bar-chip' + (filters.hideSold ? ' filter-bar-chip-active' : '')}
+          aria-pressed={filters.hideSold}
+          onClick={() => onChange({ ...filters, hideSold: !filters.hideSold })}
+        >
+          Hide sold
+        </button>
+      )}
       <button type="button" className="filter-bar-chip filter-bar-sort" onClick={() => setOpenSheet('sort')}>
         <ArrowUpDown size={14} />
         Sort
