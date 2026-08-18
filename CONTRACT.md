@@ -722,3 +722,41 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — recently-viewed rail (client-only)
+
+Product views feed a "Recently viewed" rail on `/home`. Nothing server-side changes: no
+schema, no new tables, no writes — the history lives in the browser.
+
+- **Recording.** `src/lib/recentlyViewed.ts` (new) owns localStorage key
+  `spotted_recently_viewed`: a JSON array of listing ids, most-recent-first, deduped,
+  capped at 20. `Product.tsx` records the *resolved* listing's id (canonical, unlike the
+  URL param) once its query settles; unresolvable ids never enter the history. Reads and
+  writes are try/catch-wrapped — storage being unavailable is silent, never an error.
+- **Resolution at render time.** Ids only are stored; listing data is resolved when the
+  rail renders via `useListingsByIds(ids)` (new, `src/lib/useListings.ts`) — the same
+  `LISTING_COLUMNS` + `mapRow` path every grid uses, but `.in('id', …)` with **no status
+  filter**, so sold listings still resolve and carry `status: 'sold'`. Results are
+  re-ordered to match the stored ids (PostgREST guarantees no order); ids that no longer
+  resolve (deleted listings) drop out of the rail silently, and any query error resolves
+  to an empty rail. localStorage is never pruned on a failed resolution — a network blip
+  must not wipe the history.
+- **Rail.** `Home.tsx` renders the rail directly above the main grid, only when the
+  resolved list is non-empty (no skeleton/empty state). Small cards — image + price
+  only — as plain `Link`s to the listing (no ProductCard, which would drag like state
+  into the rail); horizontal scroll with `scroll-snap-type: x proximity`, matching the
+  Picks row pattern. Sold listings get a small "Sold" pill overlay (same styling family
+  as the product page's sold badge). Card taps emit `home_recent_click` analytics,
+  matching Home's existing events. Section is `aria-labelledby` its heading; each card's
+  accessible name comes from the image alt (listing title) plus the price text.
+
+User-facing copy strings added this round (source of truth):
+
+- "Recently viewed" (rail heading)
+- "Sold" (rail card pill — same word the product page badge already uses)
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| recently-viewed | src/lib/recentlyViewed.ts (new), src/lib/useListings.ts (`useListingsByIds` only), src/pages/Product.tsx (view recording only), src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |
