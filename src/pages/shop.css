@@ -7,11 +7,19 @@
 }
 
 .shop-header {
+  position: relative; /* Round 8 (share agent): anchors .shop-share-btn */
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   padding: 24px 20px 20px;
+}
+
+/* Round 8 (share agent): share pinned to the header's top corner. */
+.shop-share-btn {
+  position: absolute;
+  top: 16px;
+  right: 12px;
 }
 
 .shop-avatar {

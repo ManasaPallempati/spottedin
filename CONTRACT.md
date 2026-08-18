@@ -722,3 +722,54 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — share buttons (listing + shop)
+
+Client-only sharing for the two things a visitor would send someone: a listing and a
+seller's shop. One shared control, `src/components/ShareButton.tsx` (lucide `Share2`
+icon-only button, `aria-label` required by prop): where `navigator.share` exists it
+opens the OS share sheet with `{ title, url }` (the sheet is its own feedback — no
+toast; a dismissed sheet / `AbortError` is not treated as failure); everywhere else it
+copies the URL with `navigator.clipboard.writeText` and shows a ~1.8s "Link copied"
+toast. The toast text lives in a permanently mounted `aria-live="polite"` region (a
+region created at announce time is not read by screen readers) that takes the shared
+`.toast` styling from `styles/motion.css` only while text is present. Keyboard: real
+`<button>`, `:focus-visible` outline matching the auth screens' convention
+(`3px solid var(--accent)`).
+
+- **Product page** (`/listing/:id/:slug`): share button at the far end of the like
+  row; shares `canonicalUrl(listingPath(id, brand))` — the exact URL the page's own
+  SEO effect canonicalizes to — titled "`<Brand> - Size <size> | SPOTTED`".
+- **Shop page** (`/shop/:handle`): share button pinned to the header's top-right
+  corner (both the real-profile and fictional-seller header variants); shares
+  `canonicalUrl('/shop/' + handle)` titled "@`<handle>` on SPOTTED".
+- **Canonical-path bootstrap** (`resolveCanonicalPath` in `src/App.tsx`): canonical
+  URLs are path-based, but HashRouter only reads the fragment, so before this round a
+  shared link (or a crawler-followed canonical) opened at `/listing/…` rendered the
+  Welcome screen and the destination was silently lost to the catch-all route. App
+  bootstrap now rewrites any non-root pathname into the equivalent hash route
+  (`/listing/x` → `/#/listing/x`, query preserved) via `history.replaceState`, before
+  HashRouter mounts, in the same synchronous slot as Round 7's OAuth-error cleaner.
+  OAuth callbacks are unaffected — GoTrue redirects land on pathname `/`, which the
+  rewrite skips. Netlify already serves the app shell for every path (netlify.toml),
+  so the path reaches the client intact.
+- **`base: '/'` in vite.config.ts** (was `'./'`, a GitHub-Pages-era setting; Pages was
+  retired in a64a406 and both sites are Netlify serving from the domain root). With the
+  relative base, the shell served for a deep path referenced `./assets/…` relative to
+  that path; Netlify's `/*` rewrite answered those asset requests with index.html, the
+  module script failed its MIME check, and every deep-path URL rendered a blank page
+  before any script ran — verified against a production build via `vite preview`. The
+  bootstrap above cannot run until the app boots, so this is a prerequisite, not a
+  cosmetic change.
+
+User-facing copy strings added this round (source of truth):
+
+- "Link copied"
+- "Couldn't copy the link" (clipboard denied/unavailable fallback)
+- Accessible names: "Share this listing", "Share this shop"
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| share | src/components/ShareButton.tsx (new), src/components/ShareButton.css (new), src/pages/Product.tsx (share button), src/pages/product.css (`.product-share-btn`), src/pages/Shop.tsx (share button), src/pages/shop.css (`.shop-share-btn`), src/App.tsx (`resolveCanonicalPath` only), vite.config.ts (`base`), CONTRACT.md |
