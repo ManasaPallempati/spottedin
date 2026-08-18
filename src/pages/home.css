@@ -197,15 +197,3 @@
   gap: 8px;
   padding: 0 16px;
 }
-
-.home-skeleton {
-  aspect-ratio: 1 / 1;
-  border-radius: 8px;
-  background: var(--surface);
-  animation: home-skeleton-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes home-skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}

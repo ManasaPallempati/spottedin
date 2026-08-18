@@ -1,0 +1,54 @@
+/* Dimensions mirror .product-card / .product-card-image-wrap / .product-card-info
+   so swapping skeletons for real cards causes no layout shift. */
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-card-image {
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+}
+
+.skeleton-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.skeleton-card-bar {
+  border-radius: 4px;
+}
+
+/* Matches the two-line clamped brand block (min-height 2.8em @ 14px). */
+.skeleton-card-bar-title {
+  width: 85%;
+  height: 2.8em;
+}
+
+/* Stands in for the size + price lines. */
+.skeleton-card-bar-meta {
+  width: 45%;
+  height: 1.4em;
+}
+
+.skeleton-shimmer {
+  background-color: var(--surface);
+  background-image: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    background-image: none;
+    animation: none;
+  }
+}
