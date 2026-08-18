@@ -438,7 +438,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       if (error.message.includes('under_minimum_age')) {
-        return { error: 'You need to be 18 or over to use Spotted.' }
+        // The trigger (round11) raises this below 13, not 18 — under-18s are
+        // allowed with restrictions. Same copy as the Signup form's own check.
+        return { error: 'You need to be 13 or over to use Spotted.' }
       }
       if (error.message.includes('date_of_birth_in_future')) {
         return { error: 'Please enter a valid date of birth.' }
