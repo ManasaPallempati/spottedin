@@ -191,6 +191,24 @@
   scroll-snap-align: start;
 }
 
+.home-foryou-header {
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.home-foryou-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.home-foryou-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
 .home-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

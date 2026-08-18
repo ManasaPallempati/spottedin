@@ -722,3 +722,43 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — personalized "For You" home feed
+
+Onboarding has always collected sizes and brands (localStorage `spotted_prefs_v1`, written
+by `src/pages/onboarding/Sizes.tsx` / `Brands.tsx`) and the account holds an interest
+(`profiles.interest`: womenswear/menswear/both), but the Home grid ignored all of it. This
+round adds a client-side ranking layer that reorders the grid so likely matches come
+first. Reorder only — nothing is ever hidden or filtered out.
+
+`src/lib/forYou.ts` (pure, no React):
+
+- `readStoredPrefs()` — the one shared reader for `spotted_prefs_v1` (Home's previous
+  private copy was removed in favor of this).
+- `scoreListingForUser(listing, prefs)` — brand match in the title = 4, size match = 2
+  (both sides normalized: `US ` prefix and `"` stripped, lowercased), interest→department
+  match via `categoryForListing` = 1. Weights are spaced so a brand match always outranks
+  size + interest combined.
+- `personalizeFeed(listings, prefs)` — stable sort by score descending, so ties keep the
+  existing recency order. Returns the input array unchanged with `personalized: false`
+  when the user has no preferences at all (not onboarded / logged out) or when nothing
+  scores above zero, so those feeds are provably identical to before.
+
+`src/pages/Home.tsx` renders the grid from the ranked list. When personalization is
+active (and only then), the grid gains a small header and sits in a
+`<section aria-labelledby="home-foryou-title">`; otherwise the markup is exactly the
+pre-Round-8 grid. Brands/sizes apply whenever stored (matching the existing "Picks for
+you" row, which also reads localStorage regardless of auth); `interest` applies only when
+a profile is loaded. The existing "Picks for you" row and the mock/picsum image fallback
+in `useListings` are untouched.
+
+User-facing copy added this round (source of truth):
+
+- "For You"
+- "Sorted by your sizes, brands and style — everything's still here."
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| for-you-feed | src/lib/forYou.ts, src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |
