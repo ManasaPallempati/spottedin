@@ -59,7 +59,8 @@ function mapRow(row: ListingRow): Listing {
   }
 }
 
-export function useListings(): { listings: Listing[]; loading: boolean } {
+export function useListings(options?: { includeSold?: boolean }): { listings: Listing[]; loading: boolean } {
+  const includeSold = options?.includeSold ?? false
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -67,10 +68,12 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
     let cancelled = false
 
     async function load() {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(LISTING_COLUMNS)
-        .eq('status', 'live')
+      // `.in(...)` rather than dropping the status filter: round 7 added a
+      // 'removed' status, and the owner-select RLS policy would let a seller
+      // see their own removed rows here. The sold rows themselves are readable
+      // by everyone via round 4's `listings_select_sold` policy.
+      const base = supabase.from('listings').select(LISTING_COLUMNS)
+      const { data, error } = await (includeSold ? base.in('status', ['live', 'sold']) : base.eq('status', 'live'))
         .order('created_at', { ascending: false })
         .limit(40)
 
@@ -95,7 +98,7 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [includeSold])
 
   return { listings, loading }
 }

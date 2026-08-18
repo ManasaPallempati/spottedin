@@ -19,7 +19,9 @@ export default function Search() {
   const categorySlug = normalizeCategory(searchParams.get('category') ?? '')
   const category = INDIAN_CATEGORIES.find((item) => item.slug === categorySlug)
 
-  const { listings, loading } = useListings()
+  // Search/browse shows sold items too (with a Sold chip) so results reflect
+  // the market; the "Hide sold" filter chip lets the shopper opt out.
+  const { listings, loading } = useListings({ includeSold: true })
   // Only when there is a text query: browsing a category is looking for items,
   // not sellers.
   const { people } = usePeopleSearch(category ? '' : q)
@@ -107,7 +109,14 @@ export default function Search() {
       )}
 
       <div className="search-page-filters">
-        <FilterBar listings={searched} filters={filters} onChange={setFilters} sort={sort} onSort={setSort} />
+        <FilterBar
+          listings={searched}
+          filters={filters}
+          onChange={setFilters}
+          sort={sort}
+          onSort={setSort}
+          showSoldToggle
+        />
       </div>
 
       {!loading && results.length === 0 ? (
