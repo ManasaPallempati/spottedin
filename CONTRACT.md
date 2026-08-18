@@ -722,3 +722,43 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — Product page photo gallery
+
+PR #16 (`supabase/round13-listing-images.sql`) let sellers attach up to eight photos per
+listing, but the Product page still rendered only `listing.img` (position 0). This round
+shows all of them.
+
+- **Data:** `useListingImages(listingId)` in `src/lib/useListings.ts` queries
+  `listing_images` (`path,position`, ordered by position) and resolves each path to a URL
+  the same way `resolveImage` does (http(s) passthrough, else the `LISTING_IMAGE_BASE`
+  storage prefix — shared `resolveStoragePath` helper). Deliberately a separate query,
+  NOT an embed in `LISTING_COLUMNS`: that constant also feeds the feed and the
+  shop/profile grids, which only show thumbnails.
+- **UI:** `ProductGallery` (internal to `src/pages/Product.tsx`) replaces the single
+  `.product-image-wrap`. A CSS scroll-snap track (`scroll-snap-type: x mandatory`,
+  full-width gapless slides, hidden scrollbar) gives native touch swiping; dot buttons
+  below jump to a slide; the track is focusable (`tabIndex=0`) and ArrowLeft/ArrowRight
+  move one slide (with `preventDefault` so the browser's own scroll nudge doesn't fight
+  the snap). Active dot tracked from `scrollLeft / clientWidth`. Non-first slides load
+  lazily. Container is `role="group"` + `aria-roledescription="carousel"`; each image and
+  dot is labelled "photo n of N".
+- **Fallback:** with one photo (old listings backfilled to a single row, picsum
+  placeholders with no rows, or the images query still in flight) it renders exactly the
+  original single-image markup — no carousel roles, no dots. Because round 13's sync
+  trigger keeps `listings.image_path` equal to the position-0 path, the single image shown
+  while the gallery loads is the same as the first slide, so hydration causes no visual
+  jump. `ogImage` stays `listing.img` — position 0 is the canonical thumbnail by design.
+
+User-facing copy strings added this round (all accessibility labels):
+
+- "Listing photos" (carousel `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>. Use the arrow keys to see other photos." (track `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>" (per-image `alt`)
+- "Photo \<n\> of \<N\>" (dot button `aria-label`)
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| product-gallery | src/pages/Product.tsx, src/pages/product.css, src/lib/useListings.ts (`resolveStoragePath` + `useListingImages` only), CONTRACT.md |
