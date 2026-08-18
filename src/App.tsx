@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import { supabase } from './lib/supabase'
 import { AuthProvider, useAuth, friendlyOAuthCallbackError } from './lib/auth'
@@ -25,6 +25,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
+import NotFound from './pages/NotFound'
 import { setPageIndexing } from './lib/seo'
 
 function RouteIndexingPolicy() {
@@ -42,6 +43,18 @@ function RouteIndexingPolicy() {
     if (!pageOwnsIndexing) {
       setPageIndexing(false)
     }
+  }, [location.pathname])
+
+  return null
+}
+
+// Browsers keep the window scroll position across SPA route changes; without this a
+// visitor who scrolled deep into one screen lands mid-page on the next.
+function ScrollToTop() {
+  const location = useLocation()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
   }, [location.pathname])
 
   return null
@@ -155,6 +168,7 @@ function AppShell() {
   return (
     <div className={isFullBleed ? 'app-shell app-shell--full' : 'app-shell'}>
       <RouteIndexingPolicy />
+      <ScrollToTop />
       <OAuthReturn />
       <Routes>
         <Route path="/" element={<Welcome />} />
@@ -181,8 +195,8 @@ function AppShell() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/sell/new" element={<SellNew />} />
-        {/* Without this an unmatched hash renders an empty shell rather than a page. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* An unmatched hash renders the 404 page instead of silently bouncing home. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
     </div>
