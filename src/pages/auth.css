@@ -122,6 +122,24 @@
   color: var(--text-dim);
 }
 
+/* Round 8: neutral sibling of .auth-error for the birthday gate's legacy-username
+   notice — informational, so hairline/surface rather than the error red. */
+.auth-notice {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.auth-notice a {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .auth-error {
   font-size: 14px;
   color: var(--accent);
@@ -157,6 +175,19 @@
   text-decoration: underline;
 }
 
+/* Round 8: the birthday gate's "Log out" is a button (it calls signOut rather
+   than navigating), styled like the footer links around it. */
+.auth-footer .auth-linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .auth-confirm {
   display: flex;
   flex-direction: column;
@@ -181,6 +212,7 @@
 
 /* Visible keyboard focus on every interactive control */
 .auth-page a:focus-visible,
+.auth-footer .auth-linklike:focus-visible,
 .auth-oauth-btn:focus-visible,
 .auth-submit:focus-visible,
 .auth-field input:focus-visible {
