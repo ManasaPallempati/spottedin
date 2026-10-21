@@ -17,6 +17,7 @@ npm install
 cp .env.example .env.local   # then fill in the staging project's URL and anon key
 npm run dev      # http://localhost:5173
 npm run build    # production build (base './')
+npm test         # smoke tests (Vitest; Supabase is faked, no network)
 ```
 
 ## Screens
