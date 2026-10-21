@@ -55,6 +55,10 @@ export type ProfileEdit = {
 export type AuthContextValue = {
   session: Session | null
   profile: Profile | null
+  // Set when a signed-in person has no profile *because creating one failed*,
+  // as opposed to not having one yet. Screens must not treat this as signed
+  // out — that is what hid a broken signup until a user reported it.
+  profileError: string | null
   isAuthed: boolean
   loading: boolean
   signUp: (
@@ -135,43 +139,74 @@ function randomDigits(len: number): string {
 const PROFILE_COLUMNS =
   'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,guardian_email,guardian_consent_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
+// Distinguishes "this person has no profile yet" from "we could not create
+// one". Both used to return null, so a failed insert rendered as the
+// signed-out view with no explanation — which is how a missing INSERT grant on
+// date_of_birth broke every signup and was only found when a user complained.
+type EnsureProfileResult = { profile: Profile; error: null } | { profile: null; error: string }
+
 async function ensureProfile(
   userId: string,
   meta: { handle?: string; name?: string; date_of_birth?: string },
   email: string,
-): Promise<Profile | null> {
-  const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
-  if (existing) return mapProfile(existing as ProfileRow)
+): Promise<EnsureProfileResult> {
+  const { data: existing, error: readError } = await supabase
+    .from('profiles')
+    .select(PROFILE_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (existing) return { profile: mapProfile(existing as ProfileRow), error: null }
+  if (readError) {
+    console.warn('[auth] profile read failed:', readError)
+    return { profile: null, error: 'We could not load your profile. Please try again.' }
+  }
 
   const baseHandle = meta.handle ?? sanitizeHandle(email)
   const name = meta.name ?? (email.split('@')[0] || 'User')
+  // date_of_birth rides along from signup metadata. Without it the row is
+  // created with a null date, which is_adult() treats as an adult — so an
+  // OAuth signup, which has no date, is an adult until they set one.
+  const newRow = { id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null }
 
   const { data: inserted, error } = await supabase
     .from('profiles')
-    // date_of_birth rides along from signup metadata. Without it the row is
-    // created with a null date, which is_adult() treats as an adult — so an
-    // OAuth signup, which has no date, is an adult until they set one.
-    .insert({ id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null })
+    .insert(newRow)
     .select(PROFILE_COLUMNS)
     .single()
 
-  if (!error && inserted) return mapProfile(inserted as ProfileRow)
+  if (!error && inserted) return { profile: mapProfile(inserted as ProfileRow), error: null }
 
-  // unique-violation on handle: retry once with 2 random digits appended
+  // unique-violation on handle: retry once with 2 random digits appended.
+  // Spreads the same row so the retry cannot quietly drop date_of_birth — an
+  // earlier version rebuilt the object by hand and did exactly that, making a
+  // minor an adult purely because their first choice of handle was taken.
   if (error && error.code === '23505') {
-    const retryHandle = `${baseHandle}${randomDigits(2)}`
     const { data: retried, error: retryError } = await supabase
       .from('profiles')
-      .insert({ id: userId, handle: retryHandle, name })
+      .insert({ ...newRow, handle: `${baseHandle}${randomDigits(2)}` })
       .select(PROFILE_COLUMNS)
       .single()
-    if (!retryError && retried) return mapProfile(retried as ProfileRow)
-    console.warn(retryError)
-    return null
+    if (!retryError && retried) return { profile: mapProfile(retried as ProfileRow), error: null }
+    console.warn('[auth] profile create failed on retry:', retryError)
+    return { profile: null, error: profileCreateMessage(retryError) }
   }
 
-  console.warn(error)
-  return null
+  console.warn('[auth] profile create failed:', error)
+  return { profile: null, error: profileCreateMessage(error) }
+}
+
+// Postgres errors here are almost always a schema or grant problem rather than
+// anything the person did, so the copy says so instead of blaming their input.
+// The code is included because it is what makes a bug report actionable.
+function profileCreateMessage(error: { code?: string; message?: string } | null): string {
+  if (error?.code === '42501') {
+    return 'We could not finish setting up your account (permission error). Please contact support.'
+  }
+  if (error?.code === '23514') {
+    return 'We could not finish setting up your account (invalid details). Please contact support.'
+  }
+  return `We could not finish setting up your account${error?.code ? ` (${error.code})` : ''}. Please try again.`
 }
 
 // Shape covers both the AuthError instances supabase-js rejects with (which carry a
@@ -295,6 +330,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileError, setProfileError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -306,9 +342,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       if (data.session) {
         const meta = (data.session.user.user_metadata ?? {}) as { handle?: string; name?: string }
-        const p = await ensureProfile(data.session.user.id, meta, data.session.user.email ?? '')
+        const result = await ensureProfile(data.session.user.id, meta, data.session.user.email ?? '')
         if (cancelled) return
-        setProfile(p)
+        setProfile(result.profile)
+        setProfileError(result.error)
       }
       setLoading(false)
     }
@@ -330,15 +367,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // profile; OAuth reloads the page, so the listener is the only path.
         setTimeout(() => {
           if (cancelled) return
-          ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((p) => {
+          ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((result) => {
             if (cancelled) return
-            setProfile(p)
+            setProfile(result.profile)
+            setProfileError(result.error)
             setLoading(false)
           })
         }, 0)
       } else if (event === 'SIGNED_OUT') {
         setSession(null)
         setProfile(null)
+        setProfileError(null)
         setLoading(false)
       } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         setSession(newSession)
@@ -482,6 +521,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     session,
     profile,
+    profileError,
     isAuthed: session !== null,
     loading,
     signUp,
