@@ -3,6 +3,7 @@ import { ArrowUpDown } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { CONDITIONS } from '../data/sellers'
 import { applyFilters, type Filters, type Sort } from '../lib/filters'
+import { sizeOptionsFor } from '../lib/sizes'
 import Chip from './Chip'
 import BottomSheet from './BottomSheet'
 import './FilterBar.css'
@@ -46,7 +47,7 @@ export default function FilterBar({ listings, filters, onChange, sort, onSort, s
   const [openSheet, setOpenSheet] = useState<SheetKind>(null)
 
   const brandOptions = Array.from(new Set(listings.map((l) => l.brand))).sort()
-  const sizeOptions = Array.from(new Set(listings.map((l) => l.size))).sort()
+  const sizeOptions = sizeOptionsFor(listings.map((l) => l.size))
   const resultCount = applyFilters(listings, filters, sort).length
 
   return (
