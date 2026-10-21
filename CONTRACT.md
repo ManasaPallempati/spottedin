@@ -722,3 +722,108 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 | Agent | Owns |
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
+
+## Round 8 — sell-form draft autosave
+
+The create-listing form (`src/pages/SellNew.tsx`) autosaves its text/select values —
+title, price, size, category, condition, description — to localStorage under
+`spotted_sell_draft`, debounced 500ms. Photos are deliberately excluded (storage
+uploads and object URLs, too big and too stateful for localStorage). An untouched
+form never writes a draft, and clearing every field by hand removes it again.
+
+On mount, an existing draft is restored into the fields and a dismissible bar
+(`aria-live="polite"`) appears; a corrupt or non-object draft is silently ignored.
+The draft is cleared on successful publish and on explicit discard, which also
+resets the form. Dismissing the bar keeps the draft.
+
+User-facing copy strings added this round (source of truth):
+
+- "Draft restored"
+- "Discard draft"
+
+## Round 8 — share buttons (listing + shop)
+
+Client-only sharing for the two things a visitor would send someone: a listing and a
+seller's shop. One shared control, `src/components/ShareButton.tsx` (lucide `Share2`
+icon-only button, `aria-label` required by prop): where `navigator.share` exists it
+opens the OS share sheet with `{ title, url }` (the sheet is its own feedback — no
+toast; a dismissed sheet / `AbortError` is not treated as failure); everywhere else it
+copies the URL with `navigator.clipboard.writeText` and shows a ~1.8s "Link copied"
+toast. The toast text lives in a permanently mounted `aria-live="polite"` region (a
+region created at announce time is not read by screen readers) that takes the shared
+`.toast` styling from `styles/motion.css` only while text is present. Keyboard: real
+`<button>`, `:focus-visible` outline matching the auth screens' convention
+(`3px solid var(--accent)`).
+
+- **Product page** (`/listing/:id/:slug`): share button at the far end of the like
+  row; shares `canonicalUrl(listingPath(id, brand))` — the exact URL the page's own
+  SEO effect canonicalizes to — titled "`<Brand> - Size <size> | SPOTTED`".
+- **Shop page** (`/shop/:handle`): share button pinned to the header's top-right
+  corner (both the real-profile and fictional-seller header variants); shares
+  `canonicalUrl('/shop/' + handle)` titled "@`<handle>` on SPOTTED".
+- **Canonical-path bootstrap** (`resolveCanonicalPath` in `src/App.tsx`): canonical
+  URLs are path-based, but HashRouter only reads the fragment, so before this round a
+  shared link (or a crawler-followed canonical) opened at `/listing/…` rendered the
+  Welcome screen and the destination was silently lost to the catch-all route. App
+  bootstrap now rewrites any non-root pathname into the equivalent hash route
+  (`/listing/x` → `/#/listing/x`, query preserved) via `history.replaceState`, before
+  HashRouter mounts, in the same synchronous slot as Round 7's OAuth-error cleaner.
+  OAuth callbacks are unaffected — GoTrue redirects land on pathname `/`, which the
+  rewrite skips. Netlify already serves the app shell for every path (netlify.toml),
+  so the path reaches the client intact.
+- **`base: '/'` in vite.config.ts** (was `'./'`, a GitHub-Pages-era setting; Pages was
+  retired in a64a406 and both sites are Netlify serving from the domain root). With the
+  relative base, the shell served for a deep path referenced `./assets/…` relative to
+  that path; Netlify's `/*` rewrite answered those asset requests with index.html, the
+  module script failed its MIME check, and every deep-path URL rendered a blank page
+  before any script ran — verified against a production build via `vite preview`. The
+  bootstrap above cannot run until the app boots, so this is a prerequisite, not a
+  cosmetic change.
+
+User-facing copy strings added this round (source of truth):
+
+- "Link copied"
+- "Couldn't copy the link" (clipboard denied/unavailable fallback)
+- Accessible names: "Share this listing", "Share this shop"
+
+## Round 8 — Product page photo gallery
+
+PR #16 (`supabase/round13-listing-images.sql`) let sellers attach up to eight photos per
+listing, but the Product page still rendered only `listing.img` (position 0). This round
+shows all of them.
+
+- **Data:** `useListingImages(listingId)` in `src/lib/useListings.ts` queries
+  `listing_images` (`path,position`, ordered by position) and resolves each path to a URL
+  the same way `resolveImage` does (http(s) passthrough, else the `LISTING_IMAGE_BASE`
+  storage prefix — shared `resolveStoragePath` helper). Deliberately a separate query,
+  NOT an embed in `LISTING_COLUMNS`: that constant also feeds the feed and the
+  shop/profile grids, which only show thumbnails.
+- **UI:** `ProductGallery` (internal to `src/pages/Product.tsx`) replaces the single
+  `.product-image-wrap`. A CSS scroll-snap track (`scroll-snap-type: x mandatory`,
+  full-width gapless slides, hidden scrollbar) gives native touch swiping; dot buttons
+  below jump to a slide; the track is focusable (`tabIndex=0`) and ArrowLeft/ArrowRight
+  move one slide (with `preventDefault` so the browser's own scroll nudge doesn't fight
+  the snap). Active dot tracked from `scrollLeft / clientWidth`. Non-first slides load
+  lazily. Container is `role="group"` + `aria-roledescription="carousel"`; each image and
+  dot is labelled "photo n of N".
+- **Fallback:** with one photo (old listings backfilled to a single row, picsum
+  placeholders with no rows, or the images query still in flight) it renders exactly the
+  original single-image markup — no carousel roles, no dots. Because round 13's sync
+  trigger keeps `listings.image_path` equal to the position-0 path, the single image shown
+  while the gallery loads is the same as the first slide, so hydration causes no visual
+  jump. `ogImage` stays `listing.img` — position 0 is the canonical thumbnail by design.
+
+User-facing copy strings added this round (all accessibility labels):
+
+- "Listing photos" (carousel `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>. Use the arrow keys to see other photos." (track `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>" (per-image `alt`)
+- "Photo \<n\> of \<N\>" (dot button `aria-label`)
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| sell-draft-autosave | src/pages/SellNew.tsx, src/pages/sellnew.css, CONTRACT.md |
+| share | src/components/ShareButton.tsx (new), src/components/ShareButton.css (new), src/pages/Product.tsx (share button), src/pages/product.css (`.product-share-btn`), src/pages/Shop.tsx (share button), src/pages/shop.css (`.shop-share-btn`), src/App.tsx (`resolveCanonicalPath` only), vite.config.ts (`base`), CONTRACT.md |
+| product-gallery | src/pages/Product.tsx, src/pages/product.css, src/lib/useListings.ts (`resolveStoragePath` + `useListingImages` only), CONTRACT.md |
