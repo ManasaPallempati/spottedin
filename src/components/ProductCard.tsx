@@ -24,6 +24,8 @@ export default function ProductCard({ listing }: ProductCardProps) {
     <Link to={listingPath(id, brand)} className="product-card">
       <div className="product-card-image-wrap">
         <img src={img} alt={brand} loading="lazy" />
+        {/* Contract (Round 4): only `status === 'sold'` means sold — undefined is live. */}
+        {listing.status === 'sold' && <span className="product-card-sold">Sold</span>}
         <button
           className={`product-card-like${justLiked ? ' heart-burst' : ''}`}
           aria-label="Like"
