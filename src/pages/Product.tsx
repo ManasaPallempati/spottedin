@@ -7,9 +7,10 @@ import { conditionForListing, describeListing, sellerFor } from '../data/sellers
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
 import Chip from '../components/Chip'
+import ShareButton from '../components/ShareButton'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { listingPath } from '../lib/listingUrls'
-import { setPageMeta } from '../lib/seo'
+import { canonicalUrl, setPageMeta } from '../lib/seo'
 import './product.css'
 
 function formatInr(value: number) {
@@ -171,6 +172,12 @@ export default function Product() {
           <Heart size={22} fill={liked ? 'var(--accent)' : 'none'} color={liked ? 'var(--accent)' : 'currentColor'} />
         </button>
         <span className="product-like-count">{count} likes</span>
+        <ShareButton
+          className="product-share-btn"
+          title={`${listing.brand} - Size ${listing.size} | SPOTTED`}
+          url={canonicalUrl(listingPath(listing.id, listing.brand))}
+          label="Share this listing"
+        />
       </div>
 
       <h1 className="product-title">{title}</h1>
