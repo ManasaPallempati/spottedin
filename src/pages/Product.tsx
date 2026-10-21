@@ -7,6 +7,7 @@ import { useListing, useListingImages, useListings } from '../lib/useListings'
 import { useAppState } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import type { BoostResult } from '../lib/payments'
+import { BoutiqueTag } from '../components/BoutiqueTag'
 import { conditionForListing, describeListing, sellerFor } from '../data/sellers'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
@@ -372,7 +373,10 @@ export default function Product() {
             </Link>
           ))}
         </div>
-        <p className="product-condition">Condition: {condition}</p>
+        <p className="product-condition">
+          <span className="product-condition-label">Condition</span>{' '}
+          <BoutiqueTag>{condition}</BoutiqueTag>
+        </p>
       </div>
 
       <div className="product-seller-card">
