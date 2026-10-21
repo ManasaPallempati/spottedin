@@ -398,12 +398,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     dateOfBirth: string,
   ): Promise<{ error: string | null }> {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { handle, name, date_of_birth: dateOfBirth } },
     })
-    return { error: error ? friendlyAuthError(error) : null }
+    if (error) return { error: friendlyAuthError(error) }
+    // With email confirmation on, GoTrue answers an already-registered address
+    // with a success and an obfuscated user whose identities array is empty, so
+    // the form used to say "check your email" for an email that will never come.
+    if (data.user && !data.session && (data.user.identities?.length ?? 0) === 0) {
+      return { error: 'An account with this email already exists. Log in, or reset your password.' }
+    }
+    return { error: null }
   }
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
@@ -474,7 +481,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       if (error.message.includes('under_minimum_age')) {
-        return { error: 'You need to be 18 or over to use Spotted.' }
+        // The trigger (round11) raises this below 13, not 18 — under-18s are
+        // allowed with restrictions. Same copy as the Signup form's own check.
+        return { error: 'You need to be 13 or over to use Spotted.' }
       }
       if (error.message.includes('date_of_birth_in_future')) {
         return { error: 'Please enter a valid date of birth.' }

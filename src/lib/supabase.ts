@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY =
 // reads its own storage instead of production's.
 export const LISTING_IMAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public/listing-images/`
 
-// PKCE, not the library default `implicit`: this app uses HashRouter, and the implicit
+// PKCE, not the library default `implicit`: this app used HashRouter, and the implicit
 // flow returns its tokens in the URL fragment (`#access_token=…`) — the exact place the
 // router reads the route from, so the OAuth callback lands on an unmatched path. PKCE
 // returns `?code=…` in the query string instead, which the router ignores.
