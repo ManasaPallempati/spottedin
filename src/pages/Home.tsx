@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import SearchBar from '../components/SearchBar'
 import ProductCard from '../components/ProductCard'
+import SkeletonCard from '../components/SkeletonCard'
 import type { Listing } from '../data/listings'
 import { FEATURED_CATEGORIES, listingMatchesCategory } from '../data/taxonomy'
 import { useListings, useListingsByIds } from '../lib/useListings'
@@ -196,11 +197,9 @@ export default function Home() {
         </section>
       )}
 
-      <div className={`home-grid${loading ? '' : ' fade-in'}`}>
+      <div className={`home-grid${loading ? '' : ' fade-in'}`} aria-busy={loading}>
         {loading
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <div className="home-skeleton" key={i} />
-            ))
+          ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
           : listings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
       </div>
     </div>

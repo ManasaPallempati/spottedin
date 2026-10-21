@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import { supabase } from './lib/supabase'
 import { AuthProvider, useAuth, friendlyOAuthCallbackError } from './lib/auth'
@@ -25,6 +25,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
+import NotFound from './pages/NotFound'
 import { setPageIndexing } from './lib/seo'
 
 function RouteIndexingPolicy() {
@@ -42,6 +43,18 @@ function RouteIndexingPolicy() {
     if (!pageOwnsIndexing) {
       setPageIndexing(false)
     }
+  }, [location.pathname])
+
+  return null
+}
+
+// Browsers keep the window scroll position across SPA route changes; without this a
+// visitor who scrolled deep into one screen lands mid-page on the next.
+function ScrollToTop() {
+  const location = useLocation()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
   }, [location.pathname])
 
   return null
@@ -99,8 +112,25 @@ function resolveOAuthCallbackError(): void {
   sessionStorage.removeItem('spotted_oauth_next')
 
   const url = new URL(window.location.href)
+  url.pathname = '/login'
   url.search = ''
-  url.hash = '#/login'
+  url.hash = ''
+  window.history.replaceState(null, '', url.toString())
+}
+
+// The app used HashRouter until this change, so links already shared on WhatsApp,
+// Instagram, etc. look like https://host/#/listing/<id>/<slug>. Move a '#/…' fragment
+// into the real path before BrowserRouter mounts so those links keep working.
+// A GoTrue error fragment ('#error=…') never starts with '#/', and is handled first
+// by resolveOAuthCallbackError(). Idempotent: after the rewrite there is no '#/'.
+function resolveLegacyHashRoute(): void {
+  const { hash } = window.location
+  if (!hash.startsWith('#/')) return
+  const url = new URL(window.location.href)
+  const legacy = new URL(hash.slice(1), url.origin)
+  url.pathname = legacy.pathname
+  url.search = legacy.search
+  url.hash = legacy.hash
   window.history.replaceState(null, '', url.toString())
 }
 
@@ -155,6 +185,7 @@ function AppShell() {
   return (
     <div className={isFullBleed ? 'app-shell app-shell--full' : 'app-shell'}>
       <RouteIndexingPolicy />
+      <ScrollToTop />
       <OAuthReturn />
       <Routes>
         <Route path="/" element={<Welcome />} />
@@ -181,8 +212,8 @@ function AppShell() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/sell/new" element={<SellNew />} />
-        {/* Without this an unmatched hash renders an empty shell rather than a page. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* An unmatched hash renders the 404 page instead of silently bouncing home. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       {!hideNav && <BottomNav />}
     </div>
@@ -190,17 +221,19 @@ function AppShell() {
 }
 
 export default function App() {
-  // Must run before HashRouter (below) is rendered — see resolveOAuthCallbackError's
-  // own comment for why this can't be an effect.
+  // Must run before BrowserRouter (below) is rendered — see resolveOAuthCallbackError's
+  // own comment for why this can't be an effect. Order matters: the OAuth error
+  // cleaner first, then the legacy '#/' link rewrite.
   resolveOAuthCallbackError()
+  resolveLegacyHashRoute()
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AuthProvider>
         <AppStateProvider>
           <AppShell />
         </AppStateProvider>
       </AuthProvider>
-    </HashRouter>
+    </BrowserRouter>
   )
 }
