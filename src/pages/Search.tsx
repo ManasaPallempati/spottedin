@@ -1,5 +1,7 @@
+import SkeletonCard from '../components/SkeletonCard'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { SearchX } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import Chip from '../components/Chip'
 import FilterBar from '../components/FilterBar'
@@ -19,7 +21,9 @@ export default function Search() {
   const categorySlug = normalizeCategory(searchParams.get('category') ?? '')
   const category = INDIAN_CATEGORIES.find((item) => item.slug === categorySlug)
 
-  const { listings, loading } = useListings()
+  // Search/browse shows sold items too (with a Sold chip) so results reflect
+  // the market; the "Hide sold" filter chip lets the shopper opt out.
+  const { listings, loading } = useListings({ includeSold: true })
   // Only when there is a text query: browsing a category is looking for items,
   // not sellers.
   const { people } = usePeopleSearch(category ? '' : q)
@@ -107,26 +111,38 @@ export default function Search() {
       )}
 
       <div className="search-page-filters">
-        <FilterBar listings={searched} filters={filters} onChange={setFilters} sort={sort} onSort={setSort} />
+        <FilterBar
+          listings={searched}
+          filters={filters}
+          onChange={setFilters}
+          sort={sort}
+          onSort={setSort}
+          showSoldToggle
+        />
       </div>
 
       {!loading && results.length === 0 ? (
-        <div className="search-page-empty">
-          <p className="search-page-empty-text">
-            {category ? `No ${category.label.toLowerCase()} are available right now.` : `No results for '${q}'`}
+        <div className="search-page-empty" role="status">
+          <SearchX size={56} strokeWidth={1.25} className="search-page-empty-icon" aria-hidden="true" />
+          <p className="search-page-empty-title">
+            {category ? `No ${category.label.toLowerCase()} right now` : q ? `Nothing for '${q}' yet` : 'Nothing matches those filters'}
           </p>
-          <button
-            type="button"
-            className="btn btn-primary search-page-clear-btn"
-            onClick={() => navigate('/search')}
-          >
-            Clear search
-          </button>
+          <p className="search-page-empty-text">
+            Try a broader word (“kurta” instead of “blue silk kurta”), loosen the filters, or check back — new pieces are listed every day.
+          </p>
+          <div className="search-page-empty-actions">
+            <button type="button" className="btn btn-primary search-page-clear-btn" onClick={() => navigate('/search')}>
+              Clear search
+            </button>
+            <Link to="/sell" className="btn btn-outline search-page-clear-btn">
+              Sell something like it
+            </Link>
+          </div>
         </div>
       ) : (
-        <div className="search-page-grid">
+        <div className="search-page-grid" aria-busy={loading}>
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => <div className="search-page-skeleton" key={i} />)
+            ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
             : results.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
         </div>
       )}

@@ -9,6 +9,7 @@ export type Filters = {
   price: 'any' | 'u500' | '500to1500' | '1500to3000' | 'over3000'
   conditions: string[]
   onSale: boolean
+  hideSold: boolean
 }
 
 export type Sort = 'newest' | 'priceAsc' | 'priceDesc' | 'mostLiked'
@@ -20,6 +21,7 @@ export const emptyFilters: Filters = {
   price: 'any',
   conditions: [],
   onSale: false,
+  hideSold: false,
 }
 
 function inPriceBand(price: number, band: Filters['price']): boolean {
@@ -48,6 +50,8 @@ export function applyFilters(listings: Listing[], filters: Filters, sort: Sort):
     if (!inPriceBand(listing.price, filters.price)) return false
     if (filters.conditions.length > 0 && !filters.conditions.includes(conditionForListing(listing.id))) return false
     if (filters.onSale && !listing.originalPrice) return false
+    // Contract (Round 4): only `status === 'sold'` means sold — undefined is live.
+    if (filters.hideSold && listing.status === 'sold') return false
     return true
   })
 

@@ -41,7 +41,7 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, loading, signOut } = useAuth()
+  const { isAuthed, profile, profileError, loading, signOut } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
@@ -134,6 +134,25 @@ export default function Profile() {
       {loading ? (
         <div className="profile-guest">
           <p className="profile-guest-copy">Loading your closet…</p>
+        </div>
+      ) : isAuthed && !profile && profileError ? (
+        /* Signed in, but their profile could not be created. Showing the
+           signed-out prompt here tells them to log in when they already are,
+           which is both useless and misleading. */
+        <div className="profile-guest">
+          <h2 className="profile-guest-title">Something went wrong</h2>
+          <p className="profile-guest-copy" role="alert">
+            {profileError}
+          </p>
+          <div className="profile-guest-actions">
+            <button
+              type="button"
+              className="btn btn-primary profile-guest-btn"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </button>
+          </div>
         </div>
       ) : !isAuthed || !profile ? (
         <div className="profile-guest">
