@@ -138,6 +138,9 @@ function RecoveryReturn() {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
+        // An abandoned OAuth attempt must not let OAuthReturn replace this route
+        // after AuthProvider publishes the recovery session.
+        sessionStorage.removeItem('spotted_oauth_next')
         navigate('/reset-password', { replace: true })
       }
     })
