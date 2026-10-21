@@ -18,3 +18,8 @@ history_organizer_ui.py
 launch_history_organizer_ui.bat
 restore_codex_sessions.py
 restore_codex_sessions.bat
+
+# Local environment files. Vite loads .env.local; keep real values out of git.
+.env
+.env.*
+!.env.example
