@@ -34,7 +34,7 @@ function handleFromEmail(email: string): string {
 }
 
 export default function Signup() {
-  const { signUp, session } = useAuth()
+  const { signUp, session, profileError } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const next = safeNext(searchParams.get('next'), '/profile')
@@ -106,6 +106,14 @@ export default function Signup() {
   // after. Give it a brief window before falling back to the "check your email" state.
   useEffect(() => {
     if (phase !== 'checking') return
+    if (session && profileError) {
+      // Signed in, but the profile row could not be created — say so here
+      // instead of landing on a page that renders as signed out.
+      setLoading(false)
+      setPhase('form')
+      setError(profileError)
+      return
+    }
     if (session) {
       // Clear stale OAuth target (same race condition as Login.tsx — OAuthReturn
       // in App.tsx would hijack this signup's redirect).
@@ -118,7 +126,7 @@ export default function Signup() {
       setPhase('confirm')
     }, 600)
     return () => clearTimeout(timer)
-  }, [phase, session, next, navigate])
+  }, [phase, session, profileError, next, navigate])
 
   if (phase === 'confirm') {
     return (

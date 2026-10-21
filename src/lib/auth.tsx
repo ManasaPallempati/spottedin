@@ -415,12 +415,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     dateOfBirth: string,
   ): Promise<{ error: string | null }> {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { handle, name, date_of_birth: dateOfBirth } },
     })
-    return { error: error ? friendlyAuthError(error) : null }
+    if (error) return { error: friendlyAuthError(error) }
+    // With email confirmation on, GoTrue answers an already-registered address
+    // with a success and an obfuscated user whose identities array is empty, so
+    // the form used to say "check your email" for an email that will never come.
+    if (data.user && !data.session && (data.user.identities?.length ?? 0) === 0) {
+      return { error: 'An account with this email already exists. Log in, or reset your password.' }
+    }
+    return { error: null }
   }
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
