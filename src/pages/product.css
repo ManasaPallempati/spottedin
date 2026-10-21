@@ -416,3 +416,5 @@
 }
 
 /* .toast is defined in src/styles/motion.css (shared across pages); not duplicated here. */
+
+.product-safety { padding: 4px 16px 0; }

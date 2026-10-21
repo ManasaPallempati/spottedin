@@ -1,3 +1,4 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight, Heart, ShieldCheck, Star } from 'lucide-react'
@@ -242,6 +243,10 @@ export default function Product() {
         <Link to={`/inbox/t/${seller.handle}?listing=${listing.id}`} className="product-ask-link">
           Ask a question
         </Link>
+      </div>
+
+      <div className="product-safety">
+        <SafetyMenu targetType="listing" targetId={listing.id} handle={seller.handle} label="Report this listing" />
       </div>
 
       {seller.reviews.length > 0 && (

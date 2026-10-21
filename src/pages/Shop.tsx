@@ -1,3 +1,4 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
@@ -99,6 +100,7 @@ export default function Shop() {
 
         <p className="shop-sold">{realProfile.sales ?? 0} sold</p>
 
+        <SafetyMenu targetType="profile" targetId={realProfile.handle} handle={realProfile.handle} label="Report or block this account" />
         <div className="shop-follow-row">
           <span className="shop-follow-stat">{followerCount} followers</span>
           {!isOwnProfile && (
