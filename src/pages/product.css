@@ -490,3 +490,46 @@
 }
 
 /* .toast is defined in src/styles/motion.css (shared across pages); not duplicated here. */
+
+/* Sticky mobile Buy bar — sits above the floating BottomNav and appears only
+   after the inline Buy/Offer buttons have scrolled off the top. */
+.product-buybar {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translate(-50%, 16px);
+  width: calc(100% - 24px);
+  max-width: 406px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 49;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.product-buybar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+.product-buybar-price {
+  flex: 1;
+  font-weight: 800;
+  font-size: 17px;
+}
+.product-buybar .btn {
+  height: 40px;
+  padding: 0 16px;
+}
+@media (min-width: 900px) {
+  .product-buybar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-buybar { transition: none; }
+}

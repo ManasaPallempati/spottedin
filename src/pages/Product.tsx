@@ -121,6 +121,18 @@ export default function Product() {
   const { listings: allListings } = useListings()
 
   const [offerOpen, setOfferOpen] = useState(false)
+  // Sticky mobile Buy bar: shown only once the inline CTAs scroll out of view.
+  const ctasRef = useRef<HTMLDivElement | null>(null)
+  const [buyBarVisible, setBuyBarVisible] = useState(false)
+  useEffect(() => {
+    const el = ctasRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([entry]) => {
+      setBuyBarVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [listing?.id, listing?.status])
   const [offerSent, setOfferSent] = useState(false)
   const [offerAmount, setOfferAmount] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
@@ -273,7 +285,7 @@ export default function Product() {
           </Link>
         </div>
       ) : (
-        <div className="product-ctas">
+        <div className="product-ctas" ref={ctasRef}>
           <button type="button" className="btn btn-primary" onClick={handleBuyNow}>
             Buy now
           </button>
@@ -282,6 +294,18 @@ export default function Product() {
           </button>
           <button type="button" className="btn btn-outline" onClick={handleAddToBag}>
             Add to bag
+          </button>
+        </div>
+      )}
+
+      {listing.status !== 'sold' && (
+        <div className={'product-buybar' + (buyBarVisible ? ' is-visible' : '')} aria-hidden={!buyBarVisible}>
+          <span className="product-buybar-price">{formatInr(listing.price)}</span>
+          <button type="button" className="btn btn-outline" tabIndex={buyBarVisible ? 0 : -1} onClick={openOfferSheet}>
+            Offer
+          </button>
+          <button type="button" className="btn btn-primary" tabIndex={buyBarVisible ? 0 : -1} onClick={handleBuyNow}>
+            Buy now
           </button>
         </div>
       )}
