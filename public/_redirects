@@ -1,0 +1,3 @@
+# Netlify SPA fallback (mirrors the [[redirects]] block in netlify.toml) so
+# clean BrowserRouter paths like /listing/<id>/<slug> load the app with HTTP 200.
+/*    /index.html   200

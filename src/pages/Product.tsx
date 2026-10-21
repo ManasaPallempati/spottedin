@@ -1,15 +1,19 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight, Heart, ShieldCheck, Star } from 'lucide-react'
-import { useListing, useListings } from '../lib/useListings'
+import { useListing, useListingImages, useListings } from '../lib/useListings'
 import { useAppState } from '../lib/appState'
 import { conditionForListing, describeListing, sellerFor } from '../data/sellers'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
 import Chip from '../components/Chip'
+import ShareButton from '../components/ShareButton'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { listingPath } from '../lib/listingUrls'
-import { setPageMeta } from '../lib/seo'
+import { recordRecentlyViewed } from '../lib/recentlyViewed'
+import { canonicalUrl, setPageMeta } from '../lib/seo'
 import './product.css'
 
 function formatInr(value: number) {
@@ -32,15 +36,105 @@ function StarRow({ rating }: { rating: number }) {
   )
 }
 
+// Swipeable photo carousel: a CSS scroll-snap track (native touch swiping, no
+// JS animation) plus dot buttons and arrow keys. With one photo it renders the
+// original single-image markup — no carousel roles, no dots — which is what
+// pre-round-13 listings and picsum placeholders get.
+function ProductGallery({ images, alt }: { images: string[]; alt: string }) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const [index, setIndex] = useState(0)
+
+  if (images.length <= 1) {
+    return (
+      <div className="product-image-wrap">
+        <img src={images[0]} alt={alt} />
+      </div>
+    )
+  }
+
+  const clampIndex = (value: number) => Math.max(0, Math.min(images.length - 1, value))
+
+  const scrollToIndex = (next: number) => {
+    const track = trackRef.current
+    if (!track) return
+    track.scrollTo({ left: clampIndex(next) * track.clientWidth, behavior: 'smooth' })
+  }
+
+  // Slides are exactly container-width with no gap, so the nearest slide is
+  // scrollLeft / clientWidth rounded.
+  const handleScroll = () => {
+    const track = trackRef.current
+    if (!track || track.clientWidth === 0) return
+    const next = clampIndex(Math.round(track.scrollLeft / track.clientWidth))
+    if (next !== index) setIndex(next)
+  }
+
+  // preventDefault, or the browser's own focused-scrollable arrow handling
+  // nudges by a few pixels instead of snapping a full slide.
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      scrollToIndex(index - 1)
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      scrollToIndex(index + 1)
+    }
+  }
+
+  return (
+    <div className="product-gallery" role="group" aria-roledescription="carousel" aria-label="Listing photos">
+      <div
+        ref={trackRef}
+        className="product-gallery-track"
+        tabIndex={0}
+        onScroll={handleScroll}
+        onKeyDown={handleKeyDown}
+        aria-label={`${alt} — photo ${index + 1} of ${images.length}. Use the arrow keys to see other photos.`}
+      >
+        {images.map((src, i) => (
+          <div className="product-gallery-slide" key={`${src}-${i}`}>
+            <img src={src} alt={`${alt} — photo ${i + 1} of ${images.length}`} loading={i === 0 ? undefined : 'lazy'} />
+          </div>
+        ))}
+      </div>
+      <div className="product-gallery-dots">
+        {images.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`product-gallery-dot${i === index ? ' is-active' : ''}`}
+            aria-label={`Photo ${i + 1} of ${images.length}`}
+            aria-current={i === index ? 'true' : undefined}
+            onClick={() => scrollToIndex(i)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Product() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const { listing, loading } = useListing(id)
+  const { images: galleryImages } = useListingImages(id)
   const { toggleLike, isLiked, likeCountFor, addToBag, makeOffer } = useAppState()
   const { listings: allListings } = useListings()
 
   const [offerOpen, setOfferOpen] = useState(false)
+  // Sticky mobile Buy bar: shown only once the inline CTAs scroll out of view.
+  const ctasRef = useRef<HTMLDivElement | null>(null)
+  const [buyBarVisible, setBuyBarVisible] = useState(false)
+  useEffect(() => {
+    const el = ctasRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([entry]) => {
+      setBuyBarVisible(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [listing?.id, listing?.status])
   const [offerSent, setOfferSent] = useState(false)
   const [offerAmount, setOfferAmount] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
@@ -78,6 +172,13 @@ export default function Product() {
       navigate(canonicalPath, { replace: true })
     }
   }, [id, listing, loading, location.pathname, navigate])
+
+  // Record the view only once the listing resolves — the resolved id is
+  // canonical, unlike the URL param, and unresolvable ids never enter history.
+  const viewedId = listing?.id
+  useEffect(() => {
+    if (viewedId) recordRecentlyViewed(viewedId)
+  }, [viewedId])
 
   useEffect(() => {
     return () => {
@@ -162,15 +263,19 @@ export default function Product() {
         <span className="product-breadcrumb-current">{title}</span>
       </nav>
 
-      <div className="product-image-wrap">
-        <img src={listing.img} alt={listing.brand} />
-      </div>
+      <ProductGallery images={galleryImages.length > 0 ? galleryImages : [listing.img]} alt={listing.brand} />
 
       <div className="product-like-row">
         <button type="button" className="product-like-btn" aria-label="Like" onClick={() => toggleLike(listing.id)}>
           <Heart size={22} fill={liked ? 'var(--accent)' : 'none'} color={liked ? 'var(--accent)' : 'currentColor'} />
         </button>
         <span className="product-like-count">{count} likes</span>
+        <ShareButton
+          className="product-share-btn"
+          title={`${listing.brand} - Size ${listing.size} | SPOTTED`}
+          url={canonicalUrl(listingPath(listing.id, listing.brand))}
+          label="Share this listing"
+        />
       </div>
 
       <h1 className="product-title">{title}</h1>
@@ -189,7 +294,7 @@ export default function Product() {
           </Link>
         </div>
       ) : (
-        <div className="product-ctas">
+        <div className="product-ctas" ref={ctasRef}>
           <button type="button" className="btn btn-primary" onClick={handleBuyNow}>
             Buy now
           </button>
@@ -198,6 +303,18 @@ export default function Product() {
           </button>
           <button type="button" className="btn btn-outline" onClick={handleAddToBag}>
             Add to bag
+          </button>
+        </div>
+      )}
+
+      {listing.status !== 'sold' && (
+        <div className={'product-buybar' + (buyBarVisible ? ' is-visible' : '')} aria-hidden={!buyBarVisible}>
+          <span className="product-buybar-price">{formatInr(listing.price)}</span>
+          <button type="button" className="btn btn-outline" tabIndex={buyBarVisible ? 0 : -1} onClick={openOfferSheet}>
+            Offer
+          </button>
+          <button type="button" className="btn btn-primary" tabIndex={buyBarVisible ? 0 : -1} onClick={handleBuyNow}>
+            Buy now
           </button>
         </div>
       )}
@@ -242,6 +359,10 @@ export default function Product() {
         <Link to={`/inbox/t/${seller.handle}?listing=${listing.id}`} className="product-ask-link">
           Ask a question
         </Link>
+      </div>
+
+      <div className="product-safety">
+        <SafetyMenu targetType="listing" targetId={listing.id} handle={seller.handle} label="Report this listing" />
       </div>
 
       {seller.reviews.length > 0 && (
