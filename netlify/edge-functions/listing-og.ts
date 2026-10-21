@@ -1,0 +1,64 @@
+// Link-preview crawlers (WhatsApp, Instagram, X, iMessage) do not run JavaScript, so
+// the per-listing meta that lib/seo.ts sets client-side is invisible to them. This
+// edge function rewrites the static Open Graph tags in index.html for
+// /listing/<id>/<slug> using the public listing row. Any failure falls through to the
+// unmodified shell, so it can never break the page.
+import type { Context } from 'https://edge.netlify.com'
+
+declare const Netlify: { env: { get(key: string): string | undefined } }
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+function setMeta(html: string, attr: 'property' | 'name', key: string, value: string): string {
+  const tag = `<meta ${attr}="${key}" content="${esc(value)}" />`
+  const re = new RegExp(`<meta\\s+${attr}="${key}"[^>]*>`, 'i')
+  return re.test(html) ? html.replace(re, tag) : html.replace('</head>', `    ${tag}\n  </head>`)
+}
+
+export default async function handler(request: Request, context: Context) {
+  const response = await context.next()
+  try {
+    const supabaseUrl = Netlify.env.get('VITE_SUPABASE_URL')
+    const anonKey = Netlify.env.get('VITE_SUPABASE_ANON_KEY')
+    const id = new URL(request.url).pathname.split('/')[2]
+    if (!supabaseUrl || !anonKey || !id) return response
+    if (!(response.headers.get('content-type') ?? '').includes('text/html')) return response
+
+    const api = `${supabaseUrl}/rest/v1/listings?id=eq.${encodeURIComponent(decodeURIComponent(id))}&select=title,description,price_inr,image_path&limit=1`
+    const res = await fetch(api, { headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } })
+    if (!res.ok) return response
+    const [row] = (await res.json()) as Array<{ title: string; description: string | null; price_inr: number; image_path: string | null }>
+    if (!row) return response
+
+    const price = `₹${Number(row.price_inr).toLocaleString('en-IN')}`
+    const title = `${row.title} – ${price} | SPOTTED`
+    const description = (row.description?.trim() || `Shop ${row.title} for ${price} on SPOTTED, a marketplace for pre-owned Indian clothing.`).slice(0, 200)
+    const url = new URL(request.url)
+    const canonical = `${url.origin}${url.pathname}`
+
+    let html = await response.text()
+    html = html.replace(/<title>[^<]*<\/title>/i, `<title>${esc(title)}</title>`)
+    html = setMeta(html, 'property', 'og:title', title)
+    html = setMeta(html, 'property', 'og:description', description)
+    html = setMeta(html, 'name', 'description', description)
+    html = setMeta(html, 'property', 'og:type', 'product')
+    html = setMeta(html, 'property', 'og:url', canonical)
+    html = html.replace(/<link rel="canonical"[^>]*>/i, `<link rel="canonical" href="${esc(canonical)}" />`)
+    if (row.image_path) {
+      const image = /^https?:/.test(row.image_path)
+        ? row.image_path
+        : `${supabaseUrl}/storage/v1/object/public/listing-images/${row.image_path}`
+      html = setMeta(html, 'property', 'og:image', image)
+      html = setMeta(html, 'name', 'twitter:image', image)
+    }
+
+    const headers = new Headers(response.headers)
+    headers.delete('content-length')
+    return new Response(html, { status: response.status, headers })
+  } catch {
+    return response
+  }
+}
+
+export const config = { path: '/listing/*' }
