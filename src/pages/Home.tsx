@@ -12,26 +12,10 @@ import { useAppState } from '../lib/appState'
 import { listingPath } from '../lib/listingUrls'
 import { readRecentlyViewed } from '../lib/recentlyViewed'
 import { useAuth } from '../lib/auth'
+import { readStoredPrefs, personalizeFeed, type StoredPrefs as Prefs } from '../lib/forYou'
 import { setPageMeta } from '../lib/seo'
 import { trackEvent } from '../lib/analytics'
 import './home.css'
-
-const PREFS_KEY = 'spotted_prefs_v1'
-
-type Prefs = { sizes: string[]; brands: string[] }
-
-function readPrefs(): Prefs {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY)
-    if (!raw) return { sizes: [], brands: [] }
-    const parsed = JSON.parse(raw)
-    const sizes = Array.isArray(parsed?.sizes) ? parsed.sizes.filter((s: unknown) => typeof s === 'string') : []
-    const brands = Array.isArray(parsed?.brands) ? parsed.brands.filter((b: unknown) => typeof b === 'string') : []
-    return { sizes, brands }
-  } catch {
-    return { sizes: [], brands: [] }
-  }
-}
 
 function stripUsPrefix(size: string): string {
   return size.replace(/^US\s+/i, '').trim().toLowerCase()
@@ -70,7 +54,12 @@ export default function Home() {
   const [feedTab, setFeedTab] = useState<FeedTab>('for-you')
   const tabRefs = useRef<Partial<Record<FeedTab, HTMLButtonElement | null>>>({})
 
-  const prefs = useMemo(() => readPrefs(), [])
+  const prefs = useMemo(() => readStoredPrefs(), [])
+  const interest = profile?.interest ?? null
+  const { listings: feedListings, personalized } = useMemo(
+    () => personalizeFeed(listings, { ...prefs, interest }),
+    [listings, prefs, interest],
+  )
   const recentIds = useMemo(() => readRecentlyViewed(), [])
   const { listings: recentListings } = useListingsByIds(recentIds)
   const picks = useMemo(() => computePicks(listings, prefs), [listings, prefs])
@@ -264,11 +253,25 @@ export default function Home() {
         className="home-feed-panel"
       >
         {feedTab === 'for-you' ? (
-          <div className={`home-grid${loading ? '' : ' fade-in'}`} aria-busy={loading}>
-            {loading
-              ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-              : listings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
-          </div>
+          personalized && !loading ? (
+            <section aria-labelledby="home-foryou-title">
+              <div className="home-foryou-header">
+                <h2 id="home-foryou-title" className="home-foryou-title">For You</h2>
+                <p className="home-foryou-sub">Sorted by your sizes, brands and style — everything's still here.</p>
+              </div>
+              <div className="home-grid fade-in">
+                {feedListings.map((listing) => (
+                  <ProductCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <div className={`home-grid${loading ? '' : ' fade-in'}`} aria-busy={loading}>
+              {loading
+                ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+                : feedListings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
+            </div>
+          )
         ) : loading || !ready ? (
           // Wait for the listings query AND auth restore + follows hydration
           // (ready = !authLoading && !hydrating) — branching earlier would
