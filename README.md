@@ -1,7 +1,8 @@
 # Spottedin
 
 Depop-style resale marketplace UI for India — mobile-first web app, dark visual system,
-₹ pricing, mock data. Built to match the reference screen set in [CONTRACT.md](CONTRACT.md),
+₹ pricing, Supabase-backed listings and auth. Built to match the reference screen set in
+[CONTRACT.md](CONTRACT.md),
 which is the source of truth for every screen, token, and copy string.
 
 ## Stack
@@ -14,26 +15,35 @@ hand-rolled CSS with design tokens in `src/styles/global.css`.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # production build (base './', GitHub Pages ready)
+npm run build    # production build (base './')
 ```
 
 ## Screens
 
 | Route | Screen |
 |---|---|
-| `/` | Public landing page (full-width marketing page, no nav) |
+| `/` | Welcome sign-in gate (full width, no nav; skippable) |
+| `/about` | Public marketing page (full width, no nav) |
 | `/home` | Home feed (search, promo strip, greeting, 2-col listing grid) |
-| `/login` | Sign in — Google, Facebook, and email/password (no nav) |
+| `/login` | Sign in — social and email/password (no nav) |
 | `/signup` | Email sign-up (no nav) |
 | `/discover` | Discover (hero carousel, outfits module, categories) |
+| `/search` | Search — items, filters, and people results |
+| `/category/:slug` | Category listing grid |
+| `/listing/:id/:slug`, `/p/:id` | Product page |
+| `/shop/:handle` | Seller shop page |
 | `/sell` | Sell splash (no-fees onboarding, no nav) |
-| `/inbox` | Inbox (filter chips, empty state) |
-| `/profile` | Profile (tabs, stats, earnings, promo card, empty listings) |
+| `/sell/new` | List an item (photos, drill-down category picker, no nav) |
+| `/likes`, `/bag` | Saved items and bag |
+| `/inbox`, `/inbox/t/:handle` | Inbox and message thread |
+| `/profile` | Profile (tabs, stats, earnings, promo card) |
+| `/account` | Account details (edit profile, picture, deletion) |
 | `/onboarding/sizes` | Sizes picker (light theme) |
 | `/onboarding/brands` | Brand picker → feed (light theme) |
 
-`/` is the public landing; the marketplace feed lives at `/home`, and the floating
-`BottomNav` is hidden on the landing and on the auth routes (`/login`, `/signup`).
+`/` is the sign-in gate and `/about` the marketing page; the marketplace feed lives
+at `/home`, and the floating `BottomNav` is hidden on both full-width pages and on
+the auth routes (`/login`, `/signup`).
 
 ## Auth
 
@@ -89,10 +99,9 @@ the full list.
 
 ## Backend
 
-The Home feed reads live listings from Supabase via `src/lib/useListings.ts`. If
-the query errors or returns zero rows, it falls back to mock listings so the grid
-is never blank — which is why staging, whose database is empty, still renders a
-populated feed.
+The Home feed reads live listings from Supabase via `src/lib/useListings.ts`.
+There is no mock fallback any more: if the query errors or returns zero rows, the
+grid renders empty (`src/data/listings.ts` now only exports the `Listing` type).
 
 The client (`src/lib/supabase.ts`) reads `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY` from the environment, falling back to the **production**
