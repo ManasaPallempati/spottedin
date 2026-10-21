@@ -15,6 +15,7 @@ hand-rolled CSS with design tokens in `src/styles/global.css`.
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # production build (base './', GitHub Pages ready)
+npm test         # smoke tests (Vitest; Supabase is faked, no network)
 ```
 
 ## Screens
