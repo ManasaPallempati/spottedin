@@ -215,3 +215,20 @@ test('an upstream stream error leaves the original unread without claiming missi
   assert.equal(response.bodyUsed, false)
   await assert.rejects(response.text(), /upstream ended early/)
 })
+
+for (const status of [204, 205, 304]) {
+  test('null-body status ' + status + ' bypasses lookup and keeps staging headers', async () => {
+    const upstream = new Response(null, {
+      status, statusText: 'Synthetic no-body response',
+      headers: { 'content-type': 'text/html', 'x-shell-marker': 'unchanged' },
+    })
+    const { response, calls } = await run({ upstream, env: { VITE_NOINDEX: 'true' } })
+    assert.equal(calls.length, 0)
+    assert.equal(response.status, status)
+    assert.equal(response.statusText, 'Synthetic no-body response')
+    assert.equal(response.headers.get('x-shell-marker'), 'unchanged')
+    assert.equal(response.headers.get('x-robots-tag'), 'noindex, nofollow')
+    assert.equal(response.body, null)
+    assert.equal(await response.text(), '')
+  })
+}

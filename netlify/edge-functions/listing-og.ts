@@ -28,6 +28,9 @@ export default async function handler(request: Request, context: Context) {
       response = new Response(response.body, { status: response.status, statusText: response.statusText, headers })
     }
 
+    // Null-body responses (including 204, 205 and 304) cannot carry rewritten HTML.
+    if (response.body === null) return response
+
     const supabaseUrl = Netlify.env.get('VITE_SUPABASE_URL')
     const anonKey = Netlify.env.get('VITE_SUPABASE_ANON_KEY')
     const id = new URL(request.url).pathname.split('/')[2]
