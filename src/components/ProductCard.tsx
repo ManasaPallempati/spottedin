@@ -45,11 +45,17 @@ export default function ProductCard({ listing }: ProductCardProps) {
         </button>
       </div>
       <div className="product-card-info">
-        <p className="product-card-brand">{brand}</p>
-        <p className="product-card-size">{size}</p>
         <p className="product-card-price">
           {formatInr(price)}
-          {originalPrice && <span className="product-card-original">{formatInr(originalPrice)}</span>}
+          {originalPrice != null && originalPrice > price && (
+            <s className="product-card-original" aria-label={`was ${formatInr(originalPrice)}`}>
+              {formatInr(originalPrice)}
+            </s>
+          )}
+        </p>
+        <p className="product-card-meta">
+          <span className="product-card-brand">{brand}</span>
+          {size && <span className="product-card-size"> · {size}</span>}
         </p>
       </div>
     </Link>
