@@ -18,6 +18,19 @@
   object-fit: cover;
 }
 
+.product-card-sold {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .product-card-like {
   position: absolute;
   top: 8px;
