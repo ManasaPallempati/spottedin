@@ -843,6 +843,185 @@ User-facing copy strings added this round (source of truth):
 - "Back to home"
 - "Search"
 
+## Round 8 — recently-viewed rail (client-only)
+
+Product views feed a "Recently viewed" rail on `/home`. Nothing server-side changes: no
+schema, no new tables, no writes — the history lives in the browser.
+
+- **Recording.** `src/lib/recentlyViewed.ts` (new) owns localStorage key
+  `spotted_recently_viewed`: a JSON array of listing ids, most-recent-first, deduped,
+  capped at 20. `Product.tsx` records the *resolved* listing's id (canonical, unlike the
+  URL param) once its query settles; unresolvable ids never enter the history. Reads and
+  writes are try/catch-wrapped — storage being unavailable is silent, never an error.
+- **Resolution at render time.** Ids only are stored; listing data is resolved when the
+  rail renders via `useListingsByIds(ids)` (new, `src/lib/useListings.ts`) — the same
+  `LISTING_COLUMNS` + `mapRow` path every grid uses, but `.in('id', …)` with **no status
+  filter**, so sold listings still resolve and carry `status: 'sold'`. Results are
+  re-ordered to match the stored ids (PostgREST guarantees no order); ids that no longer
+  resolve (deleted listings) drop out of the rail silently, and any query error resolves
+  to an empty rail. localStorage is never pruned on a failed resolution — a network blip
+  must not wipe the history.
+- **Rail.** `Home.tsx` renders the rail directly above the main grid, only when the
+  resolved list is non-empty (no skeleton/empty state). Small cards — image + price
+  only — as plain `Link`s to the listing (no ProductCard, which would drag like state
+  into the rail); horizontal scroll with `scroll-snap-type: x proximity`, matching the
+  Picks row pattern. Sold listings get a small "Sold" pill overlay (same styling family
+  as the product page's sold badge). Card taps emit `home_recent_click` analytics,
+  matching Home's existing events. Section is `aria-labelledby` its heading; each card's
+  accessible name comes from the image alt (listing title) plus the price text.
+
+User-facing copy strings added this round (source of truth):
+
+- "Recently viewed" (rail heading)
+- "Sold" (rail card pill — same word the product page badge already uses)
+
+## Round 8 — sold listings in search/browse
+
+(CONTRACT round numbering, unrelated to `supabase/round8-handle-rules.sql` — the SQL round
+sequence ran ahead of this document. No schema change this round; round 4's additive
+`listings_select_sold` policy already makes sold rows readable by everyone.)
+
+Search (`/search`, text queries, category drill-ins and Browse all alike) now includes sold
+listings so results reflect the whole market, Depop-style, instead of silently dropping items
+that have sold.
+
+- `useListings(options?: { includeSold?: boolean })` (`src/lib/useListings.ts`): default is
+  unchanged (`status = 'live'` — Home, Discover, Likes, Category, Shop, Product remain
+  live-only). With `includeSold: true` the query filters `status in ('live','sold')` rather
+  than dropping the filter entirely, because round 7 added a `'removed'` status and the
+  owner-select RLS policy would otherwise let a seller meet their own removed rows in search.
+  Only `Search.tsx` passes it.
+- **Sold chip** (`src/components/ProductCard.tsx`): cards whose listing has `status === 'sold'`
+  (the Round 4 contract test — undefined means live) render a small "Sold" pill overlaid
+  bottom-left on the card image (`.product-card-sold`, `ProductCard.css`). The Profile Sold
+  tab keeps its full-card SOLD overlay and hides the chip (`.profile-sold-item
+  .product-card-sold`, `profile.css`) so the state isn't stamped twice.
+- **Hide sold toggle**: `Filters` gains `hideSold: boolean` (default `false` — sold shown;
+  `src/lib/filters.ts`), applied in `applyFilters` via `=== 'sold'`. `FilterBar` gains a
+  `showSoldToggle?: boolean` prop rendering a "Hide sold" chip (with `aria-pressed`) between
+  "On sale" and Sort; only Search passes it — on Shop the chip would be a no-op since that
+  page fetches live rows only. Session-scoped state like the other filters; nothing persisted.
+
+User-facing copy strings added this round (source of truth):
+
+- "Sold" (card overlay chip)
+- "Hide sold" (filter row toggle chip)
+
+## Round 8 — date-of-birth gate for OAuth signups
+
+Closes docs/KNOWN_GAPS.md "OAuth signups have no date of birth". Google supplies no date
+of birth, so an OAuth signup's profile row is created with `date_of_birth` null — and
+`is_adult()` deliberately treats null as adult, so such an account was never subject to
+the minor restrictions. Email signup already requires the date (Signup.tsx); this round
+makes the app unusable for a signed-in account until it has one.
+
+- **Gate.** `DobGate` (`src/App.tsx`) wraps `<Routes>`: when auth has settled
+  (`!loading`), the visitor is signed in, the profile row loaded, and
+  `profile.dateOfBirth` is null, every route except an exempt set redirects to
+  `/onboarding/birthday?next=<intended path>` (`replace`, `encodeURIComponent`d,
+  consumed through `safeNext`). Exempt: `/`, `/about`, `/login`, `/signup`,
+  `/account` (the deletion flow lives there, so someone can close their account
+  instead of answering; it is also the other screen that can set the date), and the
+  birthday screen itself. A failed profile fetch (`profile === null`) does not gate.
+  Pre-existing accounts with a null date (e.g. `spotted.demo`, which predates round 10)
+  are gated too — that is the third KNOWN_GAPS entry closing itself. **Caveat — legacy
+  handles:** for accounts whose handle predates round 8's handle rules (`spotted.demo`,
+  `prudhvi.pallempati`), the `NOT VALID` CHECK `profiles_handle_format` is re-evaluated
+  on any UPDATE of the row, so no save from the birthday screen can succeed until the
+  account renames itself. The screen predicts this client-side (same pattern as the
+  constraint, applied to the stored handle) and shows a notice linking to `/account` —
+  exempt from the gate — plus a directed error on submit, rather than letting the save
+  bounce with the generic 23514 copy about details that are not on the screen.
+- **Screen.** `src/pages/onboarding/Birthday.tsx` (new route `/onboarding/birthday`;
+  BottomNav already hidden by the `/onboarding` prefix rule). Reuses `auth.css` and
+  Signup's date-of-birth field and validation (required, 13+, `max` today, local
+  `ageFromDate` mirroring the round 11 trigger) plus Account's guardian rule: under 18
+  the parent/guardian email is required. Saves through `updateProfile`, carrying every
+  other profile field through unchanged (the stored handle is written back
+  byte-identical — no reformatting — so the round 9 cooldown trigger no-ops and the
+  save never renames anyone as a side effect), then navigates to `next`. Errors render
+  in the existing `role="alert"` region. A link-styled "Log out" button
+  (`.auth-linklike`, auth.css) is the exit for someone signed into the wrong account,
+  and a `.auth-notice` block (auth.css) carries the legacy-handle notice above the
+  form. No schema change: `date_of_birth` UPDATE was granted in round 10,
+  `guardian_email` in round 11.
+
+User-facing copy strings added this round (source of truth):
+
+- "Add your date of birth" (title)
+- "Your account doesn't have a date of birth yet. Add it once and you can carry on."
+- "Save and continue" (submit; "Saving…" while pending)
+- "Your username was made under our old rules, so we can't save changes to your
+  account until it changes. Pick a new username in Account details first, then come
+  back here." (legacy-handle notice; "Account details" is a link to `/account`)
+- "Please choose a new username in Account details first — then you can save your
+  date of birth." (submit error on the legacy-handle path)
+
+Reused verbatim, not new: "Date of birth", "You need to be 13 or over. Under 18s can
+buy, but cannot list items to sell." and "Please enter your date of birth." /
+"You need to be 13 or over to use Spotted." (Signup); "Parent or guardian's email",
+"Because you're under 18, we need a parent or guardian to confirm they're happy for you
+to use Spotted. We'll email them to ask." and "Please add a parent or guardian's email
+address so we can ask for their consent." (Account); "Log out" (Profile).
+
+## Round 8 — defect sweep (small fixes only)
+
+A hardening pass over the recently merged account/photos/categories/search work. No new
+features; each change is a small, high-confidence fix.
+
+- **Profile creation:** the handle-collision retry insert in `ensureProfile`
+  (`src/lib/auth.tsx`) now carries `date_of_birth` like the first attempt, so a minor
+  whose sanitised handle collides no longer gets a null-DOB profile that `is_adult()`
+  treats as an adult.
+- **Listing form (`src/pages/SellNew.tsx`):** insert failures are translated instead of
+  showing the raw PostgREST message; the error region gained `role="alert"`; the photo
+  input is disabled while an upload is in flight so the 8-photo limit cannot be
+  overshot from a stale count.
+- **Category picker (`src/components/CategoryPicker.tsx`):** the sheet is now
+  `role="dialog"` + `aria-modal`, labelled by its heading, and Escape dismisses it.
+- **README** re-synced with the code (no mock fallback, `/` vs `/about`, current route
+  table, no GitHub Pages).
+
+User-facing copy strings added or corrected this round (source of truth):
+
+- "We could not publish your listing just now. Please try again." (generic listing
+  insert failure)
+- "Under 18s can buy on Spotted, but cannot list items to sell." (listing insert
+  rejected by RLS, code 42501 — the round11 `is_adult()` gate; wording matches the
+  existing date-of-birth hint)
+- "You need to be 13 or over to use Spotted." — corrected translation of the
+  `under_minimum_age` trigger error in `updateProfile`, which previously said 18. The
+  round11 trigger fires below 13; this reuses the Signup form's existing string.
+
+## Round 8 — Following feed on Home
+
+Home's bottom listings grid gains a two-tab toggle: **For you** (the existing grid,
+unchanged) and **Following** — live listings whose seller the signed-in user follows,
+newest first. It is a pure client-side filter over the 40 newest live listings
+`useListings` already fetches (no new query, no schema change), so an older item from an
+inactive followee that has fallen out of that window will not appear. Seller matching
+uses `sellerFor(listing).handle` — the same resolution the follow button on Shop.tsx
+uses — so followed hash-derived demo sellers match too, not just listings with a real
+profile embed.
+
+The tabs are a WAI-ARIA tablist (roving tabindex, ArrowLeft/ArrowRight/Home/End,
+automatic activation; `role="tab"` / `aria-selected` / `role="tabpanel"`). The
+Following panel waits for both the listings query and follows hydration (`ready`)
+before branching, so signed-in followers never flash the "not following anyone" state.
+Empty states, in precedence order: signed out → sign-in prompt linking to `/login`;
+following no one → follow prompt linking to `/search`; followed sellers have nothing
+live in the window → gentle copy, no CTA.
+
+User-facing copy strings added this round (source of truth):
+
+- Tab labels: "For you" / "Following"
+- "See sellers you follow" / "Sign in to catch the newest listings from sellers you
+  follow." / button "Sign in"
+- "You're not following anyone yet" / "Follow sellers to see their latest here." /
+  button "Find sellers"
+- "Nothing new from your sellers" / "The sellers you follow haven't listed anything
+  recently. Check back soon."
+
 ### File ownership — Round 8
 
 | Agent | Owns |
@@ -851,3 +1030,88 @@ User-facing copy strings added this round (source of truth):
 | share | src/components/ShareButton.tsx (new), src/components/ShareButton.css (new), src/pages/Product.tsx (share button), src/pages/product.css (`.product-share-btn`), src/pages/Shop.tsx (share button), src/pages/shop.css (`.shop-share-btn`), src/App.tsx (`resolveCanonicalPath` only), vite.config.ts (`base`), CONTRACT.md |
 | product-gallery | src/pages/Product.tsx, src/pages/product.css, src/lib/useListings.ts (`resolveStoragePath` + `useListingImages` only), CONTRACT.md |
 | not-found-page | src/pages/NotFound.tsx (new), src/pages/notfound.css (new), src/App.tsx (catch-all route + ScrollToTop only), CONTRACT.md |
+| recently-viewed | src/lib/recentlyViewed.ts (new), src/lib/useListings.ts (`useListingsByIds` only), src/pages/Product.tsx (view recording only), src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |
+| sold-items-search | src/lib/useListings.ts (`useListings` options), src/lib/filters.ts, src/components/FilterBar.tsx, src/components/ProductCard.tsx, src/components/ProductCard.css, src/pages/profile.css (chip suppression), src/pages/Search.tsx, CONTRACT.md |
+| oauth-dob-gate | src/pages/onboarding/Birthday.tsx (new), src/App.tsx (DobGate + route), src/pages/auth.css (`.auth-linklike`, `.auth-notice`), docs/KNOWN_GAPS.md (OAuth-DOB + legacy-handles entries), CONTRACT.md |
+| hardening | src/lib/auth.tsx, src/pages/SellNew.tsx, src/components/CategoryPicker.tsx, README.md, CONTRACT.md |
+
+## Round 16 — paid listing boosts (server-gated; demo remains the default)
+
+Numbered to match `supabase/round16-listing-boosts.sql` (the sql round numbering is the
+live one). Sellers pay the platform to promote one of their own live listings; boosted
+listings rank first in the Home feed with an always-visible "Boosted" label (honest ads
+labeling — a paid placement is never presented as organic).
+
+Tiers (server-side source of truth: `BOOST_TIERS` in
+`supabase/functions/_shared/razorpay.ts`; mirrored display-only in `src/lib/payments.ts`):
+
+| Tier | Duration | Price |
+|---|---|---|
+| `3d` | 3 days | ₹29 |
+| `7d` | 7 days | ₹79 |
+
+Fail-closed gates, exactly Round 6's chain: live mode requires the same `RAZORPAY_*`
+Edge Function secrets; the client only leaves demo mode when `boost-order`'s `config`
+action reports `enabled: true`, and any error resolves to demo. Amounts are recomputed
+server-side in paise from the tier — client prices are never trusted. Demo boosts are
+recorded server-side with `payment_status 'demo'` and are only accepted while the gate
+is CLOSED; once live payments are on, every boost must be paid for. The `boosts` table
+is service-role-write-only at the grant layer (no client write grants, no write
+policies), so a client cannot forge a boost; sellers can SELECT their own rows, and
+feeds read the owner-rights `active_boosts` view, which exposes only
+`listing_id` + `boosted_until` for unexpired boosts.
+
+Server (`supabase/functions/boost-order`: config / demo / create / verify): mirrors
+`razorpay-order` — HMAC signature verification, idempotent finalization
+(`finalizeBoostPayment` in `_shared/razorpay.ts`, upsert-ignore on the unique
+`boosts.payment_id`, `expires_at` recomputed from the server tier table). Boost payments
+reuse the Round 6 `payments` table with `context 'boost'`
+(`round16-listing-boosts.sql`, UNAPPLIED at merge time), so both finalization paths
+dispatch on context: `razorpay-order` verify refuses boost rows (finalizing one there
+would fabricate an order and mark the seller's listing sold), `boost-order` verify
+refuses bag/offer rows, and `razorpay-webhook` routes `payment.captured` /
+`refund.processed` to the right finalizer. A refunded boost stops promoting immediately
+(`expires_at` set to now).
+
+Client: `src/lib/payments.ts` adds `fetchBoostConfig` / `startBoostPayment` /
+`BOOST_TIERS` / `BoostResult` on the shared checkout plumbing. The product page
+recognises its owner (`profile.id === listing.sellerId`; mock listings have no
+`sellerId` and can never look owned) and swaps the buyer CTAs for "Boost listing",
+opening `BoostSheet` (tier radios, demo/live payment row, `role="alert"` error region,
+"Pay ₹N" only when live). `useListings` ranks boosted-and-unexpired listings first
+(stable sort — the fallback path is byte-identical when the `active_boosts` view is
+missing or empty, so mock/demo data keeps working); `useListing` resolves
+`boostedUntil` for the product page.
+
+User-facing copy strings added this round (source of truth; `<date>` is
+`toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })`):
+
+- "Boost listing" (owner CTA) and "Boost this listing" (sheet title)
+- "Boosted listings appear at the top of the Home feed with a "Boosted" label until the
+  boost expires."
+- "Choose a duration"; tier options "3 days ₹29" / "7 days ₹79"
+- "Boost listing (demo)" / "Boosting…" (demo button); "Pay ₹N" / "Processing…" (live
+  button); "Checking payment options…" while the config probe is in flight
+- "Listing boosted!" with "This is a demo — no payment was taken. Boosted until
+  <date>." (demo) or "₹N paid via Razorpay. Boosted until <date>." (live); "Done"
+- "Boosted" (card + product page label); "Boosted until <date> — this listing appears
+  at the top of the Home feed." (owner status)
+- "Could not boost the listing. Please try again."
+- "We could not confirm the payment yet. If you were charged, your boost will activate
+  automatically."
+- Server messages: "Only your own listings can be boosted."; "Only live listings can be
+  boosted."; "This listing is already boosted."; "This listing can't be boosted.";
+  "Online payments are enabled — boosts require payment."
+
+Activation steps (human, in order): run `supabase/round16-listing-boosts.sql` in the
+SQL editor; `supabase functions deploy boost-order`; redeploy `razorpay-order` and
+`razorpay-webhook` (they gained the context dispatch). Demo boosts work from that point
+with no Razorpay secrets; live boosts additionally need the Round 6 `RAZORPAY_*`
+secrets already in place.
+
+### File ownership — Round 16
+
+| Agent | Owns |
+|---|---|
+| boosts | supabase/round16-listing-boosts.sql, supabase/functions/boost-order/*, supabase/functions/_shared/razorpay.ts (boost additions), supabase/functions/razorpay-order/index.ts (context guard), supabase/functions/razorpay-webhook/index.ts (context dispatch), src/lib/payments.ts (boost additions), src/lib/useListings.ts (boost ranking), src/data/listings.ts (`boostedUntil`), src/components/BoostSheet.tsx, src/components/BoostSheet.css, src/components/ProductCard.tsx, src/components/ProductCard.css, src/pages/Product.tsx, src/pages/product.css, CONTRACT.md |
+| following-feed | src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |

@@ -27,8 +27,13 @@ const LISTING = {
   status: 'live',
 }
 
+// An adult with a date of birth on file, so the birthday gate (App.tsx) lets them through.
+const BUYER_PROFILE = { id: 'user-1', handle: 'asha', name: 'Asha', date_of_birth: '1995-04-12' }
+const SELLER_PROFILE = { id: 'seller-1', handle: 'meera', name: 'Meera', date_of_birth: '1992-08-30' }
+
 describe('sign-in', () => {
   it('signs in with email and password, then returns to the requested page', async () => {
+    db.profiles = [BUYER_PROFILE]
     visit('/login?next=%2Fhome')
 
     fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'buyer@example.com' } })
@@ -84,7 +89,7 @@ describe('sell flow', () => {
   it('walks Photos → Details → Describe & list and creates the listing', async () => {
     const session = makeSession('seller@example.com', 'seller-1')
     setSession(session)
-    db.profiles = [{ id: 'seller-1', handle: 'meera', name: 'Meera' }]
+    db.profiles = [SELLER_PROFILE]
     db.categories = [
       { id: 'cat-women', parent_id: null, name: 'Women', position: 0, active: true },
       { id: 'cat-sarees', parent_id: 'cat-women', name: 'Sarees', position: 0, active: true },

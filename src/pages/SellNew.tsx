@@ -297,7 +297,13 @@ export default function SellNew() {
     if (insertError) {
       setSubmitting(false)
       console.warn(insertError)
-      setError(insertError.message)
+      // 42501 is the RLS rejection; for this insert that is the is_adult()
+      // gate from round11 — a minor's account cannot create listings.
+      setError(
+        insertError.code === '42501'
+          ? 'Under 18s can buy on Spotted, but cannot list items to sell.'
+          : 'We could not publish your listing just now. Please try again.',
+      )
       return
     }
 
@@ -407,6 +413,7 @@ export default function SellNew() {
           multiple
           className="sellnew-photo-input"
           onChange={handlePhotoChange}
+          disabled={uploading}
         />
         <p className="sellnew-hint">
           The first photo is the cover buyers see. Show the label, the fabric and any flaws.
