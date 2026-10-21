@@ -30,10 +30,14 @@ type ListingRow = {
 const LISTING_COLUMNS =
   'id,title,description,size,price_inr,category,likes,image_path,created_at,seller_id,seller:profiles!listings_seller_id_fkey(handle,name,bio,rating,sales),status'
 
+function resolveStoragePath(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path
+  return `${STORAGE_BASE}${path}`
+}
+
 function resolveImage(row: ListingRow): string {
   if (row.image_path) {
-    if (/^https?:\/\//i.test(row.image_path)) return row.image_path
-    return `${STORAGE_BASE}${row.image_path}`
+    return resolveStoragePath(row.image_path)
   }
   return `https://picsum.photos/seed/${row.id}/600/600`
 }
@@ -59,7 +63,8 @@ function mapRow(row: ListingRow): Listing {
   }
 }
 
-export function useListings(): { listings: Listing[]; loading: boolean } {
+export function useListings(options?: { includeSold?: boolean }): { listings: Listing[]; loading: boolean } {
+  const includeSold = options?.includeSold ?? false
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -67,10 +72,12 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
     let cancelled = false
 
     async function load() {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(LISTING_COLUMNS)
-        .eq('status', 'live')
+      // `.in(...)` rather than dropping the status filter: round 7 added a
+      // 'removed' status, and the owner-select RLS policy would let a seller
+      // see their own removed rows here. The sold rows themselves are readable
+      // by everyone via round 4's `listings_select_sold` policy.
+      const base = supabase.from('listings').select(LISTING_COLUMNS)
+      const { data, error } = await (includeSold ? base.in('status', ['live', 'sold']) : base.eq('status', 'live'))
         .order('created_at', { ascending: false })
         .limit(40)
 
@@ -82,7 +89,18 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
         return
       }
 
-      setListings((data as unknown as ListingRow[]).map(mapRow))
+      // Boosted-and-unexpired listings rank first (Round 16). The sort is
+      // stable, so within each group the created_at ordering above holds;
+      // when no boosts resolve (view unapplied, none active) the map is
+      // empty and the feed is exactly the pre-boost feed.
+      const mapped = (data as unknown as ListingRow[]).map(mapRow)
+      const boosts = await fetchBoostedUntil(mapped.map((listing) => listing.id))
+      if (cancelled) return
+      const ranked = mapped
+        .map((listing) => (boosts.has(listing.id) ? { ...listing, boostedUntil: boosts.get(listing.id) } : listing))
+        .sort((a, b) => Number(b.boostedUntil != null) - Number(a.boostedUntil != null))
+
+      setListings(ranked)
       setLoading(false)
     }
 
@@ -95,9 +113,32 @@ export function useListings(): { listings: Listing[]; loading: boolean } {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [includeSold])
 
   return { listings, loading }
+}
+
+// Which of these listings are boosted right now (Round 16). Reads the public
+// active_boosts view; any error — including the view not existing because the
+// round16 migration is unapplied, or mock ids with no rows — resolves to an
+// empty map so every caller behaves exactly as before boosts existed.
+export async function fetchBoostedUntil(ids: string[]): Promise<Map<string, number>> {
+  if (ids.length === 0) return new Map()
+  try {
+    const { data, error } = await supabase
+      .from('active_boosts')
+      .select('listing_id,boosted_until')
+      .in('listing_id', ids)
+    if (error || !data) return new Map()
+    const map = new Map<string, number>()
+    for (const row of data as { listing_id: string; boosted_until: string }[]) {
+      const until = Date.parse(row.boosted_until)
+      if (!Number.isNaN(until) && until > Date.now()) map.set(row.listing_id, until)
+    }
+    return map
+  } catch {
+    return new Map()
+  }
 }
 
 export function useListing(id: string): { listing: Listing | null; loading: boolean } {
@@ -109,14 +150,17 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
     setLoading(true)
 
     async function load() {
-      const { data, error } = await supabase.from('listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle()
+      const [{ data, error }, boosts] = await Promise.all([
+        supabase.from('listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle(),
+        fetchBoostedUntil([id]),
+      ])
 
       if (cancelled) return
 
       if (error || !data) {
         setListing(null)
       } else {
-        setListing(mapRow(data as unknown as ListingRow))
+        setListing({ ...mapRow(data as unknown as ListingRow), boostedUntil: boosts.get(id) })
       }
       setLoading(false)
     }
@@ -133,6 +177,98 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
   }, [id])
 
   return { listing, loading }
+}
+
+// All of a listing's photos, in gallery order, as ready-to-render URLs. A
+// separate query rather than an embed in LISTING_COLUMNS because that constant
+// also feeds the 40-item feed and the shop/profile grids, none of which show
+// more than the thumbnail — fetching up to 8 extra rows per card there would be
+// waste. Listings that predate round 13's backfill (picsum placeholders) have
+// no rows here; callers fall back to `listing.img`.
+export function useListingImages(listingId: string): { images: string[]; loading: boolean } {
+  const [images, setImages] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setImages([])
+    setLoading(true)
+
+    async function load() {
+      const { data, error } = await supabase
+        .from('listing_images')
+        .select('path,position')
+        .eq('listing_id', listingId)
+        .order('position', { ascending: true })
+
+      if (cancelled) return
+      setImages(error || !data ? [] : (data as { path: string }[]).map((row) => resolveStoragePath(row.path)))
+      setLoading(false)
+    }
+
+    load().catch(() => {
+      if (cancelled) return
+      setImages([])
+      setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [listingId])
+
+  return { images, loading }
+}
+
+// Resolves an explicit id list (e.g. the recently-viewed history) against the
+// same columns + row mapping the grids use. No status filter — sold listings
+// resolve with status 'sold' so callers can badge them. Ids that no longer
+// resolve (deleted listings) are simply absent; results are re-ordered to
+// match the input ids, since `.in()` guarantees no order.
+export function useListingsByIds(ids: string[]): { listings: Listing[]; loading: boolean } {
+  const [listings, setListings] = useState<Listing[]>([])
+  const [loading, setLoading] = useState(ids.length > 0)
+  // Stable dependency: a caller passing a fresh array each render must not
+  // retrigger the fetch. Ids are uuids, so ',' never appears in one.
+  const idsKey = ids.join(',')
+
+  useEffect(() => {
+    if (!idsKey) {
+      setListings([])
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+
+    async function load() {
+      const wanted = idsKey.split(',')
+      const { data, error } = await supabase.from('listings').select(LISTING_COLUMNS).in('id', wanted)
+
+      if (cancelled) return
+
+      if (error || !data) {
+        setListings([])
+      } else {
+        const byId = new Map((data as unknown as ListingRow[]).map((row) => [row.id, mapRow(row)]))
+        setListings(wanted.flatMap((id) => byId.get(id) ?? []))
+      }
+      setLoading(false)
+    }
+
+    load().catch(() => {
+      if (cancelled) return
+      setListings([])
+      setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [idsKey])
+
+  return { listings, loading }
 }
 
 export function useMyListings(status: 'live' | 'sold'): { listings: Listing[]; loading: boolean } {
