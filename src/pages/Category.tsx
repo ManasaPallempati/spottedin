@@ -1,3 +1,4 @@
+import SkeletonCard from '../components/SkeletonCard'
 import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
@@ -79,9 +80,9 @@ export default function Category() {
       </header>
 
       {loading ? (
-        <div className="category-grid" aria-label="Loading listings">
+        <div className="category-grid" aria-label="Loading listings" aria-busy="true">
           {Array.from({ length: 6 }).map((_, index) => (
-            <div className="category-skeleton" key={index} />
+            <SkeletonCard key={index} />
           ))}
         </div>
       ) : categoryListings.length === 0 ? (
