@@ -26,6 +26,9 @@ export default function ProductCard({ listing }: ProductCardProps) {
         <img src={img} alt={brand} loading="lazy" />
         {/* Contract (Round 4): only `status === 'sold'` means sold — undefined is live. */}
         {listing.status === 'sold' && <span className="product-card-sold">Sold</span>}
+        {listing.boostedUntil != null && listing.boostedUntil > Date.now() && (
+          <span className="product-card-boosted">Boosted</span>
+        )}
         <button
           className={`product-card-like${justLiked ? ' heart-burst' : ''}`}
           aria-label="Like"

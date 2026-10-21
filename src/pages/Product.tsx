@@ -5,9 +5,12 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight, Heart, ShieldCheck, Star } from 'lucide-react'
 import { useListing, useListingImages, useListings } from '../lib/useListings'
 import { useAppState } from '../lib/appState'
+import { useAuth } from '../lib/auth'
+import type { BoostResult } from '../lib/payments'
 import { conditionForListing, describeListing, sellerFor } from '../data/sellers'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
+import BoostSheet from '../components/BoostSheet'
 import Chip from '../components/Chip'
 import ShareButton from '../components/ShareButton'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
@@ -120,8 +123,11 @@ export default function Product() {
   const { listing, loading } = useListing(id)
   const { images: galleryImages } = useListingImages(id)
   const { toggleLike, isLiked, likeCountFor, addToBag, makeOffer } = useAppState()
+  const { profile } = useAuth()
   const { listings: allListings } = useListings()
 
+  const [boostOpen, setBoostOpen] = useState(false)
+  const [justBoostedUntil, setJustBoostedUntil] = useState<number | null>(null)
   const [offerOpen, setOfferOpen] = useState(false)
   // Sticky mobile Buy bar: shown only once the inline CTAs scroll out of view.
   const ctasRef = useRef<HTMLDivElement | null>(null)
@@ -215,6 +221,11 @@ export default function Product() {
   const offerPreset10 = Math.round(listing.price * 0.9)
   const offerPreset20 = Math.round(listing.price * 0.8)
 
+  // Mock listings have no sellerId, so they can never look owned (or boosted).
+  const isOwner = !!listing.sellerId && profile?.id === listing.sellerId
+  const boostedUntil =
+    justBoostedUntil ?? (listing.boostedUntil && listing.boostedUntil > Date.now() ? listing.boostedUntil : null)
+
   const others = allListings.filter((l) => l.id !== listing.id)
   const moreFromSeller = others.filter((l) => sellerFor(l).handle === seller.handle).slice(0, 8)
   const sameBrand = others.filter((l) => l.brand === listing.brand)
@@ -284,6 +295,7 @@ export default function Product() {
         <span className="product-price">{formatInr(listing.price)}</span>
         {listing.originalPrice && <span className="product-price-original">{formatInr(listing.originalPrice)}</span>}
         {listing.status === 'sold' && <span className="product-sold-badge">Sold</span>}
+        {listing.status !== 'sold' && boostedUntil && <span className="product-boosted-badge">Boosted</span>}
       </div>
 
       {listing.status === 'sold' ? (
@@ -292,6 +304,19 @@ export default function Product() {
           <Link to={category ? `/category/${category.slug}` : '/search'} className="product-sold-more">
             Browse similar listings
           </Link>
+        </div>
+      ) : isOwner ? (
+        <div className="product-ctas">
+          {boostedUntil ? (
+            <p className="product-boost-note">
+              Boosted until {new Date(boostedUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} —
+              this listing appears at the top of the Home feed.
+            </p>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => setBoostOpen(true)}>
+              Boost listing
+            </button>
+          )}
         </div>
       ) : (
         <div className="product-ctas" ref={ctasRef}>
@@ -403,6 +428,15 @@ export default function Product() {
             ))}
           </div>
         </div>
+      )}
+
+      {isOwner && (
+        <BoostSheet
+          listingId={listing.id}
+          open={boostOpen}
+          onClose={() => setBoostOpen(false)}
+          onBoosted={(boost: BoostResult) => setJustBoostedUntil(boost.expiresAt)}
+        />
       )}
 
       <BottomSheet open={offerOpen} onClose={closeOfferSheet} title={offerSent ? undefined : 'Make an offer'}>
