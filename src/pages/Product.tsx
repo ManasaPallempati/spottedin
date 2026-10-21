@@ -11,6 +11,7 @@ import Chip from '../components/Chip'
 import ShareButton from '../components/ShareButton'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { listingPath } from '../lib/listingUrls'
+import { useAuth } from '../lib/auth'
 import { canonicalUrl, setPageMeta } from '../lib/seo'
 import './product.css'
 
@@ -115,6 +116,9 @@ export default function Product() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAuthed } = useAuth()
+  // Signed-out Buy/Offer goes to login and comes back to this listing.
+  const sendToLogin = () => navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
   const { listing, loading } = useListing(id)
   const { images: galleryImages } = useListingImages(id)
   const { toggleLike, isLiked, likeCountFor, addToBag, makeOffer } = useAppState()
@@ -213,11 +217,19 @@ export default function Product() {
   const recommended = [...sameBrand, ...restBrand].slice(0, 8)
 
   const handleBuyNow = () => {
+    if (!isAuthed) {
+      sendToLogin()
+      return
+    }
     addToBag(listing.id)
     navigate('/bag?checkout=1')
   }
 
   function openOfferSheet() {
+    if (!isAuthed) {
+      sendToLogin()
+      return
+    }
     setOfferAmount(offerPreset10)
     setOfferSent(false)
     setOfferOpen(true)
