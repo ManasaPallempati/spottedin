@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { UserPlus } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import ProductCard from '../components/ProductCard'
+import { PrelovedSeal } from '../components/BoutiqueTag'
 import SkeletonCard from '../components/SkeletonCard'
 import type { Listing } from '../data/listings'
 import { sellerFor } from '../data/sellers'
@@ -114,7 +115,10 @@ export default function Home() {
       </div>
 
       <section className="home-hero">
-        <p className="home-eyebrow">New season</p>
+        <div className="home-hero-eyebrow-row">
+          <p className="home-eyebrow">New season</p>
+          <PrelovedSeal size={46} />
+        </div>
         <h1 className="home-hero-title">Buy and sell pre-owned Indian clothing</h1>
         <p className="home-hero-copy">
           Find occasion wear worth repeating, or turn outfits in your closet into cash. Browse by style, size,

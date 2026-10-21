@@ -63,6 +63,7 @@
 # required on staging because a context-scoped header cannot reach a site whose
 # own branch builds as `production`.
 #
-# VITE_SUPABASE_* are required on staging. src/lib/supabase.ts falls back to the
-# live project when unset, so an unconfigured staging site writes to production
-# data and its real user accounts.
+# VITE_SUPABASE_* are required on both sites. There is no fallback to the live
+# project: when unset, the build has no database and shows a warning banner, and
+# the production site's build of main fails outright (vite.config.ts). A
+# non-production build pointed at the live project also shows a banner.
