@@ -1,3 +1,4 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
@@ -10,6 +11,8 @@ import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Filters, type Sort } from '../lib/filters'
 import FilterBar from '../components/FilterBar'
 import ProductCard from '../components/ProductCard'
+import ShareButton from '../components/ShareButton'
+import { canonicalUrl } from '../lib/seo'
 import './shop.css'
 
 const TABS = ['Shop', 'Likes'] as const
@@ -72,6 +75,17 @@ export default function Shop() {
   let headerContent: React.ReactNode
   let sellerListings: Listing[]
 
+  // Same control for both header variants below; absolutely positioned in the
+  // header's top corner (shop.css) so the centered column is undisturbed.
+  const shareButton = (
+    <ShareButton
+      className="shop-share-btn"
+      title={`@${handle} on SPOTTED`}
+      url={canonicalUrl(`/shop/${encodeURIComponent(handle)}`)}
+      label="Share this shop"
+    />
+  )
+
   if (realProfile) {
     const avatar = `https://picsum.photos/seed/spotted-seller-${handle}/300/300`
     const rating = realProfile.rating
@@ -82,6 +96,7 @@ export default function Shop() {
 
     headerContent = (
       <header className="shop-header">
+        {shareButton}
         <img className="shop-avatar" src={avatar} alt={realProfile.name} />
         <h1 className="shop-handle">@{realProfile.handle}</h1>
 
@@ -99,6 +114,7 @@ export default function Shop() {
 
         <p className="shop-sold">{realProfile.sales ?? 0} sold</p>
 
+        <SafetyMenu targetType="profile" targetId={realProfile.handle} handle={realProfile.handle} label="Report or block this account" />
         <div className="shop-follow-row">
           <span className="shop-follow-stat">{followerCount} followers</span>
           {!isOwnProfile && (
@@ -129,6 +145,7 @@ export default function Shop() {
 
     headerContent = (
       <header className="shop-header">
+        {shareButton}
         <img className="shop-avatar" src={seller.avatar} alt={seller.name} />
         <h1 className="shop-handle">@{seller.handle}</h1>
 
