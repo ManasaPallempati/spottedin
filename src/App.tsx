@@ -104,6 +104,26 @@ function resolveOAuthCallbackError(): void {
   window.history.replaceState(null, '', url.toString())
 }
 
+// Canonical URLs are path-based (https://host/listing/<id>/<slug> — lib/seo.ts builds
+// them, the share buttons copy them, and Netlify serves the app shell for every path),
+// but HashRouter only reads the fragment: a visitor opening one would land on '/' and
+// the destination would be silently lost to the catch-all route. Rewrite the path into
+// the equivalent hash route before HashRouter mounts. Runs after
+// resolveOAuthCallbackError() and cannot collide with the OAuth flows: GoTrue always
+// redirects to SITE_ORIGIN with pathname '/', which this leaves untouched (including
+// the PKCE `?code=…` query). Idempotent: after the rewrite the pathname is '/'.
+function resolveCanonicalPath(): void {
+  const { pathname, search, hash } = window.location
+  if (pathname === '/' || pathname === '') return
+  if (hash.startsWith('#/')) return // already carrying an in-app route
+
+  const url = new URL(window.location.href)
+  url.pathname = '/'
+  url.search = ''
+  url.hash = `#${pathname}${search}`
+  window.history.replaceState(null, '', url.toString())
+}
+
 // After an OAuth round-trip the browser reloads at the app root with a fresh session but
 // no in-memory `next`. We stash the intended destination in sessionStorage before leaving
 // (see Login) and consume it here once the session settles.
@@ -191,8 +211,11 @@ function AppShell() {
 
 export default function App() {
   // Must run before HashRouter (below) is rendered — see resolveOAuthCallbackError's
-  // own comment for why this can't be an effect.
+  // own comment for why this can't be an effect. Order matters: the OAuth error
+  // cleaner first, then the canonical-path rewrite (which skips OAuth callbacks
+  // anyway, since those land on pathname '/').
   resolveOAuthCallbackError()
+  resolveCanonicalPath()
 
   return (
     <HashRouter>
