@@ -1,3 +1,4 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Send } from 'lucide-react'
@@ -68,6 +69,7 @@ export default function Thread() {
             <span className="thread-status">Active today</span>
           </div>
         </Link>
+        <SafetyMenu targetType="thread" targetId={handle} handle={handle} label="Report or block this chat" />
       </header>
 
       {listingId && listing && (

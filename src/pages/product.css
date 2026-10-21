@@ -76,6 +76,75 @@
   object-fit: cover;
 }
 
+/* Multi-photo carousel — Round 8. Slides are exactly container-width with no
+   gap so the scroll position maps 1:1 onto the slide index. */
+.product-gallery {
+  margin: 0 16px;
+}
+
+.product-gallery-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  border-radius: 8px;
+  background: var(--surface);
+  scrollbar-width: none;
+}
+
+.product-gallery-track::-webkit-scrollbar {
+  display: none;
+}
+
+.product-gallery-track:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.product-gallery-slide {
+  flex: 0 0 100%;
+  aspect-ratio: 1 / 1;
+  scroll-snap-align: start;
+}
+
+.product-gallery-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-gallery-dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+/* The button is a 20px touch target; the visible dot is drawn smaller. */
+.product-gallery-dot {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.product-gallery-dot::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.45;
+}
+
+.product-gallery-dot.is-active::before {
+  background: var(--text);
+  opacity: 1;
+}
+
 .product-like-row {
   display: flex;
   align-items: center;
@@ -95,6 +164,11 @@
 .product-like-count {
   font-size: 14px;
   color: var(--text-dim);
+}
+
+/* Round 8 (share agent): share sits at the far end of the like row. */
+.product-share-btn {
+  margin-left: auto;
 }
 
 .product-title {
@@ -416,3 +490,47 @@
 }
 
 /* .toast is defined in src/styles/motion.css (shared across pages); not duplicated here. */
+
+/* Sticky mobile Buy bar — sits above the floating BottomNav and appears only
+   after the inline Buy/Offer buttons have scrolled off the top. */
+.product-buybar {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translate(-50%, 16px);
+  width: calc(100% - 24px);
+  max-width: 406px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 49;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.product-buybar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+.product-buybar-price {
+  flex: 1;
+  font-weight: 800;
+  font-size: 17px;
+}
+.product-buybar .btn {
+  height: 40px;
+  padding: 0 16px;
+}
+@media (min-width: 900px) {
+  .product-buybar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-buybar { transition: none; }
+}
+.product-safety { padding: 4px 16px 0; }
