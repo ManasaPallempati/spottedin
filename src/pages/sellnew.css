@@ -263,3 +263,15 @@
   justify-content: center;
   color: var(--text-dim);
 }
+
+/* Step-by-step sell flow */
+.sellnew-steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.sellnew-step { flex: 1; display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 3px solid var(--hairline); color: var(--text-dim); font-size: 12px; font-weight: 700; }
+.sellnew-step.is-current, .sellnew-step.is-done { border-top-color: var(--accent); color: var(--text); }
+.sellnew-step-num { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); font-size: 11px; }
+.sellnew-step.is-current .sellnew-step-num { background: var(--accent); color: #fff; }
+.sellnew-nav { display: flex; gap: 10px; }
+.sellnew-nav .btn { flex: 1; }
+.sellnew-review { display: flex; gap: 12px; align-items: center; padding: 12px; background: var(--surface); border-radius: var(--radius-card); }
+.sellnew-review-img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.sellnew-review-title { font-weight: 800; }

@@ -28,6 +28,18 @@ const CONDITION_DB: Record<string, string> = {
 // Text/select values only — photos are storage uploads and object URLs, far too
 // big (and too stateful) for localStorage, so they are deliberately not drafted.
 const DRAFT_KEY = 'spotted_sell_draft'
+// The step is remembered separately so a returning seller lands where they left off.
+const STEP_KEY = 'spotted_sell_step'
+const STEPS = ['Photos', 'Details', 'Describe & list'] as const
+
+function readStep(): number {
+  try {
+    const n = Number.parseInt(localStorage.getItem(STEP_KEY) ?? '0', 10)
+    return n >= 0 && n < STEPS.length ? n : 0
+  } catch {
+    return 0
+  }
+}
 
 type SellDraft = {
   title?: string
@@ -83,6 +95,14 @@ export default function SellNew() {
   // One bar carries both the "Draft restored" announcement and the discard
   // action; dismissing it keeps the draft, discarding deletes it.
   const [draftNoticeOpen, setDraftNoticeOpen] = useState(draft !== null)
+  const [step, setStep] = useState(() => (draft ? readStep() : 0))
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP_KEY, String(step))
+    } catch {
+      // storage unavailable — the step just won't persist
+    }
+  }, [step])
   // One entry per photo, in display order. `path` is the storage key that goes
   // into listing_images; `preview` is a local object URL shown until the listing
   // exists. Position in this array is the position in the gallery, so removing
@@ -135,6 +155,7 @@ export default function SellNew() {
   function discardDraft() {
     try {
       localStorage.removeItem(DRAFT_KEY)
+      localStorage.removeItem(STEP_KEY)
     } catch {
       // ignore
     }
@@ -145,6 +166,32 @@ export default function SellNew() {
     setCondition(CONDITIONS[0])
     setDescription('')
     setDraftNoticeOpen(false)
+    setStep(0)
+  }
+
+  function validateDetails(): string | null {
+    if (!title.trim()) return 'Title is required.'
+    if (!categoryId) return 'Please choose a category.'
+    const priceNum = Number.parseInt(price, 10)
+    if (!Number.isFinite(priceNum) || priceNum <= 0 || String(priceNum) !== price.trim()) return 'Enter a valid price.'
+    return null
+  }
+
+  function goNext() {
+    if (step === 1) {
+      const problem = validateDetails()
+      if (problem) {
+        setError(problem)
+        return
+      }
+    }
+    setError(null)
+    setStep((s) => Math.min(s + 1, STEPS.length - 1))
+  }
+
+  function goBack() {
+    setError(null)
+    setStep((s) => Math.max(s - 1, 0))
   }
 
   if (authLoading || !isAuthed) {
@@ -210,19 +257,17 @@ export default function SellNew() {
       return
     }
 
-    if (!title.trim()) {
-      setError('Title is required.')
+    if (step < STEPS.length - 1) {
+      goNext()
       return
     }
-    if (!categoryId) {
-      setError('Please choose a category.')
+    const problem = validateDetails()
+    if (problem) {
+      setError(problem)
+      setStep(1)
       return
     }
     const priceNum = Number.parseInt(price, 10)
-    if (!Number.isFinite(priceNum) || priceNum <= 0 || String(priceNum) !== price.trim()) {
-      setError('Enter a valid price.')
-      return
-    }
 
     setError(null)
     setSubmitting(true)
@@ -252,7 +297,13 @@ export default function SellNew() {
     if (insertError) {
       setSubmitting(false)
       console.warn(insertError)
-      setError(insertError.message)
+      // 42501 is the RLS rejection; for this insert that is the is_adult()
+      // gate from round11 — a minor's account cannot create listings.
+      setError(
+        insertError.code === '42501'
+          ? 'Under 18s can buy on Spotted, but cannot list items to sell.'
+          : 'We could not publish your listing just now. Please try again.',
+      )
       return
     }
 
@@ -275,6 +326,7 @@ export default function SellNew() {
 
     try {
       localStorage.removeItem(DRAFT_KEY)
+      localStorage.removeItem(STEP_KEY)
     } catch {
       // ignore
     }
@@ -309,6 +361,20 @@ export default function SellNew() {
           </div>
         )}
 
+        <ol className="sellnew-steps" aria-label="Listing steps">
+          {STEPS.map((label, i) => (
+            <li
+              key={label}
+              className={'sellnew-step' + (i === step ? ' is-current' : '') + (i < step ? ' is-done' : '')}
+              aria-current={i === step ? 'step' : undefined}
+            >
+              <span className="sellnew-step-num">{i + 1}</span>
+              <span className="sellnew-step-label">{label}</span>
+            </li>
+          ))}
+        </ol>
+
+        {step === 0 && (<>
         <div className="sellnew-photos-head">
           <span className="sellnew-photos-title">Add photos</span>
           <span className="sellnew-hint">
@@ -347,12 +413,15 @@ export default function SellNew() {
           multiple
           className="sellnew-photo-input"
           onChange={handlePhotoChange}
+          disabled={uploading}
         />
         <p className="sellnew-hint">
           The first photo is the cover buyers see. Show the label, the fabric and any flaws.
         </p>
         {uploading && <p className="sellnew-hint">Uploading…</p>}
+        </>)}
 
+        {step === 1 && (<>
         <div className="sellnew-field">
           <label htmlFor="sellnew-title">Title</label>
           <input
@@ -429,6 +498,19 @@ export default function SellNew() {
           </select>
         </div>
 
+        </>)}
+
+        {step === 2 && (<>
+        <div className="sellnew-review">
+          {photos[0] && <img className="sellnew-review-img" src={photos[0].preview} alt="" />}
+          <div>
+            <p className="sellnew-review-title">{title || 'Untitled'}</p>
+            <p className="sellnew-hint">
+              ₹{price || '—'} · {size} · {condition}
+              {selectedPath.length > 0 && ` · ${selectedPath[selectedPath.length - 1].name}`}
+            </p>
+          </div>
+        </div>
         <div className="sellnew-field">
           <label htmlFor="sellnew-description">Description (optional)</label>
           <textarea
@@ -440,11 +522,26 @@ export default function SellNew() {
           />
         </div>
 
-        {error && <p className="sellnew-error">{error}</p>}
+        </>)}
 
-        <button type="submit" className="btn btn-primary sellnew-submit" disabled={submitting || uploading}>
-          {submitting ? 'Listing…' : 'List item'}
-        </button>
+        {error && <p className="sellnew-error" role="alert">{error}</p>}
+
+        <div className="sellnew-nav">
+          {step > 0 && (
+            <button type="button" className="btn btn-outline" onClick={goBack}>
+              Back
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button type="button" className="btn btn-primary sellnew-submit" onClick={goNext} disabled={uploading}>
+              Next
+            </button>
+          ) : (
+            <button type="submit" className="btn btn-primary sellnew-submit" disabled={submitting || uploading}>
+              {submitting ? 'Listing…' : 'List item'}
+            </button>
+          )}
+        </div>
       </form>
 
       <CategoryPicker
