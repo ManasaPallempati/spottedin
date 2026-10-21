@@ -1,0 +1,52 @@
+.boutique-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.boutique-tag--outline {
+  color: var(--text);
+  background: transparent;
+}
+
+.boutique-tag--solid {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.preloved-seal {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border: 1.5px dashed currentColor;
+  border-radius: 50%;
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(-12deg);
+}
+
+.product-condition-label {
+  margin-right: 6px;
+  color: var(--text-dim);
+}
+
+.preloved-seal-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
