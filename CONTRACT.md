@@ -820,6 +820,29 @@ User-facing copy strings added this round (all accessibility labels):
 - "\<Brand\> — photo \<n\> of \<N\>" (per-image `alt`)
 - "Photo \<n\> of \<N\>" (dot button `aria-label`)
 
+## Round 8 — 404 page + scroll restoration
+
+Small UX round: unmatched routes get a real screen, and every route change starts at
+the top of the page.
+
+- **404 page.** The catch-all `*` route in `src/App.tsx` no longer bounces silently to
+  `/`; it renders `src/pages/NotFound.tsx` (new, styled by `src/pages/notfound.css`
+  with the global dark tokens). The screen shows a decorative "404" figure
+  (`aria-hidden`), an `h1` title, one line of copy, and two links: "Back to home"
+  (`/home`, `btn btn-primary`) and "Search" (`/search`, `btn btn-outline`).
+  RouteIndexingPolicy already marks unmatched paths noindex, so no SEO change needed.
+- **Scroll restoration.** New `ScrollToTop` component in `src/App.tsx` (rendered inside
+  `AppShell`, next to RouteIndexingPolicy) calls `window.scrollTo(0, 0)` whenever
+  `location.pathname` changes, so navigating from a deep scroll position never lands
+  mid-page on the next screen.
+
+User-facing copy strings added this round (source of truth):
+
+- "Page not found"
+- "We couldn't spot that page. It may have moved or never existed."
+- "Back to home"
+- "Search"
+
 ### File ownership — Round 8
 
 | Agent | Owns |
@@ -827,3 +850,4 @@ User-facing copy strings added this round (all accessibility labels):
 | sell-draft-autosave | src/pages/SellNew.tsx, src/pages/sellnew.css, CONTRACT.md |
 | share | src/components/ShareButton.tsx (new), src/components/ShareButton.css (new), src/pages/Product.tsx (share button), src/pages/product.css (`.product-share-btn`), src/pages/Shop.tsx (share button), src/pages/shop.css (`.shop-share-btn`), src/App.tsx (`resolveCanonicalPath` only), vite.config.ts (`base`), CONTRACT.md |
 | product-gallery | src/pages/Product.tsx, src/pages/product.css, src/lib/useListings.ts (`resolveStoragePath` + `useListingImages` only), CONTRACT.md |
+| not-found-page | src/pages/NotFound.tsx (new), src/pages/notfound.css (new), src/App.tsx (catch-all route + ScrollToTop only), CONTRACT.md |
