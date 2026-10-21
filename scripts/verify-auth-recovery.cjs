@@ -7,6 +7,8 @@ const root = path.resolve(__dirname, '..');
 const proof = path.resolve(process.env.SPOTTED_AUTH_EVIDENCE_DIR || path.join(os.tmpdir(), 'spotted-auth-proof-' + Date.now()));
 fs.mkdirSync(proof, {recursive:true});
 const origin = 'http://127.0.0.1:4188';
+// Accept the feature branch's hash routes and current staging's clean URLs.
+function appRoute(value){const u=new URL(value);return u.hash.startsWith('#/')?u.hash.slice(1).split('?')[0]:u.pathname;}
 const env = {...process.env, VITE_SUPABASE_URL:'http://127.0.0.1:54321', VITE_SUPABASE_ANON_KEY:'synthetic-test-key', VITE_SITE_ORIGIN:origin, VITE_NOINDEX:'true'};
 const server = spawn(process.execPath, [root+'/node_modules/vite/bin/vite.js', '--host','127.0.0.1','--port','4188','--strictPort'],{cwd:root,env,windowsHide:true,stdio:['ignore','pipe','pipe']});
 const logs=[];server.stdout.on('data',b=>logs.push(b.toString()));server.stderr.on('data',b=>logs.push(b.toString()));
@@ -59,7 +61,7 @@ async function main(){
  await page.goto(origin+'/?code=synthetic-recovery-code');
  await page.getByRole('heading',{name:'Choose a new password'}).waitFor();
  await page.getByLabel('New password',{exact:true}).waitFor();
- ok('PKCE recovery callback reaches reset form',page.url().includes('#/reset-password'));
+ ok('PKCE recovery callback reaches reset form',appRoute(page.url())==='/reset-password');
  await page.getByLabel('New password',{exact:true}).fill('ValidTest1!');
  await page.getByLabel('Confirm new password',{exact:true}).fill('OtherTest1!');
  await page.getByRole('button',{name:'Update password'}).click();
@@ -97,7 +99,7 @@ async function main(){
  await page.getByText(/If an account exists for that email/).waitFor();
  await page.goto(origin+'/?code=synthetic-recovery-code-2');
  await page.waitForTimeout(500);
- ok('Abandoned OAuth cannot hijack password recovery',page.url().includes('#/reset-password'),{url:page.url()});
+ ok('Abandoned OAuth cannot hijack password recovery',appRoute(page.url())==='/reset-password',{url:page.url()});
  ok('No browser runtime errors',errors.length===0);
  await context.close();
  }finally{await browser.close();}
