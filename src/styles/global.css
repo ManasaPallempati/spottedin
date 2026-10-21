@@ -112,6 +112,13 @@ h1, h2, h3 {
   letter-spacing: -0.02em;
 }
 
+/* Must come after the rule above so the serif's lighter weight and tracking win. */
+h1,
+h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
