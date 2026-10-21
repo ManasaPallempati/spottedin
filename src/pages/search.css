@@ -187,3 +187,15 @@
 .search-page-empty-title { font-size: 20px; font-weight: 800; }
 .search-page-empty-text { max-width: 320px; color: var(--text-dim); line-height: 1.5; }
 .search-page-empty-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+
+/* Saved searches (device-only) */
+.search-page-saved { padding: 0 16px; margin-bottom: 14px; }
+.search-page-saved-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-top: 8px; }
+.search-page-saved-chip {
+  display: inline-flex; flex: none; align-items: center; gap: 4px;
+  padding: 7px 8px 7px 14px; border: 1px solid var(--hairline); border-radius: var(--radius-pill);
+  background: var(--surface); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.search-page-saved-chip a { color: var(--text); text-decoration: none; }
+.search-page-saved-chip button { display: grid; place-items: center; padding: 2px; color: var(--text-dim); }
+.search-page-empty-actions .btn { display: inline-flex; align-items: center; gap: 6px; }

@@ -1,6 +1,7 @@
 import type { Listing } from '../data/listings'
 import { conditionForListing } from '../data/sellers'
 import { normalizeCategory } from '../data/taxonomy'
+import { normalizeSize } from './sizes'
 
 export type Filters = {
   brands: string[]
@@ -42,7 +43,7 @@ function inPriceBand(price: number, band: Filters['price']): boolean {
 export function applyFilters(listings: Listing[], filters: Filters, sort: Sort): Listing[] {
   const filtered = listings.filter((listing) => {
     if (filters.brands.length > 0 && !filters.brands.includes(listing.brand)) return false
-    if (filters.sizes.length > 0 && !filters.sizes.includes(listing.size)) return false
+    if (filters.sizes.length > 0 && !filters.sizes.map(normalizeSize).includes(normalizeSize(listing.size))) return false
     if (filters.categories.length > 0) {
       const normalized = normalizeCategory(listing.category ?? '')
       if (!filters.categories.includes(normalized)) return false
