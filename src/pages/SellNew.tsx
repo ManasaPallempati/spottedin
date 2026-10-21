@@ -25,6 +25,32 @@ const CONDITION_DB: Record<string, string> = {
   'Used – good': 'fair',
 }
 
+// Text/select values only — photos are storage uploads and object URLs, far too
+// big (and too stateful) for localStorage, so they are deliberately not drafted.
+const DRAFT_KEY = 'spotted_sell_draft'
+
+type SellDraft = {
+  title?: string
+  price?: string
+  size?: string
+  categoryId?: string | null
+  condition?: string
+  description?: string
+}
+
+function readDraft(): SellDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    return parsed as SellDraft
+  } catch {
+    // Corrupt JSON or storage unavailable — treat as no draft.
+    return null
+  }
+}
+
 export default function SellNew() {
   const navigate = useNavigate()
   const { isAuthed, loading: authLoading, session } = useAuth()
@@ -32,16 +58,31 @@ export default function SellNew() {
 
   const { categories, loading: categoriesLoading } = useCategories()
   const [listingId] = useState(() => crypto.randomUUID())
+  // Read once on mount; field states are seeded from it below.
+  const [draft] = useState(readDraft)
   // Recomputed from the tree rather than stored alongside the id, so the label
   // cannot go stale if a category is renamed.
-  const [title, setTitle] = useState('')
-  const [price, setPrice] = useState('')
-  const [size, setSize] = useState(SIZES[0])
-  const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [title, setTitle] = useState(typeof draft?.title === 'string' ? draft.title : '')
+  const [price, setPrice] = useState(typeof draft?.price === 'string' ? draft.price : '')
+  const [size, setSize] = useState(
+    draft?.size && SIZES.includes(draft.size) ? draft.size : SIZES[0],
+  )
+  const [categoryId, setCategoryId] = useState<string | null>(
+    typeof draft?.categoryId === 'string' ? draft.categoryId : null,
+  )
   const [pickerOpen, setPickerOpen] = useState(false)
   const selectedPath = categoryPath(categories, categoryId)
-  const [condition, setCondition] = useState<string>(CONDITIONS[0])
-  const [description, setDescription] = useState('')
+  const [condition, setCondition] = useState<string>(
+    draft?.condition && (CONDITIONS as readonly string[]).includes(draft.condition)
+      ? draft.condition
+      : CONDITIONS[0],
+  )
+  const [description, setDescription] = useState(
+    typeof draft?.description === 'string' ? draft.description : '',
+  )
+  // One bar carries both the "Draft restored" announcement and the discard
+  // action; dismissing it keeps the draft, discarding deletes it.
+  const [draftNoticeOpen, setDraftNoticeOpen] = useState(draft !== null)
   // One entry per photo, in display order. `path` is the storage key that goes
   // into listing_images; `preview` is a local object URL shown until the listing
   // exists. Position in this array is the position in the gallery, so removing
@@ -66,6 +107,45 @@ export default function SellNew() {
       for (const photo of photosRef.current) URL.revokeObjectURL(photo.preview)
     }
   }, [])
+
+  // Debounced autosave. The hasContent guard keeps an untouched form from
+  // writing a default-valued draft (which would show "Draft restored" on the
+  // next visit for nothing), and removes the draft again if the seller clears
+  // every field by hand. A pending timer is dropped on unmount, so a save can
+  // never land after publish has cleared the draft.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const hasContent = title !== '' || price !== '' || description !== '' || categoryId !== null
+      try {
+        if (hasContent) {
+          localStorage.setItem(
+            DRAFT_KEY,
+            JSON.stringify({ title, price, size, categoryId, condition, description }),
+          )
+        } else {
+          localStorage.removeItem(DRAFT_KEY)
+        }
+      } catch {
+        // Storage full or unavailable — autosave is best-effort.
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [title, price, size, categoryId, condition, description])
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // ignore
+    }
+    setTitle('')
+    setPrice('')
+    setSize(SIZES[0])
+    setCategoryId(null)
+    setCondition(CONDITIONS[0])
+    setDescription('')
+    setDraftNoticeOpen(false)
+  }
 
   if (authLoading || !isAuthed) {
     return <div className="sellnew-page" />
@@ -193,6 +273,11 @@ export default function SellNew() {
       }
     }
 
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // ignore
+    }
     setSubmitting(false)
     navigate(listingPath(listingId, title))
   }
@@ -207,6 +292,23 @@ export default function SellNew() {
       </div>
 
       <form className="sellnew-form" onSubmit={handleSubmit}>
+        {draftNoticeOpen && (
+          <div className="sellnew-draft-notice" aria-live="polite">
+            <span className="sellnew-draft-text">Draft restored</span>
+            <button type="button" className="sellnew-draft-discard" onClick={discardDraft}>
+              Discard draft
+            </button>
+            <button
+              type="button"
+              className="sellnew-draft-dismiss"
+              aria-label="Dismiss"
+              onClick={() => setDraftNoticeOpen(false)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         <div className="sellnew-photos-head">
           <span className="sellnew-photos-title">Add photos</span>
           <span className="sellnew-hint">
