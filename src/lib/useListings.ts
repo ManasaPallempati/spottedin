@@ -30,10 +30,14 @@ type ListingRow = {
 const LISTING_COLUMNS =
   'id,title,description,size,price_inr,category,likes,image_path,created_at,seller_id,seller:profiles!listings_seller_id_fkey(handle,name,bio,rating,sales),status'
 
+function resolveStoragePath(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path
+  return `${STORAGE_BASE}${path}`
+}
+
 function resolveImage(row: ListingRow): string {
   if (row.image_path) {
-    if (/^https?:\/\//i.test(row.image_path)) return row.image_path
-    return `${STORAGE_BASE}${row.image_path}`
+    return resolveStoragePath(row.image_path)
   }
   return `https://picsum.photos/seed/${row.id}/600/600`
 }
@@ -133,6 +137,47 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
   }, [id])
 
   return { listing, loading }
+}
+
+// All of a listing's photos, in gallery order, as ready-to-render URLs. A
+// separate query rather than an embed in LISTING_COLUMNS because that constant
+// also feeds the 40-item feed and the shop/profile grids, none of which show
+// more than the thumbnail — fetching up to 8 extra rows per card there would be
+// waste. Listings that predate round 13's backfill (picsum placeholders) have
+// no rows here; callers fall back to `listing.img`.
+export function useListingImages(listingId: string): { images: string[]; loading: boolean } {
+  const [images, setImages] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setImages([])
+    setLoading(true)
+
+    async function load() {
+      const { data, error } = await supabase
+        .from('listing_images')
+        .select('path,position')
+        .eq('listing_id', listingId)
+        .order('position', { ascending: true })
+
+      if (cancelled) return
+      setImages(error || !data ? [] : (data as { path: string }[]).map((row) => resolveStoragePath(row.path)))
+      setLoading(false)
+    }
+
+    load().catch(() => {
+      if (cancelled) return
+      setImages([])
+      setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [listingId])
+
+  return { images, loading }
 }
 
 export function useMyListings(status: 'live' | 'sold'): { listings: Listing[]; loading: boolean } {
