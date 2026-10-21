@@ -1,10 +1,16 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { UserPlus } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import ProductCard from '../components/ProductCard'
+import SkeletonCard from '../components/SkeletonCard'
 import type { Listing } from '../data/listings'
+import { sellerFor } from '../data/sellers'
 import { FEATURED_CATEGORIES, listingMatchesCategory } from '../data/taxonomy'
-import { useListings } from '../lib/useListings'
+import { useListings, useListingsByIds } from '../lib/useListings'
+import { useAppState } from '../lib/appState'
+import { listingPath } from '../lib/listingUrls'
+import { readRecentlyViewed } from '../lib/recentlyViewed'
 import { useAuth } from '../lib/auth'
 import { readStoredPrefs, personalizeFeed, type StoredPrefs as Prefs } from '../lib/forYou'
 import { setPageMeta } from '../lib/seo'
@@ -32,18 +38,53 @@ function computePicks(listings: Listing[], prefs: Prefs): Listing[] {
   return [...sizeMatches, ...rest].slice(0, 10)
 }
 
+type FeedTab = 'for-you' | 'following'
+
+const FEED_TABS: { id: FeedTab; label: string }[] = [
+  { id: 'for-you', label: 'For you' },
+  { id: 'following', label: 'Following' },
+]
+
 export default function Home() {
   const { listings, loading } = useListings()
   const { isAuthed, profile } = useAuth()
+  const { follows, ready } = useAppState()
   const showShopLink = true
 
+  const [feedTab, setFeedTab] = useState<FeedTab>('for-you')
+  const tabRefs = useRef<Partial<Record<FeedTab, HTMLButtonElement | null>>>({})
+
   const prefs = useMemo(() => readStoredPrefs(), [])
-  const picks = useMemo(() => computePicks(listings, prefs), [listings, prefs])
   const interest = profile?.interest ?? null
   const { listings: feedListings, personalized } = useMemo(
     () => personalizeFeed(listings, { ...prefs, interest }),
     [listings, prefs, interest],
   )
+  const recentIds = useMemo(() => readRecentlyViewed(), [])
+  const { listings: recentListings } = useListingsByIds(recentIds)
+  const picks = useMemo(() => computePicks(listings, prefs), [listings, prefs])
+  // Same handle resolution as the follow button on Shop.tsx (sellerFor), so
+  // followed demo sellers match too, not just listings with a real profile.
+  const followingListings = useMemo(
+    () => listings.filter((listing) => follows.includes(sellerFor(listing).handle)),
+    [listings, follows],
+  )
+
+  // Roving tabindex + automatic activation (arrow moves focus AND selects) —
+  // the standard pattern for a two-tab tablist.
+  function onTabKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const idx = FEED_TABS.findIndex((t) => t.id === feedTab)
+    let next: number | null = null
+    if (e.key === 'ArrowRight') next = (idx + 1) % FEED_TABS.length
+    else if (e.key === 'ArrowLeft') next = (idx - 1 + FEED_TABS.length) % FEED_TABS.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = FEED_TABS.length - 1
+    if (next === null) return
+    e.preventDefault()
+    const tab = FEED_TABS[next]
+    setFeedTab(tab.id)
+    tabRefs.current[tab.id]?.focus()
+  }
   const categoryCounts = useMemo(
     () =>
       Object.fromEntries(
@@ -157,27 +198,130 @@ export default function Home() {
         </div>
       )}
 
-      {personalized && !loading ? (
-        <section aria-labelledby="home-foryou-title">
-          <div className="home-foryou-header">
-            <h2 id="home-foryou-title" className="home-foryou-title">For You</h2>
-            <p className="home-foryou-sub">Sorted by your sizes, brands and style — everything's still here.</p>
-          </div>
-          <div className="home-grid fade-in">
-            {feedListings.map((listing) => (
-              <ProductCard key={listing.id} listing={listing} />
+      {recentListings.length >= 1 && (
+        <section className="home-recent" aria-labelledby="home-recent-title">
+          <h2 id="home-recent-title" className="home-recent-title">
+            Recently viewed
+          </h2>
+          <div className="home-recent-row">
+            {recentListings.map((listing) => (
+              <Link
+                key={listing.id}
+                to={listingPath(listing.id, listing.brand)}
+                className="home-recent-card"
+                onClick={() => trackEvent('home_recent_click', { listing: listing.id })}
+              >
+                <div className="home-recent-image-wrap">
+                  <img src={listing.img} alt={listing.brand} loading="lazy" />
+                  {listing.status === 'sold' && <span className="home-recent-sold">Sold</span>}
+                </div>
+                <span className="home-recent-price">₹{listing.price.toLocaleString('en-IN')}</span>
+              </Link>
             ))}
           </div>
         </section>
-      ) : (
-        <div className={`home-grid${loading ? '' : ' fade-in'}`}>
-          {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
-                <div className="home-skeleton" key={i} />
-              ))
-            : feedListings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
-        </div>
       )}
+
+      <div className="home-feed-tabs" role="tablist" aria-label="Latest listings feed" onKeyDown={onTabKeyDown}>
+        {FEED_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            ref={(el) => {
+              tabRefs.current[tab.id] = el
+            }}
+            type="button"
+            role="tab"
+            id={`home-feed-tab-${tab.id}`}
+            aria-controls={`home-feed-panel-${tab.id}`}
+            aria-selected={feedTab === tab.id}
+            tabIndex={feedTab === tab.id ? 0 : -1}
+            className="home-feed-tab"
+            onClick={() => {
+              setFeedTab(tab.id)
+              trackEvent('home_feed_tab_click', { tab: tab.id })
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        role="tabpanel"
+        id={`home-feed-panel-${feedTab}`}
+        aria-labelledby={`home-feed-tab-${feedTab}`}
+        className="home-feed-panel"
+      >
+        {feedTab === 'for-you' ? (
+          personalized && !loading ? (
+            <section aria-labelledby="home-foryou-title">
+              <div className="home-foryou-header">
+                <h2 id="home-foryou-title" className="home-foryou-title">For You</h2>
+                <p className="home-foryou-sub">Sorted by your sizes, brands and style — everything's still here.</p>
+              </div>
+              <div className="home-grid fade-in">
+                {feedListings.map((listing) => (
+                  <ProductCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <div className={`home-grid${loading ? '' : ' fade-in'}`} aria-busy={loading}>
+              {loading
+                ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+                : feedListings.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
+            </div>
+          )
+        ) : loading || !ready ? (
+          // Wait for the listings query AND auth restore + follows hydration
+          // (ready = !authLoading && !hydrating) — branching earlier would
+          // flash "Sign in" during session restore, or the "follow sellers"
+          // empty state at signed-in users who already follow people.
+          <div className="home-grid" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : !isAuthed ? (
+          <div className="home-feed-empty">
+            <div className="home-feed-empty-icon">
+              <UserPlus size={40} strokeWidth={1.5} />
+            </div>
+            <h3 className="home-feed-empty-title">See sellers you follow</h3>
+            <p className="home-feed-empty-copy">Sign in to catch the newest listings from sellers you follow.</p>
+            <Link to="/login" className="btn btn-primary home-feed-empty-btn">
+              Sign in
+            </Link>
+          </div>
+        ) : follows.length === 0 ? (
+          <div className="home-feed-empty">
+            <div className="home-feed-empty-icon">
+              <UserPlus size={40} strokeWidth={1.5} />
+            </div>
+            <h3 className="home-feed-empty-title">You&rsquo;re not following anyone yet</h3>
+            <p className="home-feed-empty-copy">Follow sellers to see their latest here.</p>
+            <Link to="/search" className="btn btn-primary home-feed-empty-btn">
+              Find sellers
+            </Link>
+          </div>
+        ) : followingListings.length === 0 ? (
+          <div className="home-feed-empty">
+            <div className="home-feed-empty-icon">
+              <UserPlus size={40} strokeWidth={1.5} />
+            </div>
+            <h3 className="home-feed-empty-title">Nothing new from your sellers</h3>
+            <p className="home-feed-empty-copy">
+              The sellers you follow haven&rsquo;t listed anything recently. Check back soon.
+            </p>
+          </div>
+        ) : (
+          <div className="home-grid fade-in">
+            {followingListings.map((listing) => (
+              <ProductCard key={listing.id} listing={listing} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

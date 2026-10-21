@@ -7,11 +7,26 @@ why it was not fixed at the time, and what closing it involves.
 This is not the same as `docs/launch/BLOCKERS.md`, which is an older launch
 tracker from a previous iteration and is now stale in places.
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
 ---
 
 ## Auth and accounts
+
+### Per-column grants are easy to half-add — and fail silently
+`profiles` grants privileges per column, so a new column is invisible to the
+client until named. That is the right default, but it means adding a column is
+two decisions, not one.
+
+Round 10 granted `UPDATE` on `date_of_birth` and not `INSERT`. When
+`ensureProfile` later began carrying that column from signup metadata, **every
+profile insert started failing** with `permission denied`, and the person was
+left signed in with no profile — which the app rendered as the signed-out view.
+Nobody noticed until a user reported it. Fixed in round 15, and the failure is
+now surfaced rather than swallowed.
+
+When adding a column to `profiles`, check whether the client needs to insert it
+as well as update it, and confirm with a real signup rather than a build.
 
 ### Guardian consent is captured but never actually obtained
 `guardian_email` is collected when someone enters a date of birth under 18, and
@@ -27,14 +42,9 @@ Resend, a route that records the timestamp when they follow it, and a check that
 gates minor accounts until it is set.
 
 ### OAuth signups have no date of birth
-Google sign-in provides no date of birth, so the profile row is created with
-null. `is_adult()` treats null as an adult, which means **an OAuth account is
-never subject to the minor restrictions**.
-
-Email signup now requires the date, so this is specific to social sign-in.
-
-To close: an onboarding step after first OAuth sign-in that asks for it before
-the account can be used.
+**Closed (CONTRACT Round 8, branch claude/oauth-dob-gate — not the SQL round 8
+below):** any signed-in account with a null date of birth is now redirected to
+`/onboarding/birthday` and blocked until it supplies one.
 
 ### `is_adult()` treats unknown as adult by design
 Profiles created before the column existed have no date of birth. Treating
@@ -63,7 +73,11 @@ had to fix.
 ### Legacy handles containing periods
 `prudhvi.pallempati` and `spotted.demo` in production, and any others predating
 round 8, do not match the current handle rules. The constraint is `NOT VALID`, so
-they are grandfathered and keep working.
+they are grandfathered and keep working — but the CHECK is re-evaluated on any
+UPDATE of the row, so no profile save succeeds for these accounts, and since the
+date-of-birth gate (CONTRACT Round 8) they are also null-DOB accounts blocked
+app-wide until they rename; the birthday screen detects this and links to Account
+details for exactly that.
 
 Deliberate: renaming a live seller breaks the `/shop/:handle` URLs buyers use to
 find them. The chosen path is that people rename themselves on the Account
