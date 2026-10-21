@@ -14,8 +14,10 @@ hand-rolled CSS with design tokens in `src/styles/global.css`.
 
 ```bash
 npm install
+cp .env.example .env.local   # then fill in the staging project's URL and anon key
 npm run dev      # http://localhost:5173
 npm run build    # production build (base './')
+npm test         # smoke tests (Vitest; Supabase is faked, no network)
 ```
 
 ## Screens
@@ -104,9 +106,13 @@ There is no mock fallback any more: if the query errors or returns zero rows, th
 grid renders empty (`src/data/listings.ts` now only exports the `Listing` type).
 
 The client (`src/lib/supabase.ts`) reads `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY` from the environment, falling back to the **production**
-project when unset. That fallback means an unconfigured deploy writes to
-production data, so staging must always set both.
+`VITE_SUPABASE_ANON_KEY` from the environment. There is **no fallback to
+production**: when either is unset, the app talks to a placeholder project that
+never resolves (nothing is read or written anywhere) and shows a red warning
+banner. A non-production build pointed at the production project shows a
+banner too. The Netlify build of `main` fails outright if either variable is
+missing, so the live site can never ship without its database. For local dev,
+copy `.env.example` to `.env.local` and fill in the **staging** project's values.
 
 Storage URLs derive from `VITE_SUPABASE_URL` rather than being hardcoded, so each
 environment serves listing images from its own bucket.
