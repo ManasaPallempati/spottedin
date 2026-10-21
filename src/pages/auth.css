@@ -132,6 +132,25 @@
   background: rgba(255, 35, 0, 0.08);
 }
 
+/* Same box as .auth-error, keyed to --success — good news, not an alarm. */
+.auth-success {
+  font-size: 14px;
+  color: var(--success, #4ccf7f);
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(31, 122, 61, 0.5);
+  background: rgba(31, 122, 61, 0.12);
+}
+
+.auth-forgot {
+  align-self: flex-end;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+
 .auth-submit {
   width: 100%;
   height: 52px;

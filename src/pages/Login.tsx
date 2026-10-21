@@ -17,18 +17,26 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending>(null)
   const busy = pending !== null
 
   // App.tsx's resolveOAuthCallbackError stashes a translated message here when GoTrue
   // bounces the browser back with an OAuth failure (disabled provider, consent denial,
   // etc.) and routes here — read it once, then drop it so a later refresh of /login
-  // doesn't keep re-showing a stale error.
+  // doesn't keep re-showing a stale error. ResetPassword.tsx leaves its success
+  // message the same way (spotted_reset_success), consumed with the same
+  // read-once-then-drop rule.
   useEffect(() => {
     const oauthError = sessionStorage.getItem('spotted_oauth_error')
     if (oauthError) {
       sessionStorage.removeItem('spotted_oauth_error')
       setError(oauthError)
+    }
+    const resetNotice = sessionStorage.getItem('spotted_reset_success')
+    if (resetNotice) {
+      sessionStorage.removeItem('spotted_reset_success')
+      setNotice(resetNotice)
     }
   }, [])
 
@@ -68,6 +76,12 @@ export default function Login() {
       <div className="auth-card">
         <h1 className="auth-title">Log in</h1>
         <p className="auth-subtitle">Welcome back to Spotted</p>
+
+        {notice && (
+          <p className="auth-success" role="status">
+            {notice}
+          </p>
+        )}
 
         {error && (
           <p className="auth-error" role="alert">
@@ -133,6 +147,9 @@ export default function Login() {
               autoComplete="current-password"
               required
             />
+            <Link className="auth-forgot" to="/forgot">
+              Forgot password?
+            </Link>
           </div>
 
           <button type="submit" className="btn btn-primary auth-submit" disabled={busy} aria-busy={pending === 'email'}>

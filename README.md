@@ -25,6 +25,8 @@ npm run build    # production build (base './', GitHub Pages ready)
 | `/home` | Home feed (search, promo strip, greeting, 2-col listing grid) |
 | `/login` | Sign in — Google, Facebook, and email/password (no nav) |
 | `/signup` | Email sign-up (no nav) |
+| `/forgot` | Request a password-reset email (no nav) |
+| `/reset-password` | Choose a new password from a recovery link (no nav) |
 | `/discover` | Discover (hero carousel, outfits module, categories) |
 | `/sell` | Sell splash (no-fees onboarding, no nav) |
 | `/inbox` | Inbox (filter chips, empty state) |
@@ -33,7 +35,8 @@ npm run build    # production build (base './', GitHub Pages ready)
 | `/onboarding/brands` | Brand picker → feed (light theme) |
 
 `/` is the public landing; the marketplace feed lives at `/home`, and the floating
-`BottomNav` is hidden on the landing and on the auth routes (`/login`, `/signup`).
+`BottomNav` is hidden on the landing and on the auth routes (`/login`, `/signup`,
+`/forgot`, `/reset-password`).
 
 ## Auth
 
@@ -59,6 +62,15 @@ after the redirect, which is why unavailable providers are hidden instead of han
 OAuth failures that bounce back to the app (for example a denied consent screen) arrive
 as `error_description` URL params; the app parses these on boot and shows a translated
 message on `/login` (see CONTRACT.md Round 7).
+
+Password reset: `/forgot` sends a recovery email (`supabase.auth.resetPasswordForEmail`,
+neutral success copy that does not reveal whether an account exists). The emailed link
+returns to the app as a PKCE `?code=`; auth-js exchanges it on boot and emits
+`PASSWORD_RECOVERY`, which routes to `/reset-password` — new password + confirm under the
+shared `src/lib/password.ts` policy, saved with `supabase.auth.updateUser`, then sign-out
+and back to `/login` with a confirmation notice. The PKCE caveat from signup confirmation
+applies here too: the link only completes in the browser that requested it (see
+CONTRACT.md Round 8).
 
 ## Environments
 
