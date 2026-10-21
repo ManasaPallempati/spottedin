@@ -723,6 +723,289 @@ of the hardcoded production apex, matching Landing.tsx (Round 5's staging fix).
 |---|---|
 | auth-errors | src/lib/auth.tsx, src/pages/Login.tsx, src/pages/Signup.tsx, src/pages/Welcome.tsx, src/App.tsx, README.md (Auth section), CONTRACT.md |
 
+## Round 8 — sell-form draft autosave
+
+The create-listing form (`src/pages/SellNew.tsx`) autosaves its text/select values —
+title, price, size, category, condition, description — to localStorage under
+`spotted_sell_draft`, debounced 500ms. Photos are deliberately excluded (storage
+uploads and object URLs, too big and too stateful for localStorage). An untouched
+form never writes a draft, and clearing every field by hand removes it again.
+
+On mount, an existing draft is restored into the fields and a dismissible bar
+(`aria-live="polite"`) appears; a corrupt or non-object draft is silently ignored.
+The draft is cleared on successful publish and on explicit discard, which also
+resets the form. Dismissing the bar keeps the draft.
+
+User-facing copy strings added this round (source of truth):
+
+- "Draft restored"
+- "Discard draft"
+
+## Round 8 — share buttons (listing + shop)
+
+Client-only sharing for the two things a visitor would send someone: a listing and a
+seller's shop. One shared control, `src/components/ShareButton.tsx` (lucide `Share2`
+icon-only button, `aria-label` required by prop): where `navigator.share` exists it
+opens the OS share sheet with `{ title, url }` (the sheet is its own feedback — no
+toast; a dismissed sheet / `AbortError` is not treated as failure); everywhere else it
+copies the URL with `navigator.clipboard.writeText` and shows a ~1.8s "Link copied"
+toast. The toast text lives in a permanently mounted `aria-live="polite"` region (a
+region created at announce time is not read by screen readers) that takes the shared
+`.toast` styling from `styles/motion.css` only while text is present. Keyboard: real
+`<button>`, `:focus-visible` outline matching the auth screens' convention
+(`3px solid var(--accent)`).
+
+- **Product page** (`/listing/:id/:slug`): share button at the far end of the like
+  row; shares `canonicalUrl(listingPath(id, brand))` — the exact URL the page's own
+  SEO effect canonicalizes to — titled "`<Brand> - Size <size> | SPOTTED`".
+- **Shop page** (`/shop/:handle`): share button pinned to the header's top-right
+  corner (both the real-profile and fictional-seller header variants); shares
+  `canonicalUrl('/shop/' + handle)` titled "@`<handle>` on SPOTTED".
+- **Canonical-path bootstrap** (`resolveCanonicalPath` in `src/App.tsx`): canonical
+  URLs are path-based, but HashRouter only reads the fragment, so before this round a
+  shared link (or a crawler-followed canonical) opened at `/listing/…` rendered the
+  Welcome screen and the destination was silently lost to the catch-all route. App
+  bootstrap now rewrites any non-root pathname into the equivalent hash route
+  (`/listing/x` → `/#/listing/x`, query preserved) via `history.replaceState`, before
+  HashRouter mounts, in the same synchronous slot as Round 7's OAuth-error cleaner.
+  OAuth callbacks are unaffected — GoTrue redirects land on pathname `/`, which the
+  rewrite skips. Netlify already serves the app shell for every path (netlify.toml),
+  so the path reaches the client intact.
+- **`base: '/'` in vite.config.ts** (was `'./'`, a GitHub-Pages-era setting; Pages was
+  retired in a64a406 and both sites are Netlify serving from the domain root). With the
+  relative base, the shell served for a deep path referenced `./assets/…` relative to
+  that path; Netlify's `/*` rewrite answered those asset requests with index.html, the
+  module script failed its MIME check, and every deep-path URL rendered a blank page
+  before any script ran — verified against a production build via `vite preview`. The
+  bootstrap above cannot run until the app boots, so this is a prerequisite, not a
+  cosmetic change.
+
+User-facing copy strings added this round (source of truth):
+
+- "Link copied"
+- "Couldn't copy the link" (clipboard denied/unavailable fallback)
+- Accessible names: "Share this listing", "Share this shop"
+
+## Round 8 — Product page photo gallery
+
+PR #16 (`supabase/round13-listing-images.sql`) let sellers attach up to eight photos per
+listing, but the Product page still rendered only `listing.img` (position 0). This round
+shows all of them.
+
+- **Data:** `useListingImages(listingId)` in `src/lib/useListings.ts` queries
+  `listing_images` (`path,position`, ordered by position) and resolves each path to a URL
+  the same way `resolveImage` does (http(s) passthrough, else the `LISTING_IMAGE_BASE`
+  storage prefix — shared `resolveStoragePath` helper). Deliberately a separate query,
+  NOT an embed in `LISTING_COLUMNS`: that constant also feeds the feed and the
+  shop/profile grids, which only show thumbnails.
+- **UI:** `ProductGallery` (internal to `src/pages/Product.tsx`) replaces the single
+  `.product-image-wrap`. A CSS scroll-snap track (`scroll-snap-type: x mandatory`,
+  full-width gapless slides, hidden scrollbar) gives native touch swiping; dot buttons
+  below jump to a slide; the track is focusable (`tabIndex=0`) and ArrowLeft/ArrowRight
+  move one slide (with `preventDefault` so the browser's own scroll nudge doesn't fight
+  the snap). Active dot tracked from `scrollLeft / clientWidth`. Non-first slides load
+  lazily. Container is `role="group"` + `aria-roledescription="carousel"`; each image and
+  dot is labelled "photo n of N".
+- **Fallback:** with one photo (old listings backfilled to a single row, picsum
+  placeholders with no rows, or the images query still in flight) it renders exactly the
+  original single-image markup — no carousel roles, no dots. Because round 13's sync
+  trigger keeps `listings.image_path` equal to the position-0 path, the single image shown
+  while the gallery loads is the same as the first slide, so hydration causes no visual
+  jump. `ogImage` stays `listing.img` — position 0 is the canonical thumbnail by design.
+
+User-facing copy strings added this round (all accessibility labels):
+
+- "Listing photos" (carousel `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>. Use the arrow keys to see other photos." (track `aria-label`)
+- "\<Brand\> — photo \<n\> of \<N\>" (per-image `alt`)
+- "Photo \<n\> of \<N\>" (dot button `aria-label`)
+
+## Round 8 — 404 page + scroll restoration
+
+Small UX round: unmatched routes get a real screen, and every route change starts at
+the top of the page.
+
+- **404 page.** The catch-all `*` route in `src/App.tsx` no longer bounces silently to
+  `/`; it renders `src/pages/NotFound.tsx` (new, styled by `src/pages/notfound.css`
+  with the global dark tokens). The screen shows a decorative "404" figure
+  (`aria-hidden`), an `h1` title, one line of copy, and two links: "Back to home"
+  (`/home`, `btn btn-primary`) and "Search" (`/search`, `btn btn-outline`).
+  RouteIndexingPolicy already marks unmatched paths noindex, so no SEO change needed.
+- **Scroll restoration.** New `ScrollToTop` component in `src/App.tsx` (rendered inside
+  `AppShell`, next to RouteIndexingPolicy) calls `window.scrollTo(0, 0)` whenever
+  `location.pathname` changes, so navigating from a deep scroll position never lands
+  mid-page on the next screen.
+
+User-facing copy strings added this round (source of truth):
+
+- "Page not found"
+- "We couldn't spot that page. It may have moved or never existed."
+- "Back to home"
+- "Search"
+
+## Round 8 — recently-viewed rail (client-only)
+
+Product views feed a "Recently viewed" rail on `/home`. Nothing server-side changes: no
+schema, no new tables, no writes — the history lives in the browser.
+
+- **Recording.** `src/lib/recentlyViewed.ts` (new) owns localStorage key
+  `spotted_recently_viewed`: a JSON array of listing ids, most-recent-first, deduped,
+  capped at 20. `Product.tsx` records the *resolved* listing's id (canonical, unlike the
+  URL param) once its query settles; unresolvable ids never enter the history. Reads and
+  writes are try/catch-wrapped — storage being unavailable is silent, never an error.
+- **Resolution at render time.** Ids only are stored; listing data is resolved when the
+  rail renders via `useListingsByIds(ids)` (new, `src/lib/useListings.ts`) — the same
+  `LISTING_COLUMNS` + `mapRow` path every grid uses, but `.in('id', …)` with **no status
+  filter**, so sold listings still resolve and carry `status: 'sold'`. Results are
+  re-ordered to match the stored ids (PostgREST guarantees no order); ids that no longer
+  resolve (deleted listings) drop out of the rail silently, and any query error resolves
+  to an empty rail. localStorage is never pruned on a failed resolution — a network blip
+  must not wipe the history.
+- **Rail.** `Home.tsx` renders the rail directly above the main grid, only when the
+  resolved list is non-empty (no skeleton/empty state). Small cards — image + price
+  only — as plain `Link`s to the listing (no ProductCard, which would drag like state
+  into the rail); horizontal scroll with `scroll-snap-type: x proximity`, matching the
+  Picks row pattern. Sold listings get a small "Sold" pill overlay (same styling family
+  as the product page's sold badge). Card taps emit `home_recent_click` analytics,
+  matching Home's existing events. Section is `aria-labelledby` its heading; each card's
+  accessible name comes from the image alt (listing title) plus the price text.
+
+User-facing copy strings added this round (source of truth):
+
+- "Recently viewed" (rail heading)
+- "Sold" (rail card pill — same word the product page badge already uses)
+
+## Round 8 — sold listings in search/browse
+
+(CONTRACT round numbering, unrelated to `supabase/round8-handle-rules.sql` — the SQL round
+sequence ran ahead of this document. No schema change this round; round 4's additive
+`listings_select_sold` policy already makes sold rows readable by everyone.)
+
+Search (`/search`, text queries, category drill-ins and Browse all alike) now includes sold
+listings so results reflect the whole market, Depop-style, instead of silently dropping items
+that have sold.
+
+- `useListings(options?: { includeSold?: boolean })` (`src/lib/useListings.ts`): default is
+  unchanged (`status = 'live'` — Home, Discover, Likes, Category, Shop, Product remain
+  live-only). With `includeSold: true` the query filters `status in ('live','sold')` rather
+  than dropping the filter entirely, because round 7 added a `'removed'` status and the
+  owner-select RLS policy would otherwise let a seller meet their own removed rows in search.
+  Only `Search.tsx` passes it.
+- **Sold chip** (`src/components/ProductCard.tsx`): cards whose listing has `status === 'sold'`
+  (the Round 4 contract test — undefined means live) render a small "Sold" pill overlaid
+  bottom-left on the card image (`.product-card-sold`, `ProductCard.css`). The Profile Sold
+  tab keeps its full-card SOLD overlay and hides the chip (`.profile-sold-item
+  .product-card-sold`, `profile.css`) so the state isn't stamped twice.
+- **Hide sold toggle**: `Filters` gains `hideSold: boolean` (default `false` — sold shown;
+  `src/lib/filters.ts`), applied in `applyFilters` via `=== 'sold'`. `FilterBar` gains a
+  `showSoldToggle?: boolean` prop rendering a "Hide sold" chip (with `aria-pressed`) between
+  "On sale" and Sort; only Search passes it — on Shop the chip would be a no-op since that
+  page fetches live rows only. Session-scoped state like the other filters; nothing persisted.
+
+User-facing copy strings added this round (source of truth):
+
+- "Sold" (card overlay chip)
+- "Hide sold" (filter row toggle chip)
+
+## Round 8 — date-of-birth gate for OAuth signups
+
+Closes docs/KNOWN_GAPS.md "OAuth signups have no date of birth". Google supplies no date
+of birth, so an OAuth signup's profile row is created with `date_of_birth` null — and
+`is_adult()` deliberately treats null as adult, so such an account was never subject to
+the minor restrictions. Email signup already requires the date (Signup.tsx); this round
+makes the app unusable for a signed-in account until it has one.
+
+- **Gate.** `DobGate` (`src/App.tsx`) wraps `<Routes>`: when auth has settled
+  (`!loading`), the visitor is signed in, the profile row loaded, and
+  `profile.dateOfBirth` is null, every route except an exempt set redirects to
+  `/onboarding/birthday?next=<intended path>` (`replace`, `encodeURIComponent`d,
+  consumed through `safeNext`). Exempt: `/`, `/about`, `/login`, `/signup`,
+  `/account` (the deletion flow lives there, so someone can close their account
+  instead of answering; it is also the other screen that can set the date), and the
+  birthday screen itself. A failed profile fetch (`profile === null`) does not gate.
+  Pre-existing accounts with a null date (e.g. `spotted.demo`, which predates round 10)
+  are gated too — that is the third KNOWN_GAPS entry closing itself. **Caveat — legacy
+  handles:** for accounts whose handle predates round 8's handle rules (`spotted.demo`,
+  `prudhvi.pallempati`), the `NOT VALID` CHECK `profiles_handle_format` is re-evaluated
+  on any UPDATE of the row, so no save from the birthday screen can succeed until the
+  account renames itself. The screen predicts this client-side (same pattern as the
+  constraint, applied to the stored handle) and shows a notice linking to `/account` —
+  exempt from the gate — plus a directed error on submit, rather than letting the save
+  bounce with the generic 23514 copy about details that are not on the screen.
+- **Screen.** `src/pages/onboarding/Birthday.tsx` (new route `/onboarding/birthday`;
+  BottomNav already hidden by the `/onboarding` prefix rule). Reuses `auth.css` and
+  Signup's date-of-birth field and validation (required, 13+, `max` today, local
+  `ageFromDate` mirroring the round 11 trigger) plus Account's guardian rule: under 18
+  the parent/guardian email is required. Saves through `updateProfile`, carrying every
+  other profile field through unchanged (the stored handle is written back
+  byte-identical — no reformatting — so the round 9 cooldown trigger no-ops and the
+  save never renames anyone as a side effect), then navigates to `next`. Errors render
+  in the existing `role="alert"` region. A link-styled "Log out" button
+  (`.auth-linklike`, auth.css) is the exit for someone signed into the wrong account,
+  and a `.auth-notice` block (auth.css) carries the legacy-handle notice above the
+  form. No schema change: `date_of_birth` UPDATE was granted in round 10,
+  `guardian_email` in round 11.
+
+User-facing copy strings added this round (source of truth):
+
+- "Add your date of birth" (title)
+- "Your account doesn't have a date of birth yet. Add it once and you can carry on."
+- "Save and continue" (submit; "Saving…" while pending)
+- "Your username was made under our old rules, so we can't save changes to your
+  account until it changes. Pick a new username in Account details first, then come
+  back here." (legacy-handle notice; "Account details" is a link to `/account`)
+- "Please choose a new username in Account details first — then you can save your
+  date of birth." (submit error on the legacy-handle path)
+
+Reused verbatim, not new: "Date of birth", "You need to be 13 or over. Under 18s can
+buy, but cannot list items to sell." and "Please enter your date of birth." /
+"You need to be 13 or over to use Spotted." (Signup); "Parent or guardian's email",
+"Because you're under 18, we need a parent or guardian to confirm they're happy for you
+to use Spotted. We'll email them to ask." and "Please add a parent or guardian's email
+address so we can ask for their consent." (Account); "Log out" (Profile).
+
+## Round 8 — defect sweep (small fixes only)
+
+A hardening pass over the recently merged account/photos/categories/search work. No new
+features; each change is a small, high-confidence fix.
+
+- **Profile creation:** the handle-collision retry insert in `ensureProfile`
+  (`src/lib/auth.tsx`) now carries `date_of_birth` like the first attempt, so a minor
+  whose sanitised handle collides no longer gets a null-DOB profile that `is_adult()`
+  treats as an adult.
+- **Listing form (`src/pages/SellNew.tsx`):** insert failures are translated instead of
+  showing the raw PostgREST message; the error region gained `role="alert"`; the photo
+  input is disabled while an upload is in flight so the 8-photo limit cannot be
+  overshot from a stale count.
+- **Category picker (`src/components/CategoryPicker.tsx`):** the sheet is now
+  `role="dialog"` + `aria-modal`, labelled by its heading, and Escape dismisses it.
+- **README** re-synced with the code (no mock fallback, `/` vs `/about`, current route
+  table, no GitHub Pages).
+
+User-facing copy strings added or corrected this round (source of truth):
+
+- "We could not publish your listing just now. Please try again." (generic listing
+  insert failure)
+- "Under 18s can buy on Spotted, but cannot list items to sell." (listing insert
+  rejected by RLS, code 42501 — the round11 `is_adult()` gate; wording matches the
+  existing date-of-birth hint)
+- "You need to be 13 or over to use Spotted." — corrected translation of the
+  `under_minimum_age` trigger error in `updateProfile`, which previously said 18. The
+  round11 trigger fires below 13; this reuses the Signup form's existing string.
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| sell-draft-autosave | src/pages/SellNew.tsx, src/pages/sellnew.css, CONTRACT.md |
+| share | src/components/ShareButton.tsx (new), src/components/ShareButton.css (new), src/pages/Product.tsx (share button), src/pages/product.css (`.product-share-btn`), src/pages/Shop.tsx (share button), src/pages/shop.css (`.shop-share-btn`), src/App.tsx (`resolveCanonicalPath` only), vite.config.ts (`base`), CONTRACT.md |
+| product-gallery | src/pages/Product.tsx, src/pages/product.css, src/lib/useListings.ts (`resolveStoragePath` + `useListingImages` only), CONTRACT.md |
+| not-found-page | src/pages/NotFound.tsx (new), src/pages/notfound.css (new), src/App.tsx (catch-all route + ScrollToTop only), CONTRACT.md |
+| recently-viewed | src/lib/recentlyViewed.ts (new), src/lib/useListings.ts (`useListingsByIds` only), src/pages/Product.tsx (view recording only), src/pages/Home.tsx, src/pages/home.css, CONTRACT.md |
+| sold-items-search | src/lib/useListings.ts (`useListings` options), src/lib/filters.ts, src/components/FilterBar.tsx, src/components/ProductCard.tsx, src/components/ProductCard.css, src/pages/profile.css (chip suppression), src/pages/Search.tsx, CONTRACT.md |
+| oauth-dob-gate | src/pages/onboarding/Birthday.tsx (new), src/App.tsx (DobGate + route), src/pages/auth.css (`.auth-linklike`, `.auth-notice`), docs/KNOWN_GAPS.md (OAuth-DOB + legacy-handles entries), CONTRACT.md |
+| hardening | src/lib/auth.tsx, src/pages/SellNew.tsx, src/components/CategoryPicker.tsx, README.md, CONTRACT.md |
+
 ## Round 16 — paid listing boosts (server-gated; demo remains the default)
 
 Numbered to match `supabase/round16-listing-boosts.sql` (the sql round numbering is the
