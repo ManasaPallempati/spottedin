@@ -5,6 +5,8 @@ import './EnvWarning.css'
 const MESSAGES = {
   'missing-config':
     'No database: this build has no Supabase settings, so listings will not load and nobody can sign in or save. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for this site in Netlify.',
+  'invalid-url':
+    'No database: VITE_SUPABASE_URL for this site is not a valid URL. It must start with https:// and have no quotes, e.g. https://<project>.supabase.co.',
   'production-database':
     'Careful: this is not the live site, but it is connected to the PRODUCTION database. Anything done here changes real data. Point VITE_SUPABASE_URL at the staging project.',
 } as const

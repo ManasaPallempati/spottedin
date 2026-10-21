@@ -15,7 +15,15 @@ export const PRODUCTION_PROJECT_REF = 'masdygvcssrtwseopfmj'
 const UNCONFIGURED_URL = 'https://supabase-not-configured.invalid'
 const UNCONFIGURED_ANON_KEY = 'supabase-not-configured'
 
-export type SupabaseWarning = 'missing-config' | 'production-database'
+export type SupabaseWarning = 'missing-config' | 'invalid-url' | 'production-database'
+
+// createClient throws at import time for anything that is not an http(s) URL,
+// which blanks the whole app before EnvWarning can explain why. A pasted value
+// without https://, or one wrapped in quotes, is the realistic way to get here.
+// Shared with vite.config.ts so a malformed value also fails the main build.
+export function isUsableSupabaseUrl(url: string): boolean {
+  return /^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/\S*)?$/.test(url)
+}
 
 export type SupabaseConfig = {
   url: string
@@ -32,6 +40,9 @@ export function resolveSupabaseConfig(
   const anonKey = rawAnonKey?.trim()
   if (!url || !anonKey) {
     return { url: UNCONFIGURED_URL, anonKey: UNCONFIGURED_ANON_KEY, warning: 'missing-config' }
+  }
+  if (!isUsableSupabaseUrl(url)) {
+    return { url: UNCONFIGURED_URL, anonKey: UNCONFIGURED_ANON_KEY, warning: 'invalid-url' }
   }
   const pointsAtProduction = url.includes(PRODUCTION_PROJECT_REF)
   return { url, anonKey, warning: pointsAtProduction && !isProductionDeploy ? 'production-database' : null }

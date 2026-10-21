@@ -16,6 +16,8 @@ if (SUPABASE_CONFIG.warning === 'missing-config') {
   console.error(
     '[spotted] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. This build has no database: listings will not load, and sign-in and saving will fail.',
   )
+} else if (SUPABASE_CONFIG.warning === 'invalid-url') {
+  console.error('[spotted] VITE_SUPABASE_URL is not a valid https:// URL. This build has no database.')
 } else if (SUPABASE_CONFIG.warning === 'production-database') {
   console.error('[spotted] This non-production build is connected to the PRODUCTION Supabase project.')
 }

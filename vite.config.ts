@@ -1,5 +1,6 @@
 import { createLogger, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { isUsableSupabaseUrl } from './src/lib/supabaseConfig'
 
 export default defineConfig(({ command, mode }) => {
   // The '' prefix reads every variable, including the ones Netlify sets for
@@ -11,17 +12,18 @@ export default defineConfig(({ command, mode }) => {
   // previews run under `deploy-preview`, even for a pull request whose head is
   // `main`.
   const productionDeploy = env.NETLIFY === 'true' && env.CONTEXT === 'production' && env.BRANCH === 'main'
-  const supabaseConfigured = Boolean(env.VITE_SUPABASE_URL?.trim() && env.VITE_SUPABASE_ANON_KEY?.trim())
+  const supabaseUrl = env.VITE_SUPABASE_URL?.trim() ?? ''
+  const supabaseConfigured = isUsableSupabaseUrl(supabaseUrl) && Boolean(env.VITE_SUPABASE_ANON_KEY?.trim())
 
   if (command === 'build' && !supabaseConfigured) {
     if (productionDeploy) {
       throw new Error(
-        'Refusing to build main without VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. ' +
+        'Refusing to build main without a valid VITE_SUPABASE_URL (https://…) and VITE_SUPABASE_ANON_KEY. ' +
           'Set both for the production site in Netlify (Site configuration -> Environment variables).',
       )
     }
     createLogger().warn(
-      '\n⚠️  VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. This build has no database ' +
+      '\n⚠️  VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing or invalid. This build has no database ' +
         '(no fallback to production) and will show a warning banner.\n',
     )
   }
