@@ -533,3 +533,4 @@
 @media (prefers-reduced-motion: reduce) {
   .product-buybar { transition: none; }
 }
+.product-safety { padding: 4px 16px 0; }
