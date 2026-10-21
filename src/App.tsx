@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import { supabase } from './lib/supabase'
 import { AuthProvider, useAuth, friendlyOAuthCallbackError } from './lib/auth'
@@ -99,28 +99,25 @@ function resolveOAuthCallbackError(): void {
   sessionStorage.removeItem('spotted_oauth_next')
 
   const url = new URL(window.location.href)
+  url.pathname = '/login'
   url.search = ''
-  url.hash = '#/login'
+  url.hash = ''
   window.history.replaceState(null, '', url.toString())
 }
 
-// Canonical URLs are path-based (https://host/listing/<id>/<slug> — lib/seo.ts builds
-// them, the share buttons copy them, and Netlify serves the app shell for every path),
-// but HashRouter only reads the fragment: a visitor opening one would land on '/' and
-// the destination would be silently lost to the catch-all route. Rewrite the path into
-// the equivalent hash route before HashRouter mounts. Runs after
-// resolveOAuthCallbackError() and cannot collide with the OAuth flows: GoTrue always
-// redirects to SITE_ORIGIN with pathname '/', which this leaves untouched (including
-// the PKCE `?code=…` query). Idempotent: after the rewrite the pathname is '/'.
-function resolveCanonicalPath(): void {
-  const { pathname, search, hash } = window.location
-  if (pathname === '/' || pathname === '') return
-  if (hash.startsWith('#/')) return // already carrying an in-app route
-
+// The app used HashRouter until this change, so links already shared on WhatsApp,
+// Instagram, etc. look like https://host/#/listing/<id>/<slug>. Move a '#/…' fragment
+// into the real path before BrowserRouter mounts so those links keep working.
+// A GoTrue error fragment ('#error=…') never starts with '#/', and is handled first
+// by resolveOAuthCallbackError(). Idempotent: after the rewrite there is no '#/'.
+function resolveLegacyHashRoute(): void {
+  const { hash } = window.location
+  if (!hash.startsWith('#/')) return
   const url = new URL(window.location.href)
-  url.pathname = '/'
-  url.search = ''
-  url.hash = `#${pathname}${search}`
+  const legacy = new URL(hash.slice(1), url.origin)
+  url.pathname = legacy.pathname
+  url.search = legacy.search
+  url.hash = legacy.hash
   window.history.replaceState(null, '', url.toString())
 }
 
@@ -210,20 +207,19 @@ function AppShell() {
 }
 
 export default function App() {
-  // Must run before HashRouter (below) is rendered — see resolveOAuthCallbackError's
+  // Must run before BrowserRouter (below) is rendered — see resolveOAuthCallbackError's
   // own comment for why this can't be an effect. Order matters: the OAuth error
-  // cleaner first, then the canonical-path rewrite (which skips OAuth callbacks
-  // anyway, since those land on pathname '/').
+  // cleaner first, then the legacy '#/' link rewrite.
   resolveOAuthCallbackError()
-  resolveCanonicalPath()
+  resolveLegacyHashRoute()
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <AuthProvider>
         <AppStateProvider>
           <AppShell />
         </AppStateProvider>
       </AuthProvider>
-    </HashRouter>
+    </BrowserRouter>
   )
 }
