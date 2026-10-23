@@ -1,6 +1,7 @@
 import { createLogger, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { isUsableSupabaseUrl } from './src/lib/supabaseConfig'
+import { crawlerPolicy } from './src/build/crawlerPolicy'
 
 export default defineConfig(({ command, mode }) => {
   // The '' prefix reads every variable, including the ones Netlify sets for
@@ -36,7 +37,7 @@ export default defineConfig(({ command, mode }) => {
     // index.html, the module failed its MIME check, and the page went blank before
     // any script ran. Round 8's path→hash bootstrap needs the app to boot there.
     base: '/',
-    plugins: [react()],
+    plugins: [react(), crawlerPolicy(env.VITE_NOINDEX === 'true')],
     define: {
       __PRODUCTION_DEPLOY__: JSON.stringify(productionDeploy),
     },
