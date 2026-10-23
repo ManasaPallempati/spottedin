@@ -6,7 +6,7 @@ import { useCategories, categoryPath, legacyCategoryFor } from '../lib/categorie
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { listingPath } from '../lib/listingUrls'
-import { CONDITIONS } from '../data/sellers'
+import { CONDITIONS, CONDITION_DB } from '../data/sellers'
 import './sellnew.css'
 
 const MAX_PHOTOS = 8
@@ -18,12 +18,6 @@ const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 // derived from the chosen department by legacyCategoryFor.
 //
 // Condition remains a fixed vocabulary fixed by a CHECK constraint.
-const CONDITION_DB: Record<string, string> = {
-  'Brand new': 'new',
-  'Like new': 'like-new',
-  'Used – excellent': 'good',
-  'Used – good': 'fair',
-}
 
 // Text/select values only — photos are storage uploads and object URLs, far too
 // big (and too stateful) for localStorage, so they are deliberately not drafted.
@@ -287,7 +281,7 @@ export default function SellNew() {
       category: legacyCategoryFor(categories, categoryId),
       category_id: categoryId,
       size,
-      condition: CONDITION_DB[condition] ?? 'good',
+      condition: CONDITION_DB[condition as keyof typeof CONDITION_DB] ?? 'good',
       // Position 0 is written here as well as into listing_images so the row is
       // never briefly without a thumbnail; the sync trigger keeps it correct
       // from then on.

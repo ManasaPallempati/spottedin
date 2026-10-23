@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, LISTING_IMAGE_BASE } from './supabase'
 import type { Listing } from '../data/listings'
-import { describeListing } from '../data/sellers'
+import { conditionLabel, describeListing } from '../data/sellers'
 import { normalizeCategory } from '../data/taxonomy'
 import type { Profile } from './auth'
 
@@ -16,6 +16,7 @@ type ListingRow = {
   size: string | null
   price_inr: number
   category?: string | null
+  condition?: string | null
   likes: number
   image_path: string | null
   created_at: string
@@ -28,7 +29,7 @@ type ListingRow = {
 // connect listings to profiles — the direct seller_id one, and an indirect one
 // via a pre-existing `favorites` table — so PostgREST can't auto-disambiguate.
 const LISTING_COLUMNS =
-  'id,title,description,size,price_inr,category,likes,image_path,created_at,seller_id,seller:profiles!listings_seller_id_fkey(handle,name,bio,rating,sales),status'
+  'id,title,description,size,price_inr,category,condition,likes,image_path,created_at,seller_id,seller:profiles!listings_seller_id_fkey(handle,name,bio,rating,sales),status'
 
 function resolveStoragePath(path: string): string {
   if (/^https?:\/\//i.test(path)) return path
@@ -60,6 +61,7 @@ function mapRow(row: ListingRow): Listing {
     sellerRating: seller?.rating,
     sellerSales: seller?.sales,
     status: row.status === 'sold' ? 'sold' : 'live',
+    condition: conditionLabel(row.condition) ?? undefined,
   }
 }
 

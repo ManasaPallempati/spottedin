@@ -5,7 +5,7 @@ import { useAppState, type BagItem, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentConfig } from '../lib/payments'
 import { useListing } from '../lib/useListings'
-import { sellerFor, sellerForListing, type Seller } from '../data/sellers'
+import { sellerFor, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
 import ListingPhoto from '../components/ListingPhoto'
@@ -97,7 +97,11 @@ export default function Bag() {
     const map = new Map<string, BagGroup>()
     for (const item of bag) {
       const resolvedListing = resolved[item.listingId]
-      const seller = resolvedListing ? sellerFor(resolvedListing) : sellerForListing(item.listingId)
+      // Until a row resolves (or if it never does) its seller is unknown: group
+      // it without a header rather than attributing it to anyone.
+      const seller: Seller = resolvedListing
+        ? sellerFor(resolvedListing)
+        : { handle: '', name: '', bio: '', rating: null, sold: 0 }
       const existing = map.get(seller.handle)
       if (existing) existing.items.push(item)
       else map.set(seller.handle, { seller, items: [item] })
@@ -197,11 +201,13 @@ export default function Bag() {
         <>
           <div className="bag-list">
             {groups.map((group) => (
-              <div className="bag-group" key={group.seller.handle}>
-                <div className="bag-seller-header">
-                  <SellerAvatar className="bag-seller-avatar" handle={group.seller.handle} name={group.seller.name} />
-                  <span className="bag-seller-handle">@{group.seller.handle}</span>
-                </div>
+              <div className="bag-group" key={group.seller.handle || 'unknown-seller'}>
+                {group.seller.handle && (
+                  <div className="bag-seller-header">
+                    <SellerAvatar className="bag-seller-avatar" handle={group.seller.handle} name={group.seller.name} />
+                    <span className="bag-seller-handle">@{group.seller.handle}</span>
+                  </div>
+                )}
                 {group.items.map((item) => (
                   <BagRow key={item.listingId} listingId={item.listingId} onResolved={handleResolved} />
                 ))}

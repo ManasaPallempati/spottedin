@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
 import { useAuth } from './auth'
@@ -60,13 +60,6 @@ const EMPTY_STATE: AppState = {
   offers: [],
   threads: [],
 }
-
-// Cycle: 1st them-reply in a thread, 2nd, then 3rd+ repeats the last entry.
-const CANNED_REPLIES = [
-  "Hi! Yes, it's still available 😊",
-  'Ships in 2–3 days anywhere in India.',
-  'Sounds good — feel free to make an offer!',
-]
 
 function randomAlphaNum(len: number): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -185,17 +178,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [state, setState] = useState<AppState>(EMPTY_STATE)
   const [hydrating, setHydrating] = useState(false)
-
-  // Mirrors `state` for reads from code that can't rely on a fresh render
-  // closure (setTimeout callbacks like fireCannedReply below) or on a
-  // setState updater's `prev` param (which isn't guaranteed to run
-  // synchronously, so a ref written *inside* an updater and read right
-  // after setState() is not reliable — confirmed by testing: the updater
-  // ran, the UI updated, but the ref read after it was still null).
-  const stateRef = useRef(state)
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
 
   useEffect(() => {
     if (authLoading) return
@@ -394,30 +376,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return state.threads.find((t) => t.handle === handle) ?? null
   }
 
-  function fireCannedReply(threadId: string) {
-    // Read via stateRef (always current, unlike the `state` closure variable
-    // a setTimeout callback like this one captures) BEFORE calling setState,
-    // so replyMsg is available synchronously for the DB write right after —
-    // no dependency on when React actually invokes the updater function.
-    const thread = stateRef.current.threads.find((t) => t.id === threadId)
-    if (!thread) return
-    const themCount = thread.messages.filter((m) => m.from === 'them').length
-    const reply = CANNED_REPLIES[Math.min(themCount, CANNED_REPLIES.length - 1)]
-    const replyMsg: ThreadMessage = { id: crypto.randomUUID(), from: 'them', text: reply, at: Date.now() }
-
-    setState((prev) => ({
-      ...prev,
-      threads: prev.threads.map((t) => (t.id === threadId ? { ...t, messages: [...t.messages, replyMsg] } : t)),
-    }))
-
-    void supabase
-      .from('spotted_messages')
-      .insert({ id: replyMsg.id, thread_id: threadId, sender_id: null, body: replyMsg.text })
-      .then(({ error }) => {
-        if (error) console.warn(error)
-      })
-  }
-
   function sendMessage(handle: string, text: string) {
     if (!requireAuth()) return
     const uid = session!.user.id
@@ -458,10 +416,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (msgError) console.warn(msgError)
       } catch (err) {
         console.warn(err)
-      }
-
-      if (!peerIsReal) {
-        setTimeout(() => fireCannedReply(threadId), 1200)
       }
     })()
   }
