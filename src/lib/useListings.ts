@@ -35,11 +35,11 @@ function resolveStoragePath(path: string): string {
   return `${STORAGE_BASE}${path}`
 }
 
+// '' when the seller uploaded no photo: ListingPhoto then shows a neutral
+// "Photo unavailable" tile. Never fall back to stock imagery, which a buyer
+// would read as a picture of the item.
 function resolveImage(row: ListingRow): string {
-  if (row.image_path) {
-    return resolveStoragePath(row.image_path)
-  }
-  return `https://picsum.photos/seed/${row.id}/600/600`
+  return row.image_path ? resolveStoragePath(row.image_path) : ''
 }
 
 function mapRow(row: ListingRow): Listing {
@@ -183,8 +183,8 @@ export function useListing(id: string): { listing: Listing | null; loading: bool
 // separate query rather than an embed in LISTING_COLUMNS because that constant
 // also feeds the 40-item feed and the shop/profile grids, none of which show
 // more than the thumbnail — fetching up to 8 extra rows per card there would be
-// waste. Listings that predate round 13's backfill (picsum placeholders) have
-// no rows here; callers fall back to `listing.img`.
+// waste. Listings that predate round 13's backfill have no rows here; callers
+// fall back to `listing.img`, which is '' when there is no photo at all.
 export function useListingImages(listingId: string): { images: string[]; loading: boolean } {
   const [images, setImages] = useState<string[]>([])
   const [loading, setLoading] = useState(true)

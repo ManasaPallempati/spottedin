@@ -13,6 +13,7 @@ import FilterBar from '../components/FilterBar'
 import ProductCard from '../components/ProductCard'
 import ShareButton from '../components/ShareButton'
 import { canonicalUrl } from '../lib/seo'
+import SellerAvatar from '../components/SellerAvatar'
 import './shop.css'
 
 const TABS = ['Shop', 'Likes'] as const
@@ -87,7 +88,6 @@ export default function Shop() {
   )
 
   if (realProfile) {
-    const avatar = `https://picsum.photos/seed/spotted-seller-${handle}/300/300`
     const rating = realProfile.rating
     const followerCount = followerBase
       ? followerBase.count + (following === followerBase.wasFollowing ? 0 : following ? 1 : -1)
@@ -97,7 +97,7 @@ export default function Shop() {
     headerContent = (
       <header className="shop-header">
         {shareButton}
-        <img className="shop-avatar" src={avatar} alt={realProfile.name} />
+        <SellerAvatar className="shop-avatar" handle={realProfile.handle} name={realProfile.name} />
         <h1 className="shop-handle">@{realProfile.handle}</h1>
 
         {rating != null ? (
@@ -146,7 +146,7 @@ export default function Shop() {
     headerContent = (
       <header className="shop-header">
         {shareButton}
-        <img className="shop-avatar" src={seller.avatar} alt={seller.name} />
+        <SellerAvatar className="shop-avatar" handle={seller.handle} name={seller.name} />
         <h1 className="shop-handle">@{seller.handle}</h1>
 
         <div className="shop-rating-row">

@@ -8,6 +8,8 @@ import { useListing } from '../lib/useListings'
 import { sellerFor, sellerForListing, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
+import ListingPhoto from '../components/ListingPhoto'
+import SellerAvatar from '../components/SellerAvatar'
 import './bag.css'
 
 const SHIPPING_INR = 49
@@ -36,7 +38,7 @@ function BagRow({ listingId, onResolved }: BagRowProps) {
 
   return (
     <div className="bag-row">
-      <img className="bag-row-thumb" src={listing.img} alt={listing.brand} />
+      <ListingPhoto className="bag-row-thumb" src={listing.img} alt={listing.brand} compact />
       <div className="bag-row-info">
         <p className="bag-row-brand">{listing.brand}</p>
         <p className="bag-row-size">{listing.size}</p>
@@ -197,7 +199,7 @@ export default function Bag() {
             {groups.map((group) => (
               <div className="bag-group" key={group.seller.handle}>
                 <div className="bag-seller-header">
-                  <img className="bag-seller-avatar" src={group.seller.avatar} alt={group.seller.handle} />
+                  <SellerAvatar className="bag-seller-avatar" handle={group.seller.handle} name={group.seller.name} />
                   <span className="bag-seller-handle">@{group.seller.handle}</span>
                 </div>
                 {group.items.map((item) => (

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { UserPlus } from 'lucide-react'
+import { Tag, UserPlus } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import ProductCard from '../components/ProductCard'
+import ListingPhoto from '../components/ListingPhoto'
 import { PrelovedSeal } from '../components/BoutiqueTag'
 import SkeletonCard from '../components/SkeletonCard'
 import type { Listing } from '../data/listings'
@@ -216,7 +217,7 @@ export default function Home() {
                 onClick={() => trackEvent('home_recent_click', { listing: listing.id })}
               >
                 <div className="home-recent-image-wrap">
-                  <img src={listing.img} alt={listing.brand} loading="lazy" />
+                  <ListingPhoto src={listing.img} alt={listing.brand} loading="lazy" compact />
                   {listing.status === 'sold' && <span className="home-recent-sold">Sold</span>}
                 </div>
                 <span className="home-recent-price">₹{listing.price.toLocaleString('en-IN')}</span>
@@ -257,7 +258,27 @@ export default function Home() {
         className="home-feed-panel"
       >
         {feedTab === 'for-you' ? (
-          personalized && !loading ? (
+          !loading && feedListings.length === 0 ? (
+            // Honest about an empty marketplace rather than padding it with
+            // sample inventory: invite the first sellers instead.
+            <div className="home-feed-empty home-feed-empty--no-listings">
+              <div className="home-feed-empty-icon">
+                <Tag size={40} strokeWidth={1.5} />
+              </div>
+              <h3 className="home-feed-empty-title">No listings yet</h3>
+              <p className="home-feed-empty-copy">
+                Spotted is just opening. List your pre-loved sarees, kurtas and occasionwear and be one of the first
+                sellers buyers see. Listing is free.
+              </p>
+              <Link
+                to="/sell"
+                className="btn btn-primary home-feed-empty-btn"
+                onClick={() => trackEvent('home_empty_start_selling_click')}
+              >
+                Start selling
+              </Link>
+            </div>
+          ) : personalized && !loading ? (
             <section aria-labelledby="home-foryou-title">
               <div className="home-foryou-header">
                 <h2 id="home-foryou-title" className="home-foryou-title">For You</h2>

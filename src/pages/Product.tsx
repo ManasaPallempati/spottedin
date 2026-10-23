@@ -14,6 +14,8 @@ import BottomSheet from '../components/BottomSheet'
 import BoostSheet from '../components/BoostSheet'
 import Chip from '../components/Chip'
 import ShareButton from '../components/ShareButton'
+import ListingPhoto from '../components/ListingPhoto'
+import SellerAvatar from '../components/SellerAvatar'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
 import { listingPath } from '../lib/listingUrls'
 import { recordRecentlyViewed } from '../lib/recentlyViewed'
@@ -43,7 +45,7 @@ function StarRow({ rating }: { rating: number }) {
 // Swipeable photo carousel: a CSS scroll-snap track (native touch swiping, no
 // JS animation) plus dot buttons and arrow keys. With one photo it renders the
 // original single-image markup — no carousel roles, no dots — which is what
-// pre-round-13 listings and picsum placeholders get.
+// pre-round-13 listings and listings without a photo get.
 function ProductGallery({ images, alt }: { images: string[]; alt: string }) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const [index, setIndex] = useState(0)
@@ -51,7 +53,7 @@ function ProductGallery({ images, alt }: { images: string[]; alt: string }) {
   if (images.length <= 1) {
     return (
       <div className="product-image-wrap">
-        <img src={images[0]} alt={alt} />
+        <ListingPhoto src={images[0]} alt={alt} />
       </div>
     )
   }
@@ -97,7 +99,7 @@ function ProductGallery({ images, alt }: { images: string[]; alt: string }) {
       >
         {images.map((src, i) => (
           <div className="product-gallery-slide" key={`${src}-${i}`}>
-            <img src={src} alt={`${alt} — photo ${i + 1} of ${images.length}`} loading={i === 0 ? undefined : 'lazy'} />
+            <ListingPhoto src={src} alt={`${alt} — photo ${i + 1} of ${images.length}`} loading={i === 0 ? undefined : 'lazy'} />
           </div>
         ))}
       </div>
@@ -381,7 +383,7 @@ export default function Product() {
 
       <div className="product-seller-card">
         <div className="product-seller-top">
-          <img src={seller.avatar} alt={seller.handle} className="product-seller-avatar" />
+          <SellerAvatar handle={seller.handle} name={seller.name} className="product-seller-avatar" />
           <div>
             <p className="product-seller-handle">@{seller.handle}</p>
             <div className="product-seller-rating">

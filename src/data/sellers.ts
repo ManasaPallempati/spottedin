@@ -8,7 +8,6 @@ export type Seller = {
   handle: string
   name: string
   bio: string
-  avatar: string
   rating: number
   reviewCount: number
   sold: number
@@ -25,7 +24,6 @@ export const sellers: Seller[] = [
     handle: owner.handle,
     name: owner.name,
     bio: 'Clearing out my closet — mostly denim and streetwear. Shipping availability varies by style.',
-    avatar: 'https://picsum.photos/seed/spotted-seller-manasa/300/300',
     rating: 4.9,
     reviewCount: 34,
     sold: 28,
@@ -41,7 +39,6 @@ export const sellers: Seller[] = [
     handle: 'ritu.thrifts',
     name: 'Ritu Sharma',
     bio: 'Curated pre-loved fashion from Mumbai. Listings are shared directly by the seller.',
-    avatar: 'https://picsum.photos/seed/spotted-seller-1/300/300',
     rating: 4.8,
     reviewCount: 96,
     sold: 74,
@@ -57,7 +54,6 @@ export const sellers: Seller[] = [
     handle: 'bombayvintage',
     name: 'Bombay Vintage Co.',
     bio: 'Vintage denim and retro streetwear sourced across India.',
-    avatar: 'https://picsum.photos/seed/spotted-seller-2/300/300',
     rating: 4.7,
     reviewCount: 61,
     sold: 45,
@@ -72,7 +68,6 @@ export const sellers: Seller[] = [
     handle: 'thriftedbyarjun',
     name: 'Arjun Mehta',
     bio: 'Selling rotation and daily wear carefully described before listing.',
-    avatar: 'https://picsum.photos/seed/spotted-seller-3/300/300',
     rating: 4.6,
     reviewCount: 8,
     sold: 5,
@@ -87,7 +82,6 @@ export const sellers: Seller[] = [
     handle: 'closetofpriya',
     name: 'Priya Nair',
     bio: 'Decluttering my closet — brands I no longer wear, all excellent condition.',
-    avatar: 'https://picsum.photos/seed/spotted-seller-4/300/300',
     rating: 5.0,
     reviewCount: 140,
     sold: 90,
@@ -125,7 +119,6 @@ export function sellerFor(listing: Listing): Seller {
       handle: listing.sellerHandle,
       name: listing.sellerName ?? listing.sellerHandle,
       bio: listing.sellerBio ?? '',
-      avatar: `https://picsum.photos/seed/spotted-seller-${listing.sellerHandle}/300/300`,
       rating: listing.sellerRating ?? 0,
       reviewCount: 0,
       sold: listing.sellerSales ?? 0,
