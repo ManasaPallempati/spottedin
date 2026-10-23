@@ -8,7 +8,7 @@ import { useAppState } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import type { BoostResult } from '../lib/payments'
 import { BoutiqueTag } from '../components/BoutiqueTag'
-import { conditionForListing, describeListing, sellerFor } from '../data/sellers'
+import { describeListing, sellerFor } from '../data/sellers'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
 import BoostSheet from '../components/BoostSheet'
@@ -217,7 +217,6 @@ export default function Product() {
   const liked = isLiked(listing.id)
   const count = liked ? likeCountFor(listing) : listing.likes
   const seller = sellerFor(listing)
-  const condition = conditionForListing(listing.id)
   const { text: descText, hashtags } = describeListing(listing)
   const title = `${listing.brand} — size ${listing.size}`
   const categorySlug = normalizeCategory(listing.category ?? '')
@@ -232,7 +231,7 @@ export default function Product() {
     justBoostedUntil ?? (listing.boostedUntil && listing.boostedUntil > Date.now() ? listing.boostedUntil : null)
 
   const others = allListings.filter((l) => l.id !== listing.id)
-  const moreFromSeller = others.filter((l) => sellerFor(l).handle === seller.handle).slice(0, 8)
+  const moreFromSeller = seller.handle ? others.filter((l) => sellerFor(l).handle === seller.handle).slice(0, 8) : []
   const sameBrand = others.filter((l) => l.brand === listing.brand)
   const restBrand = others.filter((l) => l.brand !== listing.brand)
   const recommended = [...sameBrand, ...restBrand].slice(0, 8)
@@ -375,22 +374,28 @@ export default function Product() {
             </Link>
           ))}
         </div>
-        <p className="product-condition">
-          <span className="product-condition-label">Condition</span>{' '}
-          <BoutiqueTag>{condition}</BoutiqueTag>
-        </p>
+        {listing.condition && (
+          <p className="product-condition">
+            <span className="product-condition-label">Condition</span>{' '}
+            <BoutiqueTag>{listing.condition}</BoutiqueTag>
+          </p>
+        )}
       </div>
 
+      {seller.handle && (
       <div className="product-seller-card">
         <div className="product-seller-top">
           <SellerAvatar handle={seller.handle} name={seller.name} className="product-seller-avatar" />
           <div>
             <p className="product-seller-handle">@{seller.handle}</p>
-            <div className="product-seller-rating">
-              <StarRow rating={seller.rating} />
-              <span>{seller.reviewCount} reviews</span>
-            </div>
-            <p className="product-seller-active">Active this week</p>
+            {seller.rating != null ? (
+              <div className="product-seller-rating">
+                <StarRow rating={seller.rating} />
+                <span>{seller.sold} sold</span>
+              </div>
+            ) : (
+              <p className="product-seller-active">{seller.sold > 0 ? `${seller.sold} sold` : 'New seller'}</p>
+            )}
           </div>
         </div>
         <Link to={`/shop/${seller.handle}`} className="product-seller-visit">
@@ -401,26 +406,11 @@ export default function Product() {
           Ask a question
         </Link>
       </div>
+      )}
 
       <div className="product-safety">
         <SafetyMenu targetType="listing" targetId={listing.id} handle={seller.handle} label="Report this listing" />
       </div>
-
-      {seller.reviews.length > 0 && (
-        <div className="product-reviews">
-          <h2>Reviews for @{seller.handle}</h2>
-          {seller.reviews.map((r, i) => (
-            <div className="product-review" key={`${r.reviewer}-${i}`}>
-              <div className="product-review-head">
-                <span className="product-review-reviewer">@{r.reviewer}</span>
-                <StarRow rating={r.stars} />
-              </div>
-              <p className="product-review-ago">{r.ago}</p>
-              <p className="product-review-text">{r.text}</p>
-            </div>
-          ))}
-        </div>
-      )}
 
       {moreFromSeller.length > 0 && (
         <div className="product-section">

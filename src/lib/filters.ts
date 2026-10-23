@@ -1,5 +1,4 @@
 import type { Listing } from '../data/listings'
-import { conditionForListing } from '../data/sellers'
 import { normalizeCategory } from '../data/taxonomy'
 import { normalizeSize } from './sizes'
 
@@ -49,7 +48,7 @@ export function applyFilters(listings: Listing[], filters: Filters, sort: Sort):
       if (!filters.categories.includes(normalized)) return false
     }
     if (!inPriceBand(listing.price, filters.price)) return false
-    if (filters.conditions.length > 0 && !filters.conditions.includes(conditionForListing(listing.id))) return false
+    if (filters.conditions.length > 0 && !(listing.condition && filters.conditions.includes(listing.condition))) return false
     if (filters.onSale && !listing.originalPrice) return false
     // Contract (Round 4): only `status === 'sold'` means sold — undefined is live.
     if (filters.hideSold && listing.status === 'sold') return false

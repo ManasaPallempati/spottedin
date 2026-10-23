@@ -5,7 +5,6 @@ import { ChevronLeft, Send } from 'lucide-react'
 import { useAppState } from '../lib/appState'
 import { useListing, useProfileByHandle } from '../lib/useListings'
 import { listingPath } from '../lib/listingUrls'
-import { sellers } from '../data/sellers'
 import OfferCard from '../components/OfferCard'
 import ListingPhoto from '../components/ListingPhoto'
 import SellerAvatar from '../components/SellerAvatar'
@@ -33,7 +32,6 @@ export default function Thread() {
   const { threadFor, sendMessage, offersWith } = useAppState()
   const { listing } = useListing(listingId ?? '')
   const { profile: realProfile } = useProfileByHandle(handle)
-  const fictionalSeller = sellers.find((s) => s.handle === handle)
   const messages = threadFor(handle)?.messages ?? []
   const relevantOffers = offersWith(handle)
   const offer = relevantOffers[0]
@@ -62,10 +60,10 @@ export default function Thread() {
           <ChevronLeft size={22} />
         </button>
         <Link to={`/shop/${handle}`} className="thread-seller">
-          <SellerAvatar className="thread-avatar" handle={handle} name={realProfile?.name ?? fictionalSeller?.name} />
+          <SellerAvatar className="thread-avatar" handle={handle} name={realProfile?.name} />
           <div className="thread-seller-info">
             <span className="thread-handle">@{handle}</span>
-            <span className="thread-status">Active today</span>
+            {realProfile?.name && <span className="thread-status">{realProfile.name}</span>}
           </div>
         </Link>
         <SafetyMenu targetType="thread" targetId={handle} handle={handle} label="Report or block this chat" />
