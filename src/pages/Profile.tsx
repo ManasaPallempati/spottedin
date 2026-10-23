@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Menu, Star, BarChart2, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, Menu, Star, BarChart2, SlidersHorizontal } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useListings, useMyListings } from '../lib/useListings'
 import { useAppState } from '../lib/appState'
@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Sort } from '../lib/filters'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
+import ListingPhoto from '../components/ListingPhoto'
 import './profile.css'
 
 const TABS = ['Shop', 'Sold', 'Purchases', 'Likes'] as const
@@ -45,7 +46,6 @@ export default function Profile() {
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
-  const [showPromo, setShowPromo] = useState(true)
   const [sortOpen, setSortOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [sort, setSort] = useState<Sort>('newest')
@@ -100,7 +100,7 @@ export default function Profile() {
   const sortedOrders = useMemo(() => [...orders].sort((a, b) => b.placedAt - a.placedAt), [orders])
 
   function thumbFor(listingId: string): string {
-    return knownListings.get(listingId)?.img ?? `https://picsum.photos/seed/${listingId}/200/200`
+    return knownListings.get(listingId)?.img ?? ''
   }
 
   async function handleLogout() {
@@ -206,27 +206,6 @@ export default function Profile() {
               <span>Earnings</span>
             </button>
 
-            {showPromo && (
-              <div className="profile-promo">
-                <button
-                  type="button"
-                  className="profile-promo-close"
-                  aria-label="Dismiss"
-                  onClick={() => setShowPromo(false)}
-                >
-                  <X size={16} />
-                </button>
-                <div className="profile-promo-image">
-                  <img src="https://picsum.photos/seed/spotted-flatlay/400/500" alt="" />
-                </div>
-                <div className="profile-promo-text">
-                  <p className="profile-promo-bold">Represent Spotted on Campus</p>
-                  <p>Become a Spotted Campus Manager</p>
-                  <p className="profile-promo-bold">Apply today</p>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'Shop' && (
               <>
                 <div className="profile-active-row">
@@ -287,11 +266,12 @@ export default function Profile() {
                     <div className="profile-order-row" key={order.id}>
                       <div className="profile-order-thumbs">
                         {order.items.map((item, i) => (
-                          <img
+                          <ListingPhoto
                             key={item.listingId + i}
                             className="profile-order-thumb"
                             src={thumbFor(item.listingId)}
-                            alt=""
+                            alt="Ordered item"
+                            compact
                           />
                         ))}
                       </div>

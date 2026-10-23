@@ -4,6 +4,7 @@ import { Heart } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useAppState } from '../lib/appState'
 import { listingPath } from '../lib/listingUrls'
+import ListingPhoto from './ListingPhoto'
 import './ProductCard.css'
 
 type ProductCardProps = {
@@ -23,7 +24,7 @@ export default function ProductCard({ listing }: ProductCardProps) {
   return (
     <Link to={listingPath(id, brand)} className="product-card">
       <div className="product-card-image-wrap">
-        <img src={img} alt={brand} loading="lazy" />
+        <ListingPhoto src={img} alt={brand} loading="lazy" />
         {/* Contract (Round 4): only `status === 'sold'` means sold — undefined is live. */}
         {listing.status === 'sold' && <span className="product-card-sold">Sold</span>}
         {listing.boostedUntil != null && listing.boostedUntil > Date.now() && (
