@@ -139,6 +139,18 @@ function randomDigits(len: number): string {
 const PROFILE_COLUMNS =
   'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,guardian_email,guardian_consent_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
+// The signed-in person's own row, every column. Since round 18 the private
+// columns (date of birth, guardian email, legal name…) cannot be selected from
+// profiles directly by anyone, so the own row comes from my_profile(); and an
+// INSERT/UPDATE must not ask for the row back (RETURNING needs SELECT on every
+// column), so writers call this afterwards instead. Falls back to the direct
+// read where round 18 is not applied yet (PGRST202: function not found).
+async function readOwnProfile(userId: string) {
+  const viaFunction = await supabase.rpc('my_profile').select(PROFILE_COLUMNS).maybeSingle()
+  if (viaFunction.error?.code !== 'PGRST202') return viaFunction
+  return supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
+}
+
 // Distinguishes "this person has no profile yet" from "we could not create
 // one". Both used to return null, so a failed insert rendered as the
 // signed-out view with no explanation — which is how a missing INSERT grant on
@@ -150,11 +162,7 @@ async function ensureProfile(
   meta: { handle?: string; name?: string; date_of_birth?: string },
   email: string,
 ): Promise<EnsureProfileResult> {
-  const { data: existing, error: readError } = await supabase
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .eq('id', userId)
-    .maybeSingle()
+  const { data: existing, error: readError } = await readOwnProfile(userId)
 
   if (existing) return { profile: mapProfile(existing as ProfileRow), error: null }
   if (readError) {
@@ -169,30 +177,30 @@ async function ensureProfile(
   // OAuth signup, which has no date, is an adult until they set one.
   const newRow = { id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null }
 
-  const { data: inserted, error } = await supabase
-    .from('profiles')
-    .insert(newRow)
-    .select(PROFILE_COLUMNS)
-    .single()
-
-  if (!error && inserted) return { profile: mapProfile(inserted as ProfileRow), error: null }
+  const { error } = await supabase.from('profiles').insert(newRow)
+  if (!error) return readCreatedProfile(userId)
 
   // unique-violation on handle: retry once with 2 random digits appended.
   // Spreads the same row so the retry cannot quietly drop date_of_birth — an
   // earlier version rebuilt the object by hand and did exactly that, making a
   // minor an adult purely because their first choice of handle was taken.
   if (error && error.code === '23505') {
-    const { data: retried, error: retryError } = await supabase
+    const { error: retryError } = await supabase
       .from('profiles')
       .insert({ ...newRow, handle: `${baseHandle}${randomDigits(2)}` })
-      .select(PROFILE_COLUMNS)
-      .single()
-    if (!retryError && retried) return { profile: mapProfile(retried as ProfileRow), error: null }
+    if (!retryError) return readCreatedProfile(userId)
     console.warn('[auth] profile create failed on retry:', retryError)
     return { profile: null, error: profileCreateMessage(retryError) }
   }
 
   console.warn('[auth] profile create failed:', error)
+  return { profile: null, error: profileCreateMessage(error) }
+}
+
+async function readCreatedProfile(userId: string): Promise<EnsureProfileResult> {
+  const { data, error } = await readOwnProfile(userId)
+  if (data) return { profile: mapProfile(data as ProfileRow), error: null }
+  console.warn('[auth] profile created but could not be read back:', error)
   return { profile: null, error: profileCreateMessage(error) }
 }
 
@@ -447,7 +455,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function updateProfile(edit: ProfileEdit): Promise<{ error: string | null }> {
     if (!session) return { error: 'You need to be signed in to change your profile.' }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({
         handle: edit.handle,
@@ -464,8 +472,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         guardian_email: edit.guardianEmail,
       })
       .eq('id', session.user.id)
-      .select(PROFILE_COLUMNS)
-      .single()
 
     if (error) {
       if (error.code === '23505') {
@@ -495,6 +501,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'We could not save your changes just now. Please try again.' }
     }
 
+    // Saved; re-read rather than RETURNING (see readOwnProfile).
+    const { data, error: readError } = await readOwnProfile(session.user.id)
+    if (!data) {
+      console.warn('[auth] profile saved but could not be read back:', readError)
+      return { error: null }
+    }
     setProfile(mapProfile(data as ProfileRow))
     return { error: null }
   }

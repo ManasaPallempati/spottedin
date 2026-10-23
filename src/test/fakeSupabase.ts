@@ -20,8 +20,15 @@ export type FakeSession = {
 
 export const db: Record<string, Row[]> = {}
 export const inserts: { table: string; values: unknown }[] = []
+// Every .select(columns) call, in order, so tests can check what was asked for.
+export const selects: { table: string; columns: string }[] = []
 
 let currentSession: FakeSession | null = null
+const missingRpcs = new Set<string>()
+
+export function setRpcMissing(name: string) {
+  missingRpcs.add(name)
+}
 const listeners = new Set<AuthListener>()
 
 export function makeSession(email = 'buyer@example.com', id = 'user-1'): FakeSession {
@@ -43,14 +50,23 @@ function emit(event: string) {
   for (const listener of listeners) listener(event, currentSession)
 }
 
-function query(table: string) {
-  const filters: ((row: Row) => boolean)[] = []
+function query(
+  table: string,
+  options: { filter?: (row: Row) => boolean; error?: Result['error']; source?: string } = {},
+) {
+  const filters: ((row: Row) => boolean)[] = options.filter ? [options.filter] : []
   let single = false
   let inserted: Row[] | null = null
+  let patch: Row | null = null
 
   const result = (): Result => {
+    if (options.error) return { data: null, error: options.error }
     if (inserted) return { data: single ? inserted[0] ?? null : inserted, error: null }
     const rows = (db[table] ?? []).filter((row) => filters.every((keep) => keep(row)))
+    if (patch) {
+      for (const row of rows) Object.assign(row, patch)
+      return { data: null, error: null }
+    }
     return single ? { data: rows[0] ?? null, error: null } : { data: rows, error: null, count: rows.length }
   }
 
@@ -69,8 +85,11 @@ function query(table: string) {
           if (prop === 'insert' || prop === 'upsert') {
             const values = args[0] as Row | Row[]
             inserts.push({ table, values })
-            inserted = Array.isArray(values) ? values : [values]
+            inserted = (Array.isArray(values) ? values : [values]).map((row) => ({ ...row }))
+            db[table] = [...(db[table] ?? []), ...inserted]
           }
+          if (prop === 'update') patch = args[0] as Row
+          if (prop === 'select') selects.push({ table: options.source ?? table, columns: String(args[0] ?? '*') })
           return builder
         }
       },
@@ -105,7 +124,19 @@ const auth = {
 export const supabase = {
   auth,
   from: vi.fn((table: string) => query(table)),
-  rpc: vi.fn(async () => ({ data: null, error: null })),
+  // my_profile() (round 18) returns the caller's own profile row; other
+  // functions resolve to no data. setRpcMissing simulates a project where a
+  // function is not deployed yet (PostgREST answers PGRST202).
+  rpc: vi.fn((name: string) => {
+    if (missingRpcs.has(name)) {
+      return query('__rpc__', { error: { code: 'PGRST202', message: `Could not find the function public.${name}` } })
+    }
+    if (name === 'my_profile') {
+      const uid = currentSession?.user.id
+      return query('profiles', { filter: (row) => uid !== undefined && row.id === uid, source: 'rpc:my_profile' })
+    }
+    return query('__rpc__', { filter: () => false })
+  }),
   functions: { invoke: vi.fn(async () => ({ data: null, error: null })) },
   storage: {
     from: () => ({
@@ -122,7 +153,9 @@ export const SUPABASE_CONFIG = { url: 'https://supabase.test', anonKey: 'test-an
 export function resetFakeSupabase() {
   for (const table of Object.keys(db)) delete db[table]
   inserts.length = 0
+  selects.length = 0
   listeners.clear()
+  missingRpcs.clear()
   currentSession = null
   vi.clearAllMocks()
 }
