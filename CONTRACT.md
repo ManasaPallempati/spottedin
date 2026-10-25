@@ -718,3 +718,26 @@ integration, a "large parcel" shipping tier.
 | Agent | Owns |
 |---|---|
 | single session | supabase/round7-shipping-fulfilment.sql, supabase/functions/_shared/razorpay.ts, supabase/functions/razorpay-order/index.ts, src/lib/pricing.ts, src/lib/addresses.ts, src/lib/appState.tsx, src/lib/payments.ts, src/components/AddressPicker.tsx, src/components/PriceBreakdown.tsx, src/components/checkout.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, src/pages/Bag.tsx, src/pages/bag.css, src/pages/Order.tsx, src/pages/order.css, src/pages/Profile.tsx, src/pages/profile.css, src/pages/Product.tsx (Buy now link), src/App.tsx (route), docs/launch/RAZORPAY.md, CONTRACT.md |
+
+## Round 8 — Shiprocket labels and automatic tracking (server-gated)
+
+For Razorpay-paid orders, Spotted books the courier: the seller's order page shows
+"Ship now" with a "Pickup from" address picker (one of the seller's own saved addresses,
+stored in `spotted_seller_pickup`) and "Get shipping label", which calls the
+`courier-label` Edge Function. Once booked, the page shows the courier, AWB and a
+"Download shipping label" link, and the `courier-tracking` webhook moves the order to
+shipped / delivered by itself; `orders.courier_status` shows the latest courier update to
+both sides. Demo orders, and every order while `SHIPROCKET_ENABLED` is not `true`, keep
+Round 7's manual "mark as shipped" form, which now also messages the buyer in the inbox.
+On Shiprocket-booked orders the seller's earnings exclude shipping ("Paid by Spotted").
+Setup, function steps and limits: `docs/launch/SHIPROCKET.md`.
+
+Client: `src/lib/courier.ts` (`fetchCourierEnabled`, `bookCourier`, `usePickupAddress`);
+`AddressPicker` gains `label`, `autoSelect`, `selectedId`; `Order` gains `paymentStatus`,
+`courierProvider`, `courierStatus`, `labelUrl`; app state adds `applyCourierBooking`.
+
+### File ownership — Round 8
+
+| Agent | Owns |
+|---|---|
+| single session | supabase/round8-courier-labels.sql, supabase/functions/_shared/shiprocket.ts, supabase/functions/courier-label/index.ts, supabase/functions/courier-tracking/index.ts, src/lib/courier.ts, src/lib/appState.tsx, src/components/AddressPicker.tsx, src/pages/Order.tsx, src/pages/order.css, src/pages/Bag.tsx, src/components/OfferCheckout.tsx, docs/launch/SHIPROCKET.md, CONTRACT.md |

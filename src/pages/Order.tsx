@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Copy, Check, Mail } from 'lucide-react'
+import { ChevronLeft, Copy, Check, Mail, Download } from 'lucide-react'
 import { useAppState, type Order as OrderModel } from '../lib/appState'
-import { formatAddress } from '../lib/addresses'
+import { formatAddress, type Address } from '../lib/addresses'
+import { bookCourier, CourierError, fetchCourierEnabled, usePickupAddress } from '../lib/courier'
 import { formatInr } from '../lib/pricing'
+import AddressPicker from '../components/AddressPicker'
 import './order.css'
 
 // Sellers are asked to ship within this many days of the order.
@@ -93,6 +95,7 @@ function ShipForm({ order }: { order: OrderModel }) {
   return (
     <form className="order-ship-form" onSubmit={submit} noValidate>
       <p className="order-section-title">Mark as shipped</p>
+      <p className="order-action-copy">Book any courier, then enter its name and tracking number.</p>
       <label className="order-field">
         <span>Courier</span>
         <input value={courier} maxLength={40} placeholder="e.g. Delhivery, India Post" onChange={(e) => setCourier(e.target.value)} />
@@ -111,6 +114,102 @@ function ShipForm({ order }: { order: OrderModel }) {
       </button>
     </form>
   )
+}
+
+// Paid orders when Shiprocket booking is on: Spotted books the courier and
+// the seller only prints the label. Tracking then updates on its own.
+function CourierShipping({ order }: { order: OrderModel }) {
+  const { applyCourierBooking } = useAppState()
+  const { addressId, loading, savePickup } = usePickupAddress()
+  const [pickup, setPickup] = useState<Address | null>(null)
+  const [booking, setBooking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function choosePickup(address: Address) {
+    setPickup(address)
+    if (address.id === addressId) return
+    const problem = await savePickup(address.id)
+    if (problem) setError(problem)
+  }
+
+  async function getLabel() {
+    setBooking(true)
+    setError(null)
+    try {
+      const result = await bookCourier(order.uuid)
+      applyCourierBooking(order, result)
+    } catch (err) {
+      setError(err instanceof CourierError ? err.message : "Couldn't book the courier. Try again in a minute.")
+    } finally {
+      setBooking(false)
+    }
+  }
+
+  if (order.labelUrl) {
+    return (
+      <div className="order-action">
+        <p className="order-section-title">Ship now</p>
+        <p className="order-action-copy">
+          Pack the item, stick this label on the parcel and hand it to {order.courier ?? 'the courier'} at pickup.
+          Tracking updates here automatically.
+        </p>
+        <a className="btn btn-primary order-label-btn" href={order.labelUrl} target="_blank" rel="noreferrer">
+          <Download size={18} />
+          Download shipping label
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <div className="order-action">
+      <p className="order-section-title">Ship now</p>
+      <p className="order-action-copy">
+        Spotted books the courier. Get your label, pack the item and the courier collects it from you.
+      </p>
+      {!loading && (
+        <AddressPicker
+          label="Pickup from"
+          autoSelect={false}
+          selectedId={addressId}
+          selected={pickup}
+          onSelect={choosePickup}
+        />
+      )}
+      {error && (
+        <p className="order-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="button" className="btn btn-primary" disabled={booking || !pickup} onClick={getLabel}>
+        {booking ? 'Booking courier…' : !pickup ? 'Choose a pickup address' : 'Get shipping label'}
+      </button>
+    </div>
+  )
+}
+
+function SellerShipping({ order }: { order: OrderModel }) {
+  // Demo orders were never paid, so they never get a real courier booking.
+  const eligible = order.paymentStatus === 'paid'
+  const [courierOn, setCourierOn] = useState<boolean | null>(eligible ? null : false)
+
+  useEffect(() => {
+    if (!eligible) return
+    let cancelled = false
+    fetchCourierEnabled().then((on) => {
+      if (!cancelled) setCourierOn(on)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [eligible])
+
+  if (courierOn === null) return null
+  return courierOn || order.courierProvider === 'shiprocket' ? <CourierShipping order={order} /> : <ShipForm order={order} />
+}
+
+function courierStatusLabel(status: string): string {
+  return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
 export default function Order() {
@@ -167,6 +266,9 @@ export default function Order() {
   const { title, detail } = statusCopy(order, isSeller)
   const paidTotal = order.totalInr + order.shippingInr + order.buyerFeeInr
   const peerHandle = isSeller ? order.buyerHandle : order.sellerHandle
+  // When Spotted books the courier it pays for shipping out of the buyer's
+  // shipping charge; otherwise the seller ships and keeps that charge.
+  const sellerShipping = order.courierProvider === 'shiprocket' ? 0 : order.shippingInr
 
   return (
     <div className="order-page">
@@ -187,6 +289,9 @@ export default function Order() {
         <div className="order-status-card">
           <p className="order-status-title">{title}</p>
           <p className="order-status-detail">{detail}</p>
+          {order.courierStatus && order.status !== 'delivered' && (
+            <p className="order-status-detail">Latest update: {courierStatusLabel(order.courierStatus)}</p>
+          )}
           {order.status !== 'cancelled' && (
             <>
               <div
@@ -210,7 +315,7 @@ export default function Order() {
 
         {order.trackingNumber && <TrackingNumber courier={order.courier} number={order.trackingNumber} />}
 
-        {isSeller && order.status === 'paid' && <ShipForm order={order} />}
+        {isSeller && order.status === 'paid' && <SellerShipping order={order} />}
 
         {!isSeller && order.status === 'shipped' && (
           <div className="order-action">
@@ -243,7 +348,11 @@ export default function Order() {
           </div>
           <div className="order-receipt-row">
             <span>Shipping</span>
-            <span>{formatInr(order.shippingInr)}</span>
+            <span>
+              {isSeller && order.courierProvider === 'shiprocket'
+                ? 'Paid by Spotted'
+                : formatInr(order.shippingInr)}
+            </span>
           </div>
           {!isSeller && (
             <div className="order-receipt-row">
@@ -253,7 +362,7 @@ export default function Order() {
           )}
           <div className="order-receipt-row order-receipt-total">
             <span>{isSeller ? 'You receive' : 'Total'}</span>
-            <span>{formatInr(isSeller ? order.totalInr + order.shippingInr : paidTotal)}</span>
+            <span>{formatInr(isSeller ? order.totalInr + sellerShipping : paidTotal)}</span>
           </div>
           <p className="order-receipt-meta">
             Order {order.id} · placed {formatDate(order.placedAt)}

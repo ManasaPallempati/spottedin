@@ -6,6 +6,12 @@ import './checkout.css'
 type AddressPickerProps = {
   selected: Address | null
   onSelect: (address: Address) => void
+  label?: string
+  // Pick the most recent saved address automatically (checkout). Off where
+  // choosing is a deliberate save, like a seller's pickup address.
+  autoSelect?: boolean
+  // Resolve a saved address id (e.g. a stored pickup address) to its row.
+  selectedId?: string | null
 }
 
 const FIELDS: { key: keyof AddressDraft; label: string; inputMode?: 'numeric' | 'tel'; optional?: boolean }[] = [
@@ -20,7 +26,13 @@ const FIELDS: { key: keyof AddressDraft; label: string; inputMode?: 'numeric' | 
 
 // "Ships to" row for the checkout sheets. Collapsed it shows the chosen
 // address; expanded it lists saved addresses and an inline form to add one.
-export default function AddressPicker({ selected, onSelect }: AddressPickerProps) {
+export default function AddressPicker({
+  selected,
+  onSelect,
+  label = 'Ships to',
+  autoSelect = true,
+  selectedId = null,
+}: AddressPickerProps) {
   const { addresses, loading, addAddress } = useAddresses()
   const [expanded, setExpanded] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -28,10 +40,13 @@ export default function AddressPicker({ selected, onSelect }: AddressPickerProps
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // Preselect the most recent saved address once they load.
+  // Preselect the stored address, or the most recent one, once they load.
   useEffect(() => {
-    if (!selected && addresses.length > 0) onSelect(addresses[0])
-  }, [addresses, selected, onSelect])
+    if (selected || addresses.length === 0) return
+    const stored = selectedId ? addresses.find((a) => a.id === selectedId) : undefined
+    if (stored) onSelect(stored)
+    else if (autoSelect) onSelect(addresses[0])
+  }, [addresses, selected, selectedId, autoSelect, onSelect])
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -66,9 +81,15 @@ export default function AddressPicker({ selected, onSelect }: AddressPickerProps
         onClick={() => setExpanded((v) => !v)}
       >
         <span className="checkout-row-text">
-          <span className="checkout-row-label">Ships to</span>
+          <span className="checkout-row-label">{label}</span>
           <span className={'checkout-row-value' + (selected ? '' : ' checkout-row-value-strong')}>
-            {loading ? 'Loading addresses…' : selected ? `${selected.name}, ${formatAddress(selected)}` : 'Add new address'}
+            {loading
+              ? 'Loading addresses…'
+              : selected
+                ? `${selected.name}, ${formatAddress(selected)}`
+                : addresses.length > 0
+                  ? 'Choose an address'
+                  : 'Add new address'}
           </span>
         </span>
         {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -80,7 +101,7 @@ export default function AddressPicker({ selected, onSelect }: AddressPickerProps
             <label key={a.id} className="checkout-address-option">
               <input
                 type="radio"
-                name="ship-to"
+                name={label}
                 checked={selected?.id === a.id}
                 onChange={() => {
                   onSelect(a)

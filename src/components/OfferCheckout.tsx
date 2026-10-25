@@ -90,6 +90,10 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
         deliveredAt: null,
         buyerHandle: null,
         sellerHandle: offer.peerHandle,
+        paymentStatus: 'paid',
+        courierProvider: null,
+        courierStatus: null,
+        labelUrl: null,
       }
       applyPaidOrder(order)
       sendMessage(

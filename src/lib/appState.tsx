@@ -26,6 +26,12 @@ export type Order = {
   deliveredAt: number | null
   buyerHandle: string | null
   sellerHandle: string | null
+  // 'paid' only for Razorpay-paid orders; demo orders are 'demo'.
+  paymentStatus: 'demo' | 'paid' | 'refunded'
+  // Set once Shiprocket has booked the parcel; tracking then updates on its own.
+  courierProvider: 'shiprocket' | null
+  courierStatus: string | null
+  labelUrl: string | null
 }
 // What the checkout sheets pass alongside the items when placing an order.
 export type CheckoutDetails = {
@@ -80,6 +86,7 @@ export type AppStateContextValue = AppState & {
   applyPaidOrder: (order: Order) => void
   markShipped: (order: Order, courier: string, trackingNumber: string) => Promise<string | null>
   markReceived: (order: Order) => Promise<string | null>
+  applyCourierBooking: (order: Order, booking: { courier: string | null; trackingNumber: string | null; labelUrl: string }) => void
   sendMessage: (handle: string, text: string) => void
   makeOffer: (listing: Listing, amountInr: number) => void
   respondToOffer: (offer: Offer, action: 'accept' | 'decline') => void
@@ -146,6 +153,10 @@ type OrderRow = {
   tracking_number: string | null
   shipped_at: string | null
   delivered_at: string | null
+  payment_status: 'demo' | 'paid' | 'refunded' | null
+  courier_provider: 'shiprocket' | null
+  courier_status: string | null
+  label_url: string | null
   buyer: { handle: string } | { handle: string }[] | null
   seller: { handle: string } | { handle: string }[] | null
   order_items: OrderItemRow[] | null
@@ -154,7 +165,7 @@ type OrderRow = {
 // Orders RLS returns both the caller's purchases and orders for listings the
 // caller sells (orders_select_seller), so one query feeds both lists.
 const ORDER_COLUMNS =
-  'id, buyer_id, code, total_inr, placed_at, ship_to, shipping_inr, buyer_fee_inr, status, courier, tracking_number, shipped_at, delivered_at, buyer:profiles!orders_buyer_id_fkey(handle), seller:profiles!orders_seller_id_fkey(handle), order_items(listing_id, price_inr, title, img, size)'
+  'id, buyer_id, code, total_inr, placed_at, ship_to, shipping_inr, buyer_fee_inr, status, courier, tracking_number, shipped_at, delivered_at, payment_status, courier_provider, courier_status, label_url, buyer:profiles!orders_buyer_id_fkey(handle), seller:profiles!orders_seller_id_fkey(handle), order_items(listing_id, price_inr, title, img, size)'
 
 function mapOrder(r: OrderRow): Order {
   const buyer = Array.isArray(r.buyer) ? r.buyer[0] : r.buyer
@@ -181,6 +192,10 @@ function mapOrder(r: OrderRow): Order {
     deliveredAt: r.delivered_at ? toMillis(r.delivered_at) : null,
     buyerHandle: buyer?.handle ?? null,
     sellerHandle: seller?.handle ?? null,
+    paymentStatus: r.payment_status ?? 'demo',
+    courierProvider: r.courier_provider,
+    courierStatus: r.courier_status,
+    labelUrl: r.label_url,
   }
 }
 type MessageRow = { id: string; sender_id: string | null; body: string; created_at: string }
@@ -422,6 +437,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       deliveredAt: null,
       buyerHandle: null,
       sellerHandle: details.sellerHandle,
+      paymentStatus: 'demo',
+      courierProvider: null,
+      courierStatus: null,
+      labelUrl: null,
     }
     const ids = items.map((i) => i.listingId)
 
@@ -510,7 +529,36 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         o.uuid === order.uuid ? { ...o, status: 'shipped', courier, trackingNumber, shippedAt } : o
       ),
     }))
+    if (order.buyerHandle) {
+      sendMessage(
+        order.buyerHandle,
+        `Your order ${order.id} has shipped with ${courier}. Tracking number: ${trackingNumber}`
+      )
+    }
     return null
+  }
+
+  // Registers a Shiprocket booking the courier-label Edge Function already
+  // stored server-side — local state only.
+  function applyCourierBooking(
+    order: Order,
+    booking: { courier: string | null; trackingNumber: string | null; labelUrl: string }
+  ) {
+    setState((prev) => ({
+      ...prev,
+      sales: prev.sales.map((o) =>
+        o.uuid === order.uuid
+          ? {
+              ...o,
+              courierProvider: 'shiprocket',
+              courier: booking.courier,
+              trackingNumber: booking.trackingNumber,
+              labelUrl: booking.labelUrl,
+              courierStatus: o.courierStatus ?? 'AWB ASSIGNED',
+            }
+          : o
+      ),
+    }))
   }
 
   // Buyer: shipped -> delivered.
@@ -683,6 +731,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     applyPaidOrder,
     markShipped,
     markReceived,
+    applyCourierBooking,
     sendMessage,
     makeOffer,
     respondToOffer,

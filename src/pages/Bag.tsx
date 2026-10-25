@@ -181,6 +181,10 @@ export default function Bag() {
         deliveredAt: null,
         buyerHandle: null,
         sellerHandle: activeGroup?.seller.handle ?? null,
+        paymentStatus: 'paid',
+        courierProvider: null,
+        courierStatus: null,
+        labelUrl: null,
       }
       applyPaidOrder(order)
       setPlacedLive(true)

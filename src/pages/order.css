@@ -227,3 +227,16 @@
   border: 1px solid var(--hairline);
   font-weight: 700;
 }
+
+.order-label-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.order-action .checkout-ships-to {
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--bg);
+}
