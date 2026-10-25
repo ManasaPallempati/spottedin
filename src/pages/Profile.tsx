@@ -41,7 +41,7 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, signOut } = useAuth()
+  const { isAuthed, profile, signOut, hasPassword } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
@@ -317,6 +317,11 @@ export default function Profile() {
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)}>
         <div className="profile-sort-list">
+          {isAuthed && (
+            <Link to="/account/password" className="profile-sort-option" onClick={() => setMenuOpen(false)}>
+              {hasPassword ? 'Change password' : 'Set password'}
+            </Link>
+          )}
           <button type="button" className="profile-sort-option" onClick={handleLogout}>
             Log out
           </button>
