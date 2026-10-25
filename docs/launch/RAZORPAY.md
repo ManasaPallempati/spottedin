@@ -18,10 +18,13 @@ Functions:
     The client calls this when a checkout sheet opens; anything but an
     explicit `enabled: true` leaves the UI in demo mode.
   - `create` — recomputes the amount **server-side from DB rows** (listing
-    `price_inr`, or the accepted offer's `amount_inr`, + flat ₹49 shipping),
-    inserts a `payments` row, and creates the Razorpay order
+    `price_inr`, or the accepted offer's `amount_inr`, + flat ₹79 shipping +
+    buyer protection fee), snapshots the buyer's saved address (`addressId`,
+    must belong to the caller), inserts a `payments` row, and creates the
+    Razorpay order
     (amount in **paise** = INR × 100). Client-supplied prices are never
-    trusted. Mock/demo listings have no DB row and are rejected.
+    trusted. Mock/demo listings have no DB row and are rejected. A bag
+    payment must contain one seller's listings only (one parcel per order).
   - `verify` — checks the Razorpay checkout HMAC-SHA256 signature
     (`order_id|payment_id`, constant-time compare), then finalizes: inserts
     `orders`/`order_items` (with `payment_status='paid'`), clears the bought
@@ -39,17 +42,23 @@ Client-forged paid orders are impossible at the database layer:
 `orders.payment_status`/`payment_id` have **no insert/update grant** for
 `authenticated` (see `supabase/round6-razorpay-checkout.sql`) — only the
 service role (Edge Functions) can write them. The demo path keeps inserting
-`(id, buyer_id, code, total_inr)` and lands on the `'demo'` default.
+`(id, buyer_id, code, total_inr)` plus Round 7's `(seller_id, ship_to,
+shipping_inr, buyer_fee_inr)` and lands on the `'demo'` default. Order
+`status`, courier and tracking move only through the `mark_order_shipped` /
+`mark_order_received` functions (`supabase/round7-shipping-fulfilment.sql`).
 
 Amount conventions: `orders.total_inr` stays **item-price-only** (existing app
-convention); the actual charge (`payments.charged_inr`) is items + ₹49
-shipping, matching the total shown in both checkout sheets. `SHIPPING_INR = 49`
-is defined in `Bag.tsx`, `OfferCheckout.tsx`, and
-`supabase/functions/_shared/razorpay.ts` — change all three together.
+convention); the actual charge (`payments.charged_inr`) is items + ₹79
+shipping + buyer fee (8%, minimum ₹29), stored separately as
+`shipping_inr` / `buyer_fee_inr` on both `payments` and `orders`, matching the
+total shown in both checkout sheets. The pricing constants live in
+`src/lib/pricing.ts` and `supabase/functions/_shared/razorpay.ts` — change
+both together.
 
 ## Activation prerequisites (human, in order — none performed by agents)
 
-1. Run `supabase/round6-razorpay-checkout.sql` in the Supabase SQL editor.
+1. Run `supabase/round6-razorpay-checkout.sql`, then
+   `supabase/round7-shipping-fulfilment.sql`, in the Supabase SQL editor.
 2. Deploy the functions (Supabase CLI, logged into project `masdygvcssrtwseopfmj`):
    ```
    supabase functions deploy razorpay-order

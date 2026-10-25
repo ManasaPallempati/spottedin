@@ -6,8 +6,35 @@ import type { Listing } from '../data/listings'
 import { sellerFor } from '../data/sellers'
 
 export type BagItem = { listingId: string; addedAt: number }
-export type OrderItem = { listingId: string; priceInr: number }
-export type Order = { id: string; uuid: string; items: OrderItem[]; totalInr: number; placedAt: number }
+export type OrderItem = { listingId: string; priceInr: number; title?: string; img?: string; size?: string }
+export type OrderStatus = 'paid' | 'shipped' | 'delivered' | 'cancelled'
+export type ShipTo = { name: string; phone: string; line1: string; line2: string; city: string; state: string; pincode: string }
+// totalInr is item prices only; the buyer paid totalInr + shippingInr + buyerFeeInr.
+export type Order = {
+  id: string
+  uuid: string
+  items: OrderItem[]
+  totalInr: number
+  placedAt: number
+  shippingInr: number
+  buyerFeeInr: number
+  shipTo: ShipTo | null
+  status: OrderStatus
+  courier: string | null
+  trackingNumber: string | null
+  shippedAt: number | null
+  deliveredAt: number | null
+  buyerHandle: string | null
+  sellerHandle: string | null
+}
+// What the checkout sheets pass alongside the items when placing an order.
+export type CheckoutDetails = {
+  shipTo: ShipTo
+  shippingInr: number
+  buyerFeeInr: number
+  sellerId: string | null
+  sellerHandle: string | null
+}
 export type ThreadMessage = { id: string; from: 'me' | 'them'; text: string; at: number }
 export type ThreadView = { id: string; handle: string; peerIsReal: boolean; messages: ThreadMessage[] }
 export type OfferStatus = 'pending' | 'accepted' | 'declined'
@@ -26,6 +53,8 @@ export type AppState = {
   bag: BagItem[]
   follows: string[]
   orders: Order[]
+  // Orders other people placed for this user's listings.
+  sales: Order[]
   offers: Offer[]
   threads: ThreadView[]
 }
@@ -43,8 +72,14 @@ export type AppStateContextValue = AppState & {
   unfollow: (handle: string) => void
   isFollowing: (handle: string) => boolean
   hasPurchased: (listingId: string) => boolean
-  placeOrder: (items: OrderItem[], snapshots: Record<string, { title: string; img: string; size: string }>) => Order | null
+  placeOrder: (
+    items: OrderItem[],
+    snapshots: Record<string, { title: string; img: string; size: string }>,
+    details: CheckoutDetails
+  ) => Order | null
   applyPaidOrder: (order: Order) => void
+  markShipped: (order: Order, courier: string, trackingNumber: string) => Promise<string | null>
+  markReceived: (order: Order) => Promise<string | null>
   sendMessage: (handle: string, text: string) => void
   makeOffer: (listing: Listing, amountInr: number) => void
   respondToOffer: (offer: Offer, action: 'accept' | 'decline') => void
@@ -57,6 +92,7 @@ const EMPTY_STATE: AppState = {
   bag: [],
   follows: [],
   orders: [],
+  sales: [],
   offers: [],
   threads: [],
 }
@@ -95,8 +131,58 @@ type OfferRow = {
   seller_handle: string
   buyer: { handle: string } | { handle: string }[] | null
 }
-type OrderItemRow = { listing_id: string; price_inr: number }
-type OrderRow = { id: string; code: string; total_inr: number; placed_at: string; order_items: OrderItemRow[] | null }
+type OrderItemRow = { listing_id: string; price_inr: number; title: string | null; img: string | null; size: string | null }
+type OrderRow = {
+  id: string
+  buyer_id: string
+  code: string
+  total_inr: number
+  placed_at: string
+  ship_to: ShipTo | null
+  shipping_inr: number | null
+  buyer_fee_inr: number | null
+  status: OrderStatus | null
+  courier: string | null
+  tracking_number: string | null
+  shipped_at: string | null
+  delivered_at: string | null
+  buyer: { handle: string } | { handle: string }[] | null
+  seller: { handle: string } | { handle: string }[] | null
+  order_items: OrderItemRow[] | null
+}
+
+// Orders RLS returns both the caller's purchases and orders for listings the
+// caller sells (orders_select_seller), so one query feeds both lists.
+const ORDER_COLUMNS =
+  'id, buyer_id, code, total_inr, placed_at, ship_to, shipping_inr, buyer_fee_inr, status, courier, tracking_number, shipped_at, delivered_at, buyer:profiles!orders_buyer_id_fkey(handle), seller:profiles!orders_seller_id_fkey(handle), order_items(listing_id, price_inr, title, img, size)'
+
+function mapOrder(r: OrderRow): Order {
+  const buyer = Array.isArray(r.buyer) ? r.buyer[0] : r.buyer
+  const seller = Array.isArray(r.seller) ? r.seller[0] : r.seller
+  return {
+    id: r.code,
+    uuid: r.id,
+    items: (r.order_items ?? []).map((it) => ({
+      listingId: it.listing_id,
+      priceInr: it.price_inr,
+      title: it.title ?? undefined,
+      img: it.img ?? undefined,
+      size: it.size ?? undefined,
+    })),
+    totalInr: r.total_inr,
+    placedAt: toMillis(r.placed_at),
+    shippingInr: r.shipping_inr ?? 0,
+    buyerFeeInr: r.buyer_fee_inr ?? 0,
+    shipTo: r.ship_to,
+    status: r.status ?? 'paid',
+    courier: r.courier,
+    trackingNumber: r.tracking_number,
+    shippedAt: r.shipped_at ? toMillis(r.shipped_at) : null,
+    deliveredAt: r.delivered_at ? toMillis(r.delivered_at) : null,
+    buyerHandle: buyer?.handle ?? null,
+    sellerHandle: seller?.handle ?? null,
+  }
+}
 type MessageRow = { id: string; sender_id: string | null; body: string; created_at: string }
 type ThreadRow = {
   id: string
@@ -142,10 +228,7 @@ async function hydrateAll(uid: string): Promise<AppState> {
     supabase.from('likes').select('listing_id').eq('user_id', uid),
     supabase.from('bag_items').select('listing_id, added_at').eq('user_id', uid),
     supabase.from('follows').select('followee_handle').eq('user_id', uid),
-    supabase
-      .from('orders')
-      .select('id, code, total_inr, placed_at, order_items(listing_id, price_inr)')
-      .eq('buyer_id', uid),
+    supabase.from('orders').select(ORDER_COLUMNS),
     supabase
       .from('threads')
       .select('id, owner_id, peer_id, peer_handle, owner:profiles!threads_owner_id_fkey(handle), messages:spotted_messages(id, sender_id, body, created_at)')
@@ -161,19 +244,16 @@ async function hydrateAll(uid: string): Promise<AppState> {
   const likedIds = ((likesRes.data ?? []) as LikeRow[]).map((r) => r.listing_id)
   const bag = ((bagRes.data ?? []) as BagRow[]).map((r) => ({ listingId: r.listing_id, addedAt: toMillis(r.added_at) }))
   const follows = ((followsRes.data ?? []) as FollowRow[]).map((r) => r.followee_handle)
-  const orders = ((ordersRes.data ?? []) as OrderRow[]).map((r) => ({
-    id: r.code,
-    uuid: r.id,
-    items: (r.order_items ?? []).map((it) => ({ listingId: it.listing_id, priceInr: it.price_inr })),
-    totalInr: r.total_inr,
-    placedAt: toMillis(r.placed_at),
-  }))
+  if (ordersRes.error) console.warn(ordersRes.error)
+  const orderRows = (ordersRes.data ?? []) as OrderRow[]
+  const orders = orderRows.filter((r) => r.buyer_id === uid).map(mapOrder)
+  const sales = orderRows.filter((r) => r.buyer_id !== uid).map(mapOrder)
   const offers = ((offersRes.data ?? []) as OfferRow[])
     .map((r) => mapOffer(r, uid))
     .sort((a, b) => b.at - a.at)
   const threads = ((threadsRes.data ?? []) as ThreadRow[]).map((r) => mapThread(r, uid))
 
-  return { likedIds, bag, follows, orders, offers, threads }
+  return { likedIds, bag, follows, orders, sales, offers, threads }
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null)
@@ -318,14 +398,31 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   function placeOrder(
     items: OrderItem[],
-    snapshots: Record<string, { title: string; img: string; size: string }>
+    snapshots: Record<string, { title: string; img: string; size: string }>,
+    details: CheckoutDetails
   ): Order | null {
     if (!requireAuth()) return null
     const uid = session!.user.id
     const uuid = crypto.randomUUID()
     const code = 'SP-' + randomAlphaNum(6)
     const totalInr = items.reduce((sum, i) => sum + i.priceInr, 0)
-    const order: Order = { id: code, uuid, items, totalInr, placedAt: Date.now() }
+    const order: Order = {
+      id: code,
+      uuid,
+      items: items.map((item) => ({ ...item, ...snapshots[item.listingId] })),
+      totalInr,
+      placedAt: Date.now(),
+      shippingInr: details.shippingInr,
+      buyerFeeInr: details.buyerFeeInr,
+      shipTo: details.shipTo,
+      status: 'paid',
+      courier: null,
+      trackingNumber: null,
+      shippedAt: null,
+      deliveredAt: null,
+      buyerHandle: null,
+      sellerHandle: details.sellerHandle,
+    }
     const ids = items.map((i) => i.listingId)
 
     setState((prev) => ({
@@ -337,7 +434,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const { error: orderError } = await supabase
         .from('orders')
-        .insert({ id: uuid, buyer_id: uid, code, total_inr: totalInr })
+        .insert({
+          id: uuid,
+          buyer_id: uid,
+          code,
+          total_inr: totalInr,
+          seller_id: details.sellerId,
+          ship_to: details.shipTo,
+          shipping_inr: details.shippingInr,
+          buyer_fee_inr: details.buyerFeeInr,
+        })
       if (orderError) {
         console.warn(orderError)
         return
@@ -384,6 +490,42 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       orders: [...prev.orders, order],
       bag: prev.bag.filter((b) => !ids.includes(b.listingId)),
     }))
+  }
+
+  // Seller: paid -> shipped. Server checks the caller sold a listing in the order.
+  async function markShipped(order: Order, courier: string, trackingNumber: string): Promise<string | null> {
+    const { error } = await supabase.rpc('mark_order_shipped', {
+      p_order_id: order.uuid,
+      p_courier: courier,
+      p_tracking: trackingNumber,
+    })
+    if (error) {
+      console.warn(error)
+      return 'Could not mark this order as shipped. Check the details and try again.'
+    }
+    const shippedAt = Date.now()
+    setState((prev) => ({
+      ...prev,
+      sales: prev.sales.map((o) =>
+        o.uuid === order.uuid ? { ...o, status: 'shipped', courier, trackingNumber, shippedAt } : o
+      ),
+    }))
+    return null
+  }
+
+  // Buyer: shipped -> delivered.
+  async function markReceived(order: Order): Promise<string | null> {
+    const { error } = await supabase.rpc('mark_order_received', { p_order_id: order.uuid })
+    if (error) {
+      console.warn(error)
+      return 'Could not update this order. Try again.'
+    }
+    const deliveredAt = Date.now()
+    setState((prev) => ({
+      ...prev,
+      orders: prev.orders.map((o) => (o.uuid === order.uuid ? { ...o, status: 'delivered', deliveredAt } : o)),
+    }))
+    return null
   }
 
   function hasPurchased(listingId: string): boolean {
@@ -539,6 +681,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     hasPurchased,
     placeOrder,
     applyPaidOrder,
+    markShipped,
+    markReceived,
     sendMessage,
     makeOffer,
     respondToOffer,

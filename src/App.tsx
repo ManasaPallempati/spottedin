@@ -17,6 +17,7 @@ import Shop from './pages/Shop'
 import Search from './pages/Search'
 import Likes from './pages/Likes'
 import Bag from './pages/Bag'
+import Order from './pages/Order'
 import Thread from './pages/Thread'
 import Sizes from './pages/onboarding/Sizes'
 import Brands from './pages/onboarding/Brands'
@@ -116,6 +117,7 @@ function AppShell() {
         <Route path="/category/:slug" element={<Category />} />
         <Route path="/likes" element={<Likes />} />
         <Route path="/bag" element={<Bag />} />
+        <Route path="/order/:uuid" element={<Order />} />
         <Route path="/inbox/t/:handle" element={<Thread />} />
         <Route path="/onboarding/sizes" element={<Sizes />} />
         <Route path="/onboarding/brands" element={<Brands />} />

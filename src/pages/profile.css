@@ -388,3 +388,23 @@
 .profile-empty-btn {
   margin-top: 12px;
 }
+
+/* Round 7 — order rows link to the order page; sales list on the Sold tab */
+a.profile-order-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+.profile-order-status {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.profile-sales {
+  margin-bottom: 20px;
+}
+
+.profile-sales-title {
+  font-size: 16px;
+  font-weight: 700;
+}

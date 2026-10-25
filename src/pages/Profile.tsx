@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Menu, Star, BarChart2, SlidersHorizontal, X } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useListings, useMyListings } from '../lib/useListings'
-import { useAppState } from '../lib/appState'
+import { useAppState, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Sort } from '../lib/filters'
@@ -33,6 +33,13 @@ function formatOrderDate(placedAt: number) {
   })
 }
 
+const STATUS_LABEL: Record<Order['status'], string> = {
+  paid: 'Purchased',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+}
+
 function initialsFor(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return ''
@@ -51,7 +58,7 @@ export default function Profile() {
   const [sort, setSort] = useState<Sort>('newest')
   const [followerCount, setFollowerCount] = useState(0)
 
-  const { follows, orders, likedIds } = useAppState()
+  const { follows, orders, sales, likedIds } = useAppState()
   const { listings: liveListings } = useListings()
   const { listings: myLiveListings } = useMyListings('live')
   const { listings: mySoldListings } = useMyListings('sold')
@@ -98,9 +105,35 @@ export default function Profile() {
   )
 
   const sortedOrders = useMemo(() => [...orders].sort((a, b) => b.placedAt - a.placedAt), [orders])
+  // Orders waiting to ship first, then newest.
+  const sortedSales = useMemo(
+    () =>
+      [...sales].sort((a, b) => Number(b.status === 'paid') - Number(a.status === 'paid') || b.placedAt - a.placedAt),
+    [sales]
+  )
+  const toShipCount = sales.filter((o) => o.status === 'paid').length
 
-  function thumbFor(listingId: string): string {
-    return knownListings.get(listingId)?.img ?? `https://picsum.photos/seed/${listingId}/200/200`
+  function thumbFor(item: Order['items'][number]): string {
+    return item.img ?? knownListings.get(item.listingId)?.img ?? `https://picsum.photos/seed/${item.listingId}/200/200`
+  }
+
+  function orderRow(order: Order, label: string) {
+    return (
+      <Link to={`/order/${order.uuid}`} className="profile-order-row" key={order.uuid}>
+        <div className="profile-order-thumbs">
+          {order.items.map((item, i) => (
+            <img key={item.listingId + i} className="profile-order-thumb" src={thumbFor(item)} alt="" />
+          ))}
+        </div>
+        <div className="profile-order-details">
+          <p className="profile-order-date">{formatOrderDate(order.placedAt)}</p>
+          <p className="profile-order-count">
+            {order.items.length} item{order.items.length === 1 ? '' : 's'} · <span className="profile-order-status">{label}</span>
+          </p>
+        </div>
+        <p className="profile-order-total">{formatInr(order.totalInr)}</p>
+      </Link>
+    )
   }
 
   async function handleLogout() {
@@ -235,6 +268,17 @@ export default function Profile() {
               </>
             )}
 
+            {activeTab === 'Sold' && sortedSales.length > 0 && (
+              <div className="profile-orders profile-sales">
+                <p className="profile-sales-title">
+                  Orders{toShipCount > 0 ? ` · ${toShipCount} to ship` : ''}
+                </p>
+                {sortedSales.map((order) =>
+                  orderRow(order, order.status === 'paid' ? 'To ship' : STATUS_LABEL[order.status])
+                )}
+              </div>
+            )}
+
             {activeTab === 'Sold' && (
               <div className="profile-grid">
                 {mySoldListings.map((listing) => (
@@ -255,27 +299,7 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="profile-orders">
-                  {sortedOrders.map((order) => (
-                    <div className="profile-order-row" key={order.id}>
-                      <div className="profile-order-thumbs">
-                        {order.items.map((item, i) => (
-                          <img
-                            key={item.listingId + i}
-                            className="profile-order-thumb"
-                            src={thumbFor(item.listingId)}
-                            alt=""
-                          />
-                        ))}
-                      </div>
-                      <div className="profile-order-details">
-                        <p className="profile-order-date">{formatOrderDate(order.placedAt)}</p>
-                        <p className="profile-order-count">
-                          {order.items.length} item{order.items.length === 1 ? '' : 's'}
-                        </p>
-                      </div>
-                      <p className="profile-order-total">{formatInr(order.totalInr)}</p>
-                    </div>
-                  ))}
+                  {sortedOrders.map((order) => orderRow(order, STATUS_LABEL[order.status]))}
                 </div>
               ))}
 

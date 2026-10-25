@@ -112,3 +112,8 @@
   gap: 10px;
   width: 100%;
 }
+
+.offer-checkout-divider {
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+}

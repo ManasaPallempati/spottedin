@@ -669,3 +669,52 @@ shipping (`payments.charged_inr`), matching the displayed Total.
 | Agent | Owns |
 |---|---|
 | payments | supabase/round6-razorpay-checkout.sql, supabase/functions/*, src/lib/payments.ts, src/lib/appState.tsx (`applyPaidOrder` only), src/pages/Bag.tsx, src/pages/bag.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, docs/launch/RAZORPAY.md, CONTRACT.md |
+
+## Round 7 — per-seller checkout, saved addresses, buyer fee, order tracking
+
+Supersedes Round 6's ₹49 shipping and the hardcoded checkout address. Demo checkout is still
+the default (DEMO badge and "no payment was taken" copy unchanged); the Razorpay path stays
+behind the same server gate.
+
+Pricing (`src/lib/pricing.ts`, mirrored in `supabase/functions/_shared/razorpay.ts`): sellers
+pay nothing. Each seller order is charged item total + flat `SHIPPING_INR = 79` + buyer
+protection fee `max(29, round(itemTotal × 0.08))`, fee GST-inclusive. `orders.total_inr` stays
+item-price-only; `orders.shipping_inr` / `orders.buyer_fee_inr` hold the rest.
+
+Checkout is per seller: the Bag groups items by seller, each group has its own subtotal,
+"+ ₹79 shipping" and Checkout button, and one checkout = one order = one parcel.
+`/bag?checkout=<listingId>` (Buy now) opens that listing's seller group; legacy
+`?checkout=1` opens the most recently added item's group. Sold items show a SOLD overlay and
+are excluded from the charge. The checkout sheet (Bag and OfferCheckout) shows the items,
+a one-line Total that expands into a receipt (`PriceBreakdown`), a "Ships to" row
+(`AddressPicker`: saved addresses + inline add form, validated against the table's checks),
+and the payment row. Placing an order needs an address.
+
+`supabase/round7-shipping-fulfilment.sql`: `spotted_addresses` (own-row select/insert/delete),
+orders gains `seller_id`, `ship_to` (address snapshot), `shipping_inr`, `buyer_fee_inr`,
+`status` (`paid` → `shipped` → `delivered`, or `cancelled`), `courier`, `tracking_number`,
+`shipped_at`, `delivered_at`. Clients may insert only the charge/snapshot columns; status
+and tracking change only via security-definer `mark_order_shipped(order, courier, tracking)`
+(caller must have sold a listing in the order, order must be `paid`) and
+`mark_order_received(order)` (caller is the buyer, order must be `shipped`). Sellers read
+their sales through `orders_select_seller` / `order_items_select_seller`, both keyed on
+`is_order_seller()` (listings.seller_id, never the client-written orders.seller_id).
+`payments` gains the same charge/snapshot columns; `razorpay-order` requires `addressId`,
+rejects multi-seller bags, and finalization copies them onto the order.
+
+App state: `Order` carries the charges, `shipTo`, `status`, tracking fields and both handles;
+`sales: Order[]` lists orders for the user's listings; `placeOrder(items, snapshots, details)`
+takes `{ shipTo, shippingInr, buyerFeeInr, sellerId, sellerHandle }`; `markShipped` and
+`markReceived` call the RPCs. `/order/:uuid` shows the Purchased → Shipped → Delivered
+tracker, tracking number (copy), seller ship form, buyer "I've received it", address,
+receipt (buyer) or earnings (seller) and a message link. Profile: Purchases rows link to the
+order page with their status; the Sold tab lists sales, "to ship" first.
+
+Not in this round: seller payouts / Razorpay Route, disputes and refunds, courier label
+integration, a "large parcel" shipping tier.
+
+### File ownership — Round 7
+
+| Agent | Owns |
+|---|---|
+| single session | supabase/round7-shipping-fulfilment.sql, supabase/functions/_shared/razorpay.ts, supabase/functions/razorpay-order/index.ts, src/lib/pricing.ts, src/lib/addresses.ts, src/lib/appState.tsx, src/lib/payments.ts, src/components/AddressPicker.tsx, src/components/PriceBreakdown.tsx, src/components/checkout.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, src/pages/Bag.tsx, src/pages/bag.css, src/pages/Order.tsx, src/pages/order.css, src/pages/Profile.tsx, src/pages/profile.css, src/pages/Product.tsx (Buy now link), src/App.tsx (route), docs/launch/RAZORPAY.md, CONTRACT.md |

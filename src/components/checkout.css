@@ -1,0 +1,178 @@
+/* Shared checkout pieces: Ships-to picker and price breakdown (Round 7) */
+
+.checkout-row-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.checkout-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.checkout-row-label {
+  font-size: 15px;
+}
+
+.checkout-row-value {
+  font-size: 14px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkout-row-value-strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.checkout-total-line {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* --- address panel --- */
+
+.checkout-address-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.checkout-address-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.checkout-address-option input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.checkout-address-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.checkout-address-line {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.checkout-add-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.checkout-address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkout-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.checkout-field input {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.checkout-address-form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.checkout-error {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* --- receipt --- */
+
+.checkout-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--hairline);
+}
+
+.checkout-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.checkout-receipt-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkout-receipt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkout-info-btn {
+  display: inline-flex;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.checkout-receipt-note {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.checkout-receipt-total {
+  padding-top: 10px;
+  border-top: 1px dashed var(--hairline);
+  font-weight: 700;
+  font-size: 15px;
+}

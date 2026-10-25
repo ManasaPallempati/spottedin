@@ -1,0 +1,229 @@
+/* Order detail (purchase / sale) — Round 7 */
+
+.order-page {
+  min-height: 100dvh;
+  padding-bottom: 96px;
+}
+
+.order-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 20px 20px 16px;
+}
+
+.order-title {
+  font-size: 22px;
+  text-align: center;
+}
+
+.order-missing {
+  display: flex;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+}
+
+.order-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 20px;
+}
+
+.order-item {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+}
+
+.order-item-img {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.order-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-item-title {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-item-size {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.order-item-price {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: auto;
+}
+
+.order-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+}
+
+.order-status-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.order-status-detail {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.order-progress {
+  height: 8px;
+  margin-top: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.order-progress-fill {
+  height: 100%;
+  min-width: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.order-steps {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.order-step {
+  color: var(--text-dim);
+}
+
+.order-step.active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.order-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+
+.order-tracking-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-tracking-number {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+.order-address-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.order-address-line {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.order-ship-form,
+.order-action {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.order-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.order-field input {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.order-action-copy {
+  font-size: 14px;
+}
+
+.order-error {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.order-receipt {
+  gap: 10px;
+}
+
+.order-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.order-receipt-total {
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.order-receipt-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.order-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+  font-weight: 700;
+}

@@ -122,7 +122,7 @@ export default function Product() {
 
   const handleBuyNow = () => {
     addToBag(listing.id)
-    navigate('/bag?checkout=1')
+    navigate(`/bag?checkout=${encodeURIComponent(listing.id)}`)
   }
 
   function openOfferSheet() {
