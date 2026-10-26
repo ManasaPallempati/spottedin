@@ -37,6 +37,10 @@ function statusCopy(order: OrderModel, isSeller: boolean): { title: string; deta
     case 'cancelled':
       return { title: 'Order cancelled', detail: `Placed: ${formatDate(order.placedAt)}` }
     default:
+      // Sellers never see demo orders (is_order_seller), so this is the buyer's view.
+      if (order.paymentStatus === 'demo') {
+        return { title: 'Demo order', detail: "No payment was taken, so the seller won't ship this." }
+      }
       return {
         title: isSeller ? 'Ready to ship' : 'Waiting for the seller to ship',
         detail: `Ship by ${shipBy}`,

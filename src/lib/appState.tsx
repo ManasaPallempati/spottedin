@@ -262,7 +262,9 @@ async function hydrateAll(uid: string): Promise<AppState> {
   if (ordersRes.error) console.warn(ordersRes.error)
   const orderRows = (ordersRes.data ?? []) as OrderRow[]
   const orders = orderRows.filter((r) => r.buyer_id === uid).map(mapOrder)
-  const sales = orderRows.filter((r) => r.buyer_id !== uid).map(mapOrder)
+  // Sellers only ever see paid orders (is_order_seller enforces the same):
+  // a demo order was never paid for and must not look like a sale to ship.
+  const sales = orderRows.filter((r) => r.buyer_id !== uid && r.payment_status === 'paid').map(mapOrder)
   const offers = ((offersRes.data ?? []) as OfferRow[])
     .map((r) => mapOffer(r, uid))
     .sort((a, b) => b.at - a.at)
@@ -486,11 +488,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         .delete()
         .eq('user_id', uid)
         .in('listing_id', ids)
-        .then(({ error }) => {
-          if (error) console.warn(error)
-        })
-      void supabase
-        .rpc('mark_listings_sold', { p_listing_ids: ids })
         .then(({ error }) => {
           if (error) console.warn(error)
         })

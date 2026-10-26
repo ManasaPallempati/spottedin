@@ -30,7 +30,19 @@ function BagRow({ listingId, onResolved }: BagRowProps) {
   }, [loading, listing, listingId, onResolved])
 
   if (loading) return <div className="bag-row bag-row-loading" />
-  if (!listing) return null
+  // Deleted or hidden since it was bagged: say so, so the buyer can clear it.
+  if (!listing) {
+    return (
+      <div className="bag-row">
+        <div className="bag-row-info">
+          <p className="bag-row-brand">This item is no longer available</p>
+        </div>
+        <button type="button" className="bag-row-remove" onClick={() => removeFromBag(listingId)}>
+          Remove
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="bag-row">
@@ -265,6 +277,8 @@ export default function Bag() {
             {groups.map((group) => {
               const subtotal = groupSubtotal(group)
               const count = liveItems(group).length
+              // Wait for every item to load so the order never leaves one out by accident.
+              const loaded = group.items.every((item) => item.listingId in resolved)
               return (
                 <div className="bag-group" key={group.seller.handle}>
                   <div className="bag-seller-header">
@@ -288,7 +302,7 @@ export default function Bag() {
                   <button
                     type="button"
                     className="btn btn-primary bag-checkout-btn"
-                    disabled={count === 0}
+                    disabled={!loaded || count === 0}
                     onClick={() => setCheckoutAnchor(group.items[0].listingId)}
                   >
                     Checkout
