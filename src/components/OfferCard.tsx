@@ -4,6 +4,7 @@ import { useAppState, type Offer } from '../lib/appState'
 import { useListing } from '../lib/useListings'
 import { listingPath } from '../lib/listingUrls'
 import OfferCheckout from './OfferCheckout'
+import ListingPhoto from './ListingPhoto'
 import './OfferCard.css'
 
 export default function OfferCard({ offer }: { offer: Offer }) {
@@ -24,7 +25,7 @@ export default function OfferCard({ offer }: { offer: Offer }) {
     <div className="offer-card">
       {listing && (
         <Link to={listingPath(listing.id, listing.brand)} className="offer-card-listing">
-          <img className="offer-card-thumb" src={listing.img} alt={listing.brand} />
+          <ListingPhoto className="offer-card-thumb" src={listing.img} alt={listing.brand} compact />
           <div className="offer-card-listing-info">
             <span className="offer-card-brand">{listing.brand}</span>
             <span className="offer-card-price">₹{listing.price.toLocaleString('en-IN')}</span>

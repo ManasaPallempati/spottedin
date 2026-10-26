@@ -20,7 +20,7 @@
   z-index: 0;
   background:
     linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.4) 45%, #000 100%),
-    url('https://picsum.photos/seed/spotted-rack/900/1200') center / cover no-repeat;
+    url('/images/catalog/kanjeevaram-ruby.webp') center / cover no-repeat;
 }
 
 .sell-polaroids {

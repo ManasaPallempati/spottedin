@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Menu, Star, BarChart2, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, Menu, Star, BarChart2, SlidersHorizontal } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useListings, useMyListings } from '../lib/useListings'
 import { useAppState, type Order } from '../lib/appState'
@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Sort } from '../lib/filters'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
+import ListingPhoto from '../components/ListingPhoto'
 import './profile.css'
 
 const TABS = ['Shop', 'Sold', 'Purchases', 'Likes'] as const
@@ -48,11 +49,10 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, signOut, hasPassword } = useAuth()
+  const { isAuthed, profile, profileError, loading, signOut, hasPassword } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
-  const [showPromo, setShowPromo] = useState(true)
   const [sortOpen, setSortOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [sort, setSort] = useState<Sort>('newest')
@@ -114,7 +114,7 @@ export default function Profile() {
   const toShipCount = sales.filter((o) => o.status === 'paid').length
 
   function thumbFor(item: Order['items'][number]): string {
-    return item.img ?? knownListings.get(item.listingId)?.img ?? `https://picsum.photos/seed/${item.listingId}/200/200`
+    return item.img || knownListings.get(item.listingId)?.img || ''
   }
 
   function orderRow(order: Order, label: string) {
@@ -122,7 +122,7 @@ export default function Profile() {
       <Link to={`/order/${order.uuid}`} className="profile-order-row" key={order.uuid}>
         <div className="profile-order-thumbs">
           {order.items.map((item, i) => (
-            <img key={item.listingId + i} className="profile-order-thumb" src={thumbFor(item)} alt="" />
+            <ListingPhoto key={item.listingId + i} className="profile-order-thumb" src={thumbFor(item)} alt="Ordered item" compact />
           ))}
         </div>
         <div className="profile-order-details">
@@ -142,6 +142,7 @@ export default function Profile() {
     navigate('/')
   }
 
+
   const headerTitle = isAuthed && profile ? profile.handle : 'Profile'
 
   return (
@@ -159,7 +160,34 @@ export default function Profile() {
         </div>
       </header>
 
-      {!isAuthed || !profile ? (
+      {/* `loading` is checked before the guest view because a signed-in visitor
+          whose profile has not resolved yet is not a guest. Without this, the
+          signed-out prompt flashes on every OAuth return, and stays put if the
+          profile lookup is slow. */}
+      {loading ? (
+        <div className="profile-guest">
+          <p className="profile-guest-copy">Loading your closet…</p>
+        </div>
+      ) : isAuthed && !profile && profileError ? (
+        /* Signed in, but their profile could not be created. Showing the
+           signed-out prompt here tells them to log in when they already are,
+           which is both useless and misleading. */
+        <div className="profile-guest">
+          <h2 className="profile-guest-title">Something went wrong</h2>
+          <p className="profile-guest-copy" role="alert">
+            {profileError}
+          </p>
+          <div className="profile-guest-actions">
+            <button
+              type="button"
+              className="btn btn-primary profile-guest-btn"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      ) : !isAuthed || !profile ? (
         <div className="profile-guest">
           <h2 className="profile-guest-title">Your closet lives here</h2>
           <p className="profile-guest-copy">Log in to see your likes, orders and listings</p>
@@ -210,27 +238,6 @@ export default function Profile() {
               <BarChart2 size={18} />
               <span>Earnings</span>
             </button>
-
-            {showPromo && (
-              <div className="profile-promo">
-                <button
-                  type="button"
-                  className="profile-promo-close"
-                  aria-label="Dismiss"
-                  onClick={() => setShowPromo(false)}
-                >
-                  <X size={16} />
-                </button>
-                <div className="profile-promo-image">
-                  <img src="https://picsum.photos/seed/spotted-flatlay/400/500" alt="" />
-                </div>
-                <div className="profile-promo-text">
-                  <p className="profile-promo-bold">Represent Spotted on Campus</p>
-                  <p>Become a Spotted Campus Manager</p>
-                  <p className="profile-promo-bold">Apply today</p>
-                </div>
-              </div>
-            )}
 
             {activeTab === 'Shop' && (
               <>
@@ -345,6 +352,18 @@ export default function Profile() {
             <Link to="/account/password" className="profile-sort-option" onClick={() => setMenuOpen(false)}>
               {hasPassword ? 'Change password' : 'Set password'}
             </Link>
+          )}
+          {isAuthed && (
+            <button
+              type="button"
+              className="profile-sort-option"
+              onClick={() => {
+                setMenuOpen(false)
+                navigate('/account')
+              }}
+            >
+              Account details
+            </button>
           )}
           <button type="button" className="profile-sort-option" onClick={handleLogout}>
             Log out

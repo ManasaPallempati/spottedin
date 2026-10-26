@@ -1,11 +1,13 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Send } from 'lucide-react'
 import { useAppState } from '../lib/appState'
 import { useListing, useProfileByHandle } from '../lib/useListings'
 import { listingPath } from '../lib/listingUrls'
-import { sellers } from '../data/sellers'
 import OfferCard from '../components/OfferCard'
+import ListingPhoto from '../components/ListingPhoto'
+import SellerAvatar from '../components/SellerAvatar'
 import './thread.css'
 
 function formatRelativeTime(at: number): string {
@@ -30,10 +32,6 @@ export default function Thread() {
   const { threadFor, sendMessage, offersWith } = useAppState()
   const { listing } = useListing(listingId ?? '')
   const { profile: realProfile } = useProfileByHandle(handle)
-  const fictionalSeller = sellers.find((s) => s.handle === handle)
-  const avatar = realProfile
-    ? `https://picsum.photos/seed/spotted-seller-${handle}/300/300`
-    : fictionalSeller?.avatar ?? `https://picsum.photos/seed/${handle}/200/200`
   const messages = threadFor(handle)?.messages ?? []
   const relevantOffers = offersWith(handle)
   const offer = relevantOffers[0]
@@ -62,17 +60,18 @@ export default function Thread() {
           <ChevronLeft size={22} />
         </button>
         <Link to={`/shop/${handle}`} className="thread-seller">
-          <img className="thread-avatar" src={avatar} alt={handle} />
+          <SellerAvatar className="thread-avatar" handle={handle} name={realProfile?.name} />
           <div className="thread-seller-info">
             <span className="thread-handle">@{handle}</span>
-            <span className="thread-status">Active today</span>
+            {realProfile?.name && <span className="thread-status">{realProfile.name}</span>}
           </div>
         </Link>
+        <SafetyMenu targetType="thread" targetId={handle} handle={handle} label="Report or block this chat" />
       </header>
 
       {listingId && listing && (
         <Link to={listingPath(listing.id, listing.brand)} className="thread-listing-card">
-          <img className="thread-listing-thumb" src={listing.img} alt={listing.brand} />
+          <ListingPhoto className="thread-listing-thumb" src={listing.img} alt={listing.brand} compact />
           <div className="thread-listing-info">
             <span className="thread-listing-brand">{listing.brand}</span>
             <span className="thread-listing-price">₹{listing.price.toLocaleString('en-IN')}</span>

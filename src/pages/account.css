@@ -1,0 +1,224 @@
+.account-page {
+  padding: 16px 16px 96px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.account-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Section headings mirror the grouping used on the rest of the settings
+   surface: User details / About me / Manage. */
+.account-section {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 24px 0 8px;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.account-field label {
+  font-size: 13px;
+  color: var(--muted, #9a9a9a);
+}
+
+.account-field input,
+.account-field textarea {
+  width: 100%;
+  font-size: 16px; /* 16px avoids iOS zooming the viewport on focus */
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+.account-field input:disabled {
+  opacity: 0.55;
+}
+
+.account-field textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.account-emoji-input {
+  font-size: 28px !important;
+}
+
+/* Read-only rows sit alongside editable fields, so they share the divider but
+   lay out horizontally. */
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.account-row-label {
+  font-size: 15px;
+}
+
+.account-row-value {
+  font-size: 15px;
+  color: var(--muted, #9a9a9a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-hint {
+  font-size: 12px;
+  color: var(--muted, #9a9a9a);
+  line-height: 1.4;
+}
+
+/* Safety guidance, not an error — it should read as advice before typing
+   rather than as a rejection afterwards. */
+.account-callout {
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted, #b5b5b5);
+}
+
+.account-suggestions {
+  margin-top: 8px;
+}
+
+.account-suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.account-suggestion {
+  padding: 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.account-field select {
+  width: 100%;
+  font-size: 16px;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+/* The option list is rendered by the OS, which does not inherit the page
+   theme — without this, dark-on-dark makes it unreadable on some browsers. */
+.account-field select option {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.account-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.account-reason {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 15px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.account-reason input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.account-hint-warn {
+  color: var(--warn, #e6b800);
+}
+
+.account-error {
+  font-size: 14px;
+  color: var(--danger, #ff5a5a);
+  margin-top: 12px;
+}
+
+.account-saved {
+  font-size: 14px;
+  color: var(--success, #4ccf7f);
+  margin-top: 12px;
+}
+
+.account-note {
+  font-size: 15px;
+  color: var(--muted, #9a9a9a);
+  margin: 24px 0 16px;
+}
+
+.account-submit {
+  margin-top: 20px;
+  width: 100%;
+}
+
+/* Destructive actions are text links rather than filled buttons so they never
+   read as the primary action on the screen. Colour is not the only signal —
+   the confirmation copy above states the consequence. */
+.account-danger-link,
+.account-cancel-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 0;
+  font-size: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.account-danger-link {
+  color: var(--danger, #ff5a5a);
+}
+
+.account-danger-link:disabled,
+.account-cancel-link:disabled {
+  opacity: 0.6;
+}
+
+.account-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-delete-confirm p {
+  font-size: 15px;
+  line-height: 1.45;
+}

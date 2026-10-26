@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { SlidersHorizontal, Bell } from 'lucide-react'
 import Chip from '../components/Chip'
 import { useAppState } from '../lib/appState'
-import { sellers } from '../data/sellers'
+import SellerAvatar from '../components/SellerAvatar'
 import './inbox.css'
 
 const FILTERS = ['All', 'Messages', 'Selling', 'Buying'] as const
@@ -72,14 +72,10 @@ export default function Inbox() {
             {filteredThreads.map((thread) => {
               const lastMessage = thread.messages[thread.messages.length - 1]
               if (!lastMessage) return null
-              const avatar = thread.peerIsReal
-                ? `https://picsum.photos/seed/spotted-seller-${thread.handle}/300/300`
-                : sellers.find((s) => s.handle === thread.handle)?.avatar ??
-                  `https://picsum.photos/seed/${thread.handle}/200/200`
               const hasPendingOffer = offersWith(thread.handle).some((o) => o.status === 'pending')
               return (
                 <Link key={thread.id} to={`/inbox/t/${thread.handle}`} className="inbox-thread-row">
-                  <img className="inbox-thread-avatar" src={avatar} alt={thread.handle} />
+                  <SellerAvatar className="inbox-thread-avatar" handle={thread.handle} />
                   <div className="inbox-thread-main">
                     <div className="inbox-thread-handle-row">
                       <span className="inbox-thread-handle">@{thread.handle}</span>

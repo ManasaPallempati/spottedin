@@ -7,11 +7,13 @@ import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentCon
 import { chargesFor, formatInr, SHIPPING_INR } from '../lib/pricing'
 import type { Address } from '../lib/addresses'
 import { useListing } from '../lib/useListings'
-import { sellerFor, sellerForListing, type Seller } from '../data/sellers'
+import { sellerFor, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
 import AddressPicker from '../components/AddressPicker'
 import PriceBreakdown from '../components/PriceBreakdown'
+import ListingPhoto from '../components/ListingPhoto'
+import SellerAvatar from '../components/SellerAvatar'
 import './bag.css'
 
 type BagGroup = { seller: Seller; sellerId: string | null; items: BagItem[] }
@@ -47,7 +49,7 @@ function BagRow({ listingId, onResolved }: BagRowProps) {
   return (
     <div className="bag-row">
       <div className="bag-row-thumb-wrap">
-        <img className="bag-row-thumb" src={listing.img} alt={listing.brand} />
+        <ListingPhoto className="bag-row-thumb" src={listing.img} alt={listing.brand} compact />
         {listing.status === 'sold' && <span className="bag-row-sold">SOLD</span>}
       </div>
       <div className="bag-row-info">
@@ -116,7 +118,11 @@ export default function Bag() {
     const map = new Map<string, BagGroup>()
     for (const item of bag) {
       const resolvedListing = resolved[item.listingId]
-      const seller = resolvedListing ? sellerFor(resolvedListing) : sellerForListing(item.listingId)
+      // Until a row resolves (or if it never does) its seller is unknown: group
+      // it without a header rather than attributing it to anyone.
+      const seller: Seller = resolvedListing
+        ? sellerFor(resolvedListing)
+        : { handle: '', name: '', bio: '', rating: null, sold: 0 }
       const existing = map.get(seller.handle)
       if (existing) existing.items.push(item)
       else map.set(seller.handle, { seller, sellerId: resolvedListing?.sellerId ?? null, items: [item] })
@@ -280,9 +286,10 @@ export default function Bag() {
               // Wait for every item to load so the order never leaves one out by accident.
               const loaded = group.items.every((item) => item.listingId in resolved)
               return (
-                <div className="bag-group" key={group.seller.handle}>
+                <div className="bag-group" key={group.seller.handle || 'unknown-seller'}>
+                  {group.seller.handle && (
                   <div className="bag-seller-header">
-                    <img className="bag-seller-avatar" src={group.seller.avatar} alt={group.seller.handle} />
+                    <SellerAvatar className="bag-seller-avatar" handle={group.seller.handle} name={group.seller.name} />
                     <div className="bag-seller-meta">
                       <span className="bag-seller-handle">@{group.seller.handle}</span>
                       <span className="bag-seller-count">
@@ -296,17 +303,21 @@ export default function Bag() {
                       </div>
                     )}
                   </div>
+                  )}
                   {group.items.map((item) => (
                     <BagRow key={item.listingId} listingId={item.listingId} onResolved={handleResolved} />
                   ))}
-                  <button
-                    type="button"
-                    className="btn btn-primary bag-checkout-btn"
-                    disabled={!loaded || count === 0}
-                    onClick={() => setCheckoutAnchor(group.items[0].listingId)}
-                  >
-                    Checkout
-                  </button>
+                  {/* No checkout for items whose seller is unknown (still loading, or deleted). */}
+                  {group.seller.handle && (
+                    <button
+                      type="button"
+                      className="btn btn-primary bag-checkout-btn"
+                      disabled={!loaded || count === 0}
+                      onClick={() => setCheckoutAnchor(group.items[0].listingId)}
+                    >
+                      Checkout
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -319,7 +330,7 @@ export default function Bag() {
           <div className="bag-checkout-items">
             {activeItems.map((l) => (
               <div className="bag-checkout-item" key={l.id}>
-                <img src={l.img} alt="" />
+                <ListingPhoto src={l.img} alt={l.brand} compact />
                 <div>
                   <p className="bag-row-brand">{l.brand}</p>
                   <p className="bag-row-size">
