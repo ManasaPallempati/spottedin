@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 // Supabase client is replaced by an in-memory fake in src/test/setup.ts.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __PRODUCTION_DEPLOY__: 'false',
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

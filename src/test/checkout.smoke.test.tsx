@@ -6,19 +6,19 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import App from '../App'
 import { db, inserts, makeSession, setSession, supabase } from './fakeSupabase'
 
-// The app uses HashRouter, so the route lives in the fragment.
 function visit(path: string) {
-  window.history.replaceState(null, '', `/#${path}`)
+  window.history.replaceState(null, '', path)
   return render(<App />)
 }
 
 function route() {
-  return window.location.hash.slice(1)
+  return window.location.pathname + window.location.search
 }
 
-const BUYER = { id: 'user-1', handle: 'asha', name: 'Asha', avatar_emoji: null, bio: null, city: null, rating: null, sales: null }
-const SELLER = { id: 'seller-1', handle: 'meera', name: 'Meera', avatar_emoji: null, bio: null, city: null, rating: 4.8, sales: 12 }
-const OTHER_SELLER = { id: 'seller-2', handle: 'ravi', name: 'Ravi', avatar_emoji: null, bio: null, city: null, rating: null, sales: 0 }
+// Adults with a date of birth on file, so the birthday gate (App.tsx) lets them through.
+const BUYER = { id: 'user-1', handle: 'asha', name: 'Asha', avatar_emoji: null, bio: null, city: null, rating: null, sales: null, date_of_birth: '1995-04-12' }
+const SELLER = { id: 'seller-1', handle: 'meera', name: 'Meera', avatar_emoji: null, bio: null, city: null, rating: 4.8, sales: 12, date_of_birth: '1992-08-30' }
+const OTHER_SELLER = { id: 'seller-2', handle: 'ravi', name: 'Ravi', avatar_emoji: null, bio: null, city: null, rating: null, sales: 0, date_of_birth: '1990-01-01' }
 
 function listing(id: string, title: string, price: number, seller: { id: string; handle: string; name: string; rating: number | null; sales: number | null }) {
   return {
@@ -64,7 +64,7 @@ function orderRow(overrides: Record<string, unknown> = {}) {
     tracking_number: null,
     shipped_at: null,
     delivered_at: null,
-    payment_status: 'demo',
+    payment_status: 'paid',
     courier_provider: null,
     courier_status: null,
     label_url: null,
@@ -194,6 +194,19 @@ describe('per-seller checkout', () => {
     expect(order.ship_to).toMatchObject({ pincode: '560001', city: 'Bengaluru' })
     const items = inserts.find((i) => i.table === 'order_items')?.values as { listing_id: string }[]
     expect(items.map((i) => i.listing_id).sort()).toEqual(['l-1', 'l-2'])
+    // No payment was taken, so the real listings must stay on sale.
+    expect(supabase.rpc).not.toHaveBeenCalledWith('mark_listings_sold', expect.anything())
+  })
+
+  it('shows a bagged item that was deleted, so the buyer can remove it', async () => {
+    seedBag()
+    db.listings = db.listings.filter((l) => l.id !== 'l-3')
+    visit('/bag')
+
+    expect(await screen.findByText('This item is no longer available')).toBeTruthy()
+    // Only the seller whose items loaded gets a Checkout button.
+    await screen.findByText('₹1,550')
+    expect(screen.getAllByRole('button', { name: 'Checkout' })).toHaveLength(1)
   })
 
   it('needs an address before the order can be placed', async () => {
@@ -227,7 +240,27 @@ describe('per-seller checkout', () => {
 })
 
 describe('order page progress', () => {
-  it('shows a new purchase as waiting to ship', async () => {
+  it('labels a demo purchase as unpaid and keeps it off the seller\'s Sold list', async () => {
+    db.profiles = [BUYER, SELLER]
+    db.orders = [orderRow({ payment_status: 'demo' })]
+    setSession(makeSession('asha@example.com', 'user-1'))
+    visit('/order/order-uuid-1')
+
+    expect(await screen.findByText('Demo order')).toBeTruthy()
+    expect(screen.getByText("No payment was taken, so the seller won't ship this.")).toBeTruthy()
+  })
+
+  it('does not show a demo order to the seller', async () => {
+    db.profiles = [SELLER]
+    db.orders = [orderRow({ payment_status: 'demo' })]
+    setSession(makeSession('meera@example.com', 'seller-1'))
+    visit('/order/order-uuid-1')
+
+    expect(await screen.findByText("We couldn't find this order.")).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Mark as shipped' })).toBeNull()
+  })
+
+  it('shows a new paid purchase as waiting to ship', async () => {
     db.profiles = [BUYER]
     db.orders = [orderRow()]
     setSession(makeSession('asha@example.com', 'user-1'))

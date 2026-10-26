@@ -1,28 +1,60 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
+import CategoryPicker from '../components/CategoryPicker'
+import { useCategories, categoryPath, legacyCategoryFor } from '../lib/categories'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { listingPath } from '../lib/listingUrls'
-import { CONDITIONS } from '../data/sellers'
+import { CONDITIONS, CONDITION_DB } from '../data/sellers'
 import './sellnew.css'
 
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
-const CATEGORIES = ['Menswear', 'Womenswear', 'Kids', 'Everything else']
+const MAX_PHOTOS = 8
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 
-// Maps this form's Spotted-facing labels to the listings table's DB-level
-// category/condition columns (narrower vocabularies fixed by CHECK constraints).
-const CATEGORY_DB: Record<string, string> = {
-  Menswear: 'men',
-  Womenswear: 'women',
-  Kids: 'kids',
-  'Everything else': 'everything-else',
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+// Categories now come from the database (round 14) via the picker, so the old
+// four-value list is gone. The legacy listings.category column is still written,
+// derived from the chosen department by legacyCategoryFor.
+//
+// Condition remains a fixed vocabulary fixed by a CHECK constraint.
+
+// Text/select values only — photos are storage uploads and object URLs, far too
+// big (and too stateful) for localStorage, so they are deliberately not drafted.
+const DRAFT_KEY = 'spotted_sell_draft'
+// The step is remembered separately so a returning seller lands where they left off.
+const STEP_KEY = 'spotted_sell_step'
+const STEPS = ['Photos', 'Details', 'Describe & list'] as const
+
+function readStep(): number {
+  try {
+    const n = Number.parseInt(localStorage.getItem(STEP_KEY) ?? '0', 10)
+    return n >= 0 && n < STEPS.length ? n : 0
+  } catch {
+    return 0
+  }
 }
-const CONDITION_DB: Record<string, string> = {
-  'Brand new': 'new',
-  'Like new': 'like-new',
-  'Used – excellent': 'good',
-  'Used – good': 'fair',
+
+type SellDraft = {
+  title?: string
+  price?: string
+  size?: string
+  categoryId?: string | null
+  condition?: string
+  description?: string
+}
+
+function readDraft(): SellDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    return parsed as SellDraft
+  } catch {
+    // Corrupt JSON or storage unavailable — treat as no draft.
+    return null
+  }
 }
 
 export default function SellNew() {
@@ -30,15 +62,46 @@ export default function SellNew() {
   const { isAuthed, loading: authLoading, session } = useAuth()
   const uid = session?.user.id
 
+  const { categories, loading: categoriesLoading } = useCategories()
   const [listingId] = useState(() => crypto.randomUUID())
-  const [title, setTitle] = useState('')
-  const [price, setPrice] = useState('')
-  const [size, setSize] = useState(SIZES[0])
-  const [category, setCategory] = useState(CATEGORIES[0])
-  const [condition, setCondition] = useState<string>(CONDITIONS[0])
-  const [description, setDescription] = useState('')
-  const [imagePath, setImagePath] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // Read once on mount; field states are seeded from it below.
+  const [draft] = useState(readDraft)
+  // Recomputed from the tree rather than stored alongside the id, so the label
+  // cannot go stale if a category is renamed.
+  const [title, setTitle] = useState(typeof draft?.title === 'string' ? draft.title : '')
+  const [price, setPrice] = useState(typeof draft?.price === 'string' ? draft.price : '')
+  const [size, setSize] = useState(
+    draft?.size && SIZES.includes(draft.size) ? draft.size : SIZES[0],
+  )
+  const [categoryId, setCategoryId] = useState<string | null>(
+    typeof draft?.categoryId === 'string' ? draft.categoryId : null,
+  )
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const selectedPath = categoryPath(categories, categoryId)
+  const [condition, setCondition] = useState<string>(
+    draft?.condition && (CONDITIONS as readonly string[]).includes(draft.condition)
+      ? draft.condition
+      : CONDITIONS[0],
+  )
+  const [description, setDescription] = useState(
+    typeof draft?.description === 'string' ? draft.description : '',
+  )
+  // One bar carries both the "Draft restored" announcement and the discard
+  // action; dismissing it keeps the draft, discarding deletes it.
+  const [draftNoticeOpen, setDraftNoticeOpen] = useState(draft !== null)
+  const [step, setStep] = useState(() => (draft ? readStep() : 0))
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP_KEY, String(step))
+    } catch {
+      // storage unavailable — the step just won't persist
+    }
+  }, [step])
+  // One entry per photo, in display order. `path` is the storage key that goes
+  // into listing_images; `preview` is a local object URL shown until the listing
+  // exists. Position in this array is the position in the gallery, so removing
+  // one renumbers the rest rather than leaving a gap the unique index rejects.
+  const [photos, setPhotos] = useState<{ path: string; preview: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,38 +112,136 @@ export default function SellNew() {
     }
   }, [authLoading, isAuthed, navigate])
 
+  // Revoked on unmount only. A dependency on `photos` would revoke the previous
+  // array's URLs on every add, breaking the thumbnails still on screen.
+  const photosRef = useRef(photos)
+  photosRef.current = photos
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      for (const photo of photosRef.current) URL.revokeObjectURL(photo.preview)
     }
-  }, [previewUrl])
+  }, [])
+
+  // Debounced autosave. The hasContent guard keeps an untouched form from
+  // writing a default-valued draft (which would show "Draft restored" on the
+  // next visit for nothing), and removes the draft again if the seller clears
+  // every field by hand. A pending timer is dropped on unmount, so a save can
+  // never land after publish has cleared the draft.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const hasContent = title !== '' || price !== '' || description !== '' || categoryId !== null
+      try {
+        if (hasContent) {
+          localStorage.setItem(
+            DRAFT_KEY,
+            JSON.stringify({ title, price, size, categoryId, condition, description }),
+          )
+        } else {
+          localStorage.removeItem(DRAFT_KEY)
+        }
+      } catch {
+        // Storage full or unavailable — autosave is best-effort.
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [title, price, size, categoryId, condition, description])
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+      localStorage.removeItem(STEP_KEY)
+    } catch {
+      // ignore
+    }
+    setTitle('')
+    setPrice('')
+    setSize(SIZES[0])
+    setCategoryId(null)
+    setCondition(CONDITIONS[0])
+    setDescription('')
+    setDraftNoticeOpen(false)
+    setStep(0)
+  }
+
+  function validateDetails(): string | null {
+    if (!title.trim()) return 'Title is required.'
+    if (!categoryId) return 'Please choose a category.'
+    const priceNum = Number.parseInt(price, 10)
+    if (!Number.isFinite(priceNum) || priceNum <= 0 || String(priceNum) !== price.trim()) return 'Enter a valid price.'
+    return null
+  }
+
+  function goNext() {
+    if (step === 1) {
+      const problem = validateDetails()
+      if (problem) {
+        setError(problem)
+        return
+      }
+    }
+    setError(null)
+    setStep((s) => Math.min(s + 1, STEPS.length - 1))
+  }
+
+  function goBack() {
+    setError(null)
+    setStep((s) => Math.max(s - 1, 0))
+  }
 
   if (authLoading || !isAuthed) {
     return <div className="sellnew-page" />
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !uid) {
-      setImagePath(null)
+    const files = Array.from(e.target.files ?? [])
+    // Clearing the input lets the same file be picked again after removing it;
+    // without this the change event never fires a second time.
+    e.target.value = ''
+    if (files.length === 0 || !uid) return
+
+    const room = MAX_PHOTOS - photos.length
+    if (room <= 0) {
+      setError(`You can add up to ${MAX_PHOTOS} photos.`)
       return
     }
-
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(URL.createObjectURL(file))
+    const accepted = files.slice(0, room)
+    if (files.length > room) {
+      setError(`Only the first ${room} of those were added — the limit is ${MAX_PHOTOS} photos.`)
+    } else {
+      setError(null)
+    }
 
     setUploading(true)
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const path = `${uid}/${listingId}.${ext}`
-    const { error: uploadError } = await supabase.storage.from('listing-images').upload(path, file, { upsert: true })
-    setUploading(false)
-
-    if (uploadError) {
-      console.warn(uploadError)
-      setImagePath(null)
-      return
+    for (const file of accepted) {
+      if (file.size > MAX_PHOTO_BYTES) {
+        setError(`"${file.name}" is over 8MB and was skipped.`)
+        continue
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      // The storage policy and the listing_images owner-path trigger both
+      // require the seller's own uuid folder. crypto.randomUUID keeps repeat
+      // uploads of the same filename from overwriting each other.
+      const path = `${uid}/${listingId}-${crypto.randomUUID()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('listing-images')
+        .upload(path, file, { upsert: true })
+      if (uploadError) {
+        console.warn(uploadError)
+        setError('One of those photos could not be uploaded.')
+        continue
+      }
+      setPhotos((current) => [...current, { path, preview: URL.createObjectURL(file) }])
     }
-    setImagePath(path)
+    setUploading(false)
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((current) => {
+      const next = [...current]
+      const [removed] = next.splice(index, 1)
+      if (removed) URL.revokeObjectURL(removed.preview)
+      return next
+    })
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -90,15 +251,17 @@ export default function SellNew() {
       return
     }
 
-    if (!title.trim()) {
-      setError('Title is required.')
+    if (step < STEPS.length - 1) {
+      goNext()
+      return
+    }
+    const problem = validateDetails()
+    if (problem) {
+      setError(problem)
+      setStep(1)
       return
     }
     const priceNum = Number.parseInt(price, 10)
-    if (!Number.isFinite(priceNum) || priceNum <= 0 || String(priceNum) !== price.trim()) {
-      setError('Enter a valid price.')
-      return
-    }
 
     setError(null)
     setSubmitting(true)
@@ -112,20 +275,56 @@ export default function SellNew() {
       title: title.trim(),
       description: description.trim(),
       price_inr: priceNum,
-      category: CATEGORY_DB[category] ?? 'vintage',
+      // Both columns are written: category_id is the real one, and the legacy
+      // category column is NOT NULL and still read by the feed and filters, so
+      // it is derived from the chosen department rather than left to drift.
+      category: legacyCategoryFor(categories, categoryId),
+      category_id: categoryId,
       size,
-      condition: CONDITION_DB[condition] ?? 'good',
-      image_path: imagePath,
+      condition: CONDITION_DB[condition as keyof typeof CONDITION_DB] ?? 'good',
+      // Position 0 is written here as well as into listing_images so the row is
+      // never briefly without a thumbnail; the sync trigger keeps it correct
+      // from then on.
+      image_path: photos[0]?.path ?? null,
     })
 
-    setSubmitting(false)
-
     if (insertError) {
+      setSubmitting(false)
       console.warn(insertError)
-      setError(insertError.message)
+      // 42501 is the RLS rejection; for this insert that is the is_adult()
+      // gate from round11 — a minor's account cannot create listings.
+      setError(
+        insertError.code === '42501'
+          ? 'Under 18s can buy on Spotted, but cannot list items to sell.'
+          : 'We could not publish your listing just now. Please try again.',
+      )
       return
     }
 
+    // After the listing, because listing_images references it. A failure here
+    // leaves a listing with fewer photos rather than no listing, which is the
+    // better of the two — the seller can add the rest by editing.
+    if (photos.length > 0) {
+      const { error: imagesError } = await supabase.from('listing_images').insert(
+        photos.map((photo, index) => ({
+          listing_id: listingId,
+          path: photo.path,
+          position: index,
+        })),
+      )
+      if (imagesError) {
+        console.warn(imagesError)
+        setError('Your listing was created, but some photos could not be attached.')
+      }
+    }
+
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+      localStorage.removeItem(STEP_KEY)
+    } catch {
+      // ignore
+    }
+    setSubmitting(false)
     navigate(listingPath(listingId, title))
   }
 
@@ -139,22 +338,84 @@ export default function SellNew() {
       </div>
 
       <form className="sellnew-form" onSubmit={handleSubmit}>
-        <label className="sellnew-photo-label" htmlFor="sellnew-photo">
-          {previewUrl ? (
-            <img className="sellnew-photo-preview" src={previewUrl} alt="Selected item" />
-          ) : (
-            <span className="sellnew-photo-placeholder">Add a photo</span>
+        {draftNoticeOpen && (
+          <div className="sellnew-draft-notice" aria-live="polite">
+            <span className="sellnew-draft-text">Draft restored</span>
+            <button type="button" className="sellnew-draft-discard" onClick={discardDraft}>
+              Discard draft
+            </button>
+            <button
+              type="button"
+              className="sellnew-draft-dismiss"
+              aria-label="Dismiss"
+              onClick={() => setDraftNoticeOpen(false)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <ol className="sellnew-steps" aria-label="Listing steps">
+          {STEPS.map((label, i) => (
+            <li
+              key={label}
+              className={'sellnew-step' + (i === step ? ' is-current' : '') + (i < step ? ' is-done' : '')}
+              aria-current={i === step ? 'step' : undefined}
+            >
+              <span className="sellnew-step-num">{i + 1}</span>
+              <span className="sellnew-step-label">{label}</span>
+            </li>
+          ))}
+        </ol>
+
+        {step === 0 && (<>
+        <div className="sellnew-photos-head">
+          <span className="sellnew-photos-title">Add photos</span>
+          <span className="sellnew-hint">
+            {photos.length}/{MAX_PHOTOS}
+          </span>
+        </div>
+
+        <div className="sellnew-photo-grid">
+          {photos.map((photo, index) => (
+            <div key={photo.path} className="sellnew-photo-tile">
+              <img className="sellnew-photo-preview" src={photo.preview} alt="" />
+              {index === 0 && <span className="sellnew-photo-badge">Cover</span>}
+              <button
+                type="button"
+                className="sellnew-photo-remove"
+                aria-label={`Remove photo ${index + 1}`}
+                onClick={() => removePhoto(index)}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+
+          {photos.length < MAX_PHOTOS && (
+            <label className="sellnew-photo-add" htmlFor="sellnew-photo">
+              <span aria-hidden="true">+</span>
+              <span className="sellnew-photo-add-text">Add</span>
+            </label>
           )}
-        </label>
+        </div>
+
         <input
           id="sellnew-photo"
           type="file"
           accept="image/*"
+          multiple
           className="sellnew-photo-input"
           onChange={handlePhotoChange}
+          disabled={uploading}
         />
-        {uploading && <p className="sellnew-hint">Uploading photo…</p>}
+        <p className="sellnew-hint">
+          The first photo is the cover buyers see. Show the label, the fabric and any flaws.
+        </p>
+        {uploading && <p className="sellnew-hint">Uploading…</p>}
+        </>)}
 
+        {step === 1 && (<>
         <div className="sellnew-field">
           <label htmlFor="sellnew-title">Title</label>
           <input
@@ -199,13 +460,24 @@ export default function SellNew() {
 
           <div className="sellnew-field">
             <label htmlFor="sellnew-category">Category</label>
-            <select id="sellnew-category" value={category} onChange={(e) => setCategory(e.target.value)}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <button
+              type="button"
+              id="sellnew-category"
+              className="sellnew-picker-button"
+              onClick={() => setPickerOpen(true)}
+              disabled={categoriesLoading}
+            >
+              {selectedPath.length > 0 ? (
+                <span className="sellnew-picker-value">
+                  {selectedPath.map((c) => c.name).join(' › ')}
+                </span>
+              ) : (
+                <span className="sellnew-picker-placeholder">
+                  {categoriesLoading ? 'Loading…' : 'Choose a category'}
+                </span>
+              )}
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
 
@@ -220,6 +492,19 @@ export default function SellNew() {
           </select>
         </div>
 
+        </>)}
+
+        {step === 2 && (<>
+        <div className="sellnew-review">
+          {photos[0] && <img className="sellnew-review-img" src={photos[0].preview} alt="" />}
+          <div>
+            <p className="sellnew-review-title">{title || 'Untitled'}</p>
+            <p className="sellnew-hint">
+              ₹{price || '—'} · {size} · {condition}
+              {selectedPath.length > 0 && ` · ${selectedPath[selectedPath.length - 1].name}`}
+            </p>
+          </div>
+        </div>
         <div className="sellnew-field">
           <label htmlFor="sellnew-description">Description (optional)</label>
           <textarea
@@ -231,12 +516,37 @@ export default function SellNew() {
           />
         </div>
 
-        {error && <p className="sellnew-error">{error}</p>}
+        </>)}
 
-        <button type="submit" className="btn btn-primary sellnew-submit" disabled={submitting || uploading}>
-          {submitting ? 'Listing…' : 'List item'}
-        </button>
+        {error && <p className="sellnew-error" role="alert">{error}</p>}
+
+        <div className="sellnew-nav">
+          {step > 0 && (
+            <button type="button" className="btn btn-outline" onClick={goBack}>
+              Back
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button type="button" className="btn btn-primary sellnew-submit" onClick={goNext} disabled={uploading}>
+              Next
+            </button>
+          ) : (
+            <button type="submit" className="btn btn-primary sellnew-submit" disabled={submitting || uploading}>
+              {submitting ? 'Listing…' : 'List item'}
+            </button>
+          )}
+        </div>
       </form>
+
+      <CategoryPicker
+        open={pickerOpen}
+        categories={categories}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(leafId) => {
+          setCategoryId(leafId)
+          setError(null)
+        }}
+      />
     </div>
   )
 }

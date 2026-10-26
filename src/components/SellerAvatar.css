@@ -1,0 +1,15 @@
+/* Sizing and shape come from the call site's own avatar class; this only fills
+   the circle when there is no picture. */
+.seller-avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  user-select: none;
+}

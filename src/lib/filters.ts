@@ -1,6 +1,6 @@
 import type { Listing } from '../data/listings'
-import { conditionForListing } from '../data/sellers'
 import { normalizeCategory } from '../data/taxonomy'
+import { normalizeSize } from './sizes'
 
 export type Filters = {
   brands: string[]
@@ -9,6 +9,7 @@ export type Filters = {
   price: 'any' | 'u500' | '500to1500' | '1500to3000' | 'over3000'
   conditions: string[]
   onSale: boolean
+  hideSold: boolean
 }
 
 export type Sort = 'newest' | 'priceAsc' | 'priceDesc' | 'mostLiked'
@@ -20,6 +21,7 @@ export const emptyFilters: Filters = {
   price: 'any',
   conditions: [],
   onSale: false,
+  hideSold: false,
 }
 
 function inPriceBand(price: number, band: Filters['price']): boolean {
@@ -40,14 +42,16 @@ function inPriceBand(price: number, band: Filters['price']): boolean {
 export function applyFilters(listings: Listing[], filters: Filters, sort: Sort): Listing[] {
   const filtered = listings.filter((listing) => {
     if (filters.brands.length > 0 && !filters.brands.includes(listing.brand)) return false
-    if (filters.sizes.length > 0 && !filters.sizes.includes(listing.size)) return false
+    if (filters.sizes.length > 0 && !filters.sizes.map(normalizeSize).includes(normalizeSize(listing.size))) return false
     if (filters.categories.length > 0) {
       const normalized = normalizeCategory(listing.category ?? '')
       if (!filters.categories.includes(normalized)) return false
     }
     if (!inPriceBand(listing.price, filters.price)) return false
-    if (filters.conditions.length > 0 && !filters.conditions.includes(conditionForListing(listing.id))) return false
+    if (filters.conditions.length > 0 && !(listing.condition && filters.conditions.includes(listing.condition))) return false
     if (filters.onSale && !listing.originalPrice) return false
+    // Contract (Round 4): only `status === 'sold'` means sold — undefined is live.
+    if (filters.hideSold && listing.status === 'sold') return false
     return true
   })
 

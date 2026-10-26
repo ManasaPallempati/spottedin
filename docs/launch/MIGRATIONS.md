@@ -154,7 +154,7 @@ begin
   end if;
   update public.orders
   set status = 'shipped', courier = trim(p_courier), tracking_number = trim(p_tracking), shipped_at = now()
-  where id = p_order_id and status = 'paid';
+  where id = p_order_id and status = 'paid' and payment_status = 'paid';
   if not found then
     raise exception 'order is not waiting to ship';
   end if;

@@ -96,8 +96,10 @@ alter table public.payments add column if not exists buyer_fee_inr integer not n
 -- ============================================================================
 -- Whether the caller sold an order is decided from the listings the order
 -- contains, never from orders.seller_id (which the demo path writes from the
--- client). security definer keeps the orders <-> order_items policies from
--- recursing into each other.
+-- client). Only paid orders count: a demo order was never paid for, so the
+-- seller must not see it as a sale to ship, nor the buyer's address on it.
+-- security definer keeps the orders <-> order_items policies from recursing
+-- into each other.
 create or replace function public.is_order_seller(p_order_id uuid)
 returns boolean
 language sql
@@ -111,6 +113,10 @@ as $$
     join public.listings l on l.id::text = oi.listing_id
     where oi.order_id = p_order_id
       and l.seller_id = auth.uid()
+  )
+  and exists (
+    select 1 from public.orders o
+    where o.id = p_order_id and o.payment_status = 'paid'
   )
 $$;
 
@@ -143,7 +149,7 @@ begin
   end if;
   update public.orders
   set status = 'shipped', courier = trim(p_courier), tracking_number = trim(p_tracking), shipped_at = now()
-  where id = p_order_id and status = 'paid';
+  where id = p_order_id and status = 'paid' and payment_status = 'paid';
   if not found then
     raise exception 'order is not waiting to ship';
   end if;

@@ -9,7 +9,14 @@
 // Duplicate/late deliveries are safe: every handler is idempotent, and the
 // razorpay_webhook_events ledger short-circuits exact redeliveries.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { finalizePaidPayment, hmacSha256Hex, razorpayGate, timingSafeEqual, type PaymentRow } from '../_shared/razorpay.ts'
+import {
+  finalizeBoostPayment,
+  finalizePaidPayment,
+  hmacSha256Hex,
+  razorpayGate,
+  timingSafeEqual,
+  type PaymentRow,
+} from '../_shared/razorpay.ts'
 
 type PaymentEntity = { id: string; order_id: string; amount: number }
 type RefundEntity = { id: string; payment_id: string }
@@ -71,7 +78,13 @@ Deno.serve(async (req) => {
           return new Response('amount mismatch', { status: 200 })
         }
         if (payment.status === 'refunded') return new Response('already refunded', { status: 200 })
-        await finalizePaidPayment(admin, payment as PaymentRow, entity.id)
+        // Boost payments (Round 16) grant a boosts row; purchase payments
+        // become orders. Dispatch on context so one can never become the other.
+        if (payment.context === 'boost') {
+          await finalizeBoostPayment(admin, payment as PaymentRow, entity.id)
+        } else {
+          await finalizePaidPayment(admin, payment as PaymentRow, entity.id)
+        }
         return new Response('ok', { status: 200 })
       }
       case 'payment.failed': {
@@ -90,7 +103,7 @@ Deno.serve(async (req) => {
         if (!entity?.payment_id) return new Response('malformed', { status: 200 })
         const { data: payment } = await admin
           .from('payments')
-          .select('id, status')
+          .select('id, status, context')
           .eq('razorpay_payment_id', entity.payment_id)
           .maybeSingle()
         if (!payment) return new Response('unknown payment', { status: 200 })
@@ -99,7 +112,16 @@ Deno.serve(async (req) => {
           .update({ status: 'refunded', updated_at: new Date().toISOString() })
           .eq('id', payment.id)
           .eq('status', 'paid')
-        await admin.from('orders').update({ payment_status: 'refunded' }).eq('payment_id', payment.id)
+        if (payment.context === 'boost') {
+          // A refunded boost stops promoting immediately.
+          await admin
+            .from('boosts')
+            .update({ expires_at: new Date().toISOString() })
+            .eq('payment_id', payment.id)
+            .gt('expires_at', new Date().toISOString())
+        } else {
+          await admin.from('orders').update({ payment_status: 'refunded' }).eq('payment_id', payment.id)
+        }
         return new Response('ok', { status: 200 })
       }
       default:

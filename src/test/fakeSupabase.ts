@@ -153,6 +153,7 @@ export const supabase = {
 }
 
 export const LISTING_IMAGE_BASE = 'https://storage.test/listing-images/'
+export const SUPABASE_CONFIG = { url: 'https://supabase.test', anonKey: 'test-anon-key', warning: null }
 
 export function resetFakeSupabase() {
   for (const table of Object.keys(db)) delete db[table]
