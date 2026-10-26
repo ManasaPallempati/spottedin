@@ -7,7 +7,7 @@ import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentCon
 import { chargesFor, formatInr, SHIPPING_INR } from '../lib/pricing'
 import type { Address } from '../lib/addresses'
 import { useListing } from '../lib/useListings'
-import { sellerFor, sellerForListing, type Seller } from '../data/sellers'
+import { sellerFor, UNKNOWN_SELLER, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
 import AddressPicker from '../components/AddressPicker'
@@ -104,7 +104,8 @@ export default function Bag() {
     const map = new Map<string, BagGroup>()
     for (const item of bag) {
       const resolvedListing = resolved[item.listingId]
-      const seller = resolvedListing ? sellerFor(resolvedListing) : sellerForListing(item.listingId)
+      // Items still loading share one placeholder group until their seller is known.
+      const seller = resolvedListing ? sellerFor(resolvedListing) : UNKNOWN_SELLER
       const existing = map.get(seller.handle)
       if (existing) existing.items.push(item)
       else map.set(seller.handle, { seller, sellerId: resolvedListing?.sellerId ?? null, items: [item] })
@@ -270,7 +271,7 @@ export default function Bag() {
                   <div className="bag-seller-header">
                     <img className="bag-seller-avatar" src={group.seller.avatar} alt={group.seller.handle} />
                     <div className="bag-seller-meta">
-                      <span className="bag-seller-handle">@{group.seller.handle}</span>
+                      <span className="bag-seller-handle">{group.seller.handle ? `@${group.seller.handle}` : group.seller.name}</span>
                       <span className="bag-seller-count">
                         {group.items.length} item{group.items.length === 1 ? '' : 's'}
                       </span>

@@ -115,7 +115,7 @@ export default function Product() {
   const offerPreset20 = Math.round(listing.price * 0.8)
 
   const others = allListings.filter((l) => l.id !== listing.id)
-  const moreFromSeller = others.filter((l) => sellerFor(l).handle === seller.handle).slice(0, 8)
+  const moreFromSeller = seller.handle ? others.filter((l) => sellerFor(l).handle === seller.handle).slice(0, 8) : []
   const sameBrand = others.filter((l) => l.brand === listing.brand)
   const restBrand = others.filter((l) => l.brand !== listing.brand)
   const recommended = [...sameBrand, ...restBrand].slice(0, 8)
@@ -223,26 +223,32 @@ export default function Product() {
         <p className="product-condition">Condition: {condition}</p>
       </div>
 
-      <div className="product-seller-card">
-        <div className="product-seller-top">
-          <img src={seller.avatar} alt={seller.handle} className="product-seller-avatar" />
-          <div>
-            <p className="product-seller-handle">@{seller.handle}</p>
-            <div className="product-seller-rating">
-              <StarRow rating={seller.rating} />
-              <span>{seller.reviewCount} reviews</span>
+      {/* No card for a seller we couldn't resolve (e.g. a deleted account). */}
+      {seller.handle && (
+        <div className="product-seller-card">
+          <div className="product-seller-top">
+            <img src={seller.avatar} alt={seller.handle} className="product-seller-avatar" />
+            <div>
+              <p className="product-seller-handle">@{seller.handle}</p>
+              {seller.rating != null ? (
+                <div className="product-seller-rating">
+                  <StarRow rating={seller.rating} />
+                  <span>{seller.reviewCount} reviews</span>
+                </div>
+              ) : (
+                <p className="product-seller-active">New seller</p>
+              )}
             </div>
-            <p className="product-seller-active">Active this week</p>
           </div>
+          <Link to={`/shop/${seller.handle}`} className="product-seller-visit">
+            <span>Visit shop</span>
+            <ChevronRight size={18} />
+          </Link>
+          <Link to={`/inbox/t/${seller.handle}?listing=${listing.id}`} className="product-ask-link">
+            Ask a question
+          </Link>
         </div>
-        <Link to={`/shop/${seller.handle}`} className="product-seller-visit">
-          <span>Visit shop</span>
-          <ChevronRight size={18} />
-        </Link>
-        <Link to={`/inbox/t/${seller.handle}?listing=${listing.id}`} className="product-ask-link">
-          Ask a question
-        </Link>
-      </div>
+      )}
 
       {seller.reviews.length > 0 && (
         <div className="product-reviews">

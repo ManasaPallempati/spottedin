@@ -4,7 +4,7 @@ import { ChevronLeft, Send } from 'lucide-react'
 import { useAppState } from '../lib/appState'
 import { useListing, useProfileByHandle } from '../lib/useListings'
 import { listingPath } from '../lib/listingUrls'
-import { sellers } from '../data/sellers'
+import { sellerAvatar } from '../data/sellers'
 import OfferCard from '../components/OfferCard'
 import './thread.css'
 
@@ -30,10 +30,7 @@ export default function Thread() {
   const { threadFor, sendMessage, offersWith } = useAppState()
   const { listing } = useListing(listingId ?? '')
   const { profile: realProfile } = useProfileByHandle(handle)
-  const fictionalSeller = sellers.find((s) => s.handle === handle)
-  const avatar = realProfile
-    ? `https://picsum.photos/seed/spotted-seller-${handle}/300/300`
-    : fictionalSeller?.avatar ?? `https://picsum.photos/seed/${handle}/200/200`
+  const avatar = realProfile ? sellerAvatar(handle) : `https://picsum.photos/seed/${handle}/200/200`
   const messages = threadFor(handle)?.messages ?? []
   const relevantOffers = offersWith(handle)
   const offer = relevantOffers[0]
