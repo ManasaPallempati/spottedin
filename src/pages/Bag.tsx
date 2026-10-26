@@ -5,14 +5,13 @@ import { useAppState, type BagItem, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentConfig } from '../lib/payments'
 import { useListing } from '../lib/useListings'
+import { SHIPPING_INR, summarizeBag } from '../lib/bagSummary'
 import { sellerFor, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
 import ListingPhoto from '../components/ListingPhoto'
 import SellerAvatar from '../components/SellerAvatar'
 import './bag.css'
-
-const SHIPPING_INR = 49
 
 function formatInr(value: number) {
   return `₹${value.toLocaleString('en-IN')}`
@@ -34,15 +33,35 @@ function BagRow({ listingId, onResolved }: BagRowProps) {
   }, [loading, listing, listingId, onResolved])
 
   if (loading) return <div className="bag-row bag-row-loading" />
-  if (!listing) return null
+  // Deleted or hidden since it was bagged: say so and let the buyer remove it.
+  // Rendering nothing left an invisible item that still broke payment.
+  if (!listing) {
+    return (
+      <div className="bag-row bag-row-unavailable">
+        <div className="bag-row-info">
+          <p className="bag-row-brand">This item is no longer available</p>
+          <p className="bag-row-size">It is not included in your total.</p>
+        </div>
+        <button type="button" className="bag-row-remove" onClick={() => removeFromBag(listingId)}>
+          Remove
+        </button>
+      </div>
+    )
+  }
+
+  const sold = listing.status === 'sold'
 
   return (
-    <div className="bag-row">
+    <div className={sold ? 'bag-row bag-row-unavailable' : 'bag-row'}>
       <ListingPhoto className="bag-row-thumb" src={listing.img} alt={listing.brand} compact />
       <div className="bag-row-info">
         <p className="bag-row-brand">{listing.brand}</p>
         <p className="bag-row-size">{listing.size}</p>
-        <p className="bag-row-price">{formatInr(listing.price)}</p>
+        {sold ? (
+          <p className="bag-row-sold">Sold, not included in your total</p>
+        ) : (
+          <p className="bag-row-price">{formatInr(listing.price)}</p>
+        )}
       </div>
       <button type="button" className="bag-row-remove" onClick={() => removeFromBag(listingId)}>
         Remove
@@ -109,18 +128,21 @@ export default function Bag() {
     return Array.from(map.values())
   }, [bag, resolved])
 
-  const subtotal = bag.reduce((sum, item) => sum + (resolved[item.listingId]?.price ?? 0), 0)
-  const total = bag.length > 0 ? subtotal + SHIPPING_INR : 0
+  // Only live items are priced and paid for; see summarizeBag.
+  const summary = summarizeBag(bag.map((item) => item.listingId), resolved)
+  const { subtotal, shipping, total, availableIds } = summary
+  const canCheckout = !summary.pending && availableIds.length > 0
 
   function handlePlaceOrder() {
-    const items = bag.map((item) => ({
-      listingId: item.listingId,
-      priceInr: resolved[item.listingId]?.price ?? 0,
+    if (!canCheckout) return
+    const items = availableIds.map((listingId) => ({
+      listingId,
+      priceInr: resolved[listingId]?.price ?? 0,
     }))
     const snapshots: Record<string, { title: string; img: string; size: string }> = {}
-    for (const item of bag) {
-      const listing = resolved[item.listingId]
-      if (listing) snapshots[item.listingId] = { title: listing.brand, img: listing.img, size: listing.size }
+    for (const listingId of availableIds) {
+      const listing = resolved[listingId]
+      if (listing) snapshots[listingId] = { title: listing.brand, img: listing.img, size: listing.size }
     }
     const order = placeOrder(items, snapshots)
     if (order) {
@@ -130,11 +152,12 @@ export default function Bag() {
   }
 
   async function handlePayNow() {
+    if (!canCheckout) return
     setPaying(true)
     setPayError(null)
     try {
       const paid = await startRazorpayPayment(
-        { context: 'bag', listingIds: bag.map((item) => item.listingId) },
+        { context: 'bag', listingIds: availableIds },
         { name: profile?.name, email: session?.user?.email }
       )
       const order: Order = { id: paid.code, uuid: paid.uuid, items: paid.items, totalInr: paid.totalInr, placedAt: paid.placedAt }
@@ -222,7 +245,7 @@ export default function Bag() {
             </div>
             <div className="bag-summary-row">
               <span>Shipping</span>
-              <span>{formatInr(SHIPPING_INR)}</span>
+              <span>{formatInr(shipping)}</span>
             </div>
             <div className="bag-summary-row bag-summary-total">
               <span>Total</span>
@@ -231,6 +254,7 @@ export default function Bag() {
             <button
               type="button"
               className="btn btn-primary bag-checkout-btn"
+              disabled={!canCheckout}
               onClick={() => setCheckoutOpen(true)}
             >
               Checkout
@@ -265,7 +289,7 @@ export default function Bag() {
             </div>
             <div className="bag-summary-row">
               <span>Shipping</span>
-              <span>{formatInr(SHIPPING_INR)}</span>
+              <span>{formatInr(shipping)}</span>
             </div>
             <div className="bag-summary-row bag-summary-total">
               <span>Total</span>
@@ -278,11 +302,11 @@ export default function Bag() {
             </p>
           )}
           {live ? (
-            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={paying} onClick={handlePayNow}>
+            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={paying || !canCheckout} onClick={handlePayNow}>
               {paying ? 'Processing…' : `Pay ${formatInr(total)}`}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={checkingPay} onClick={handlePlaceOrder}>
+            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={checkingPay || !canCheckout} onClick={handlePlaceOrder}>
               {checkingPay ? 'Checking payment options…' : 'Place order (demo)'}
             </button>
           )}
