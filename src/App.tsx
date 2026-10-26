@@ -26,6 +26,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
+import OccasionEdit from './pages/OccasionEdit'
 import NotFound from './pages/NotFound'
 import { setPageIndexing } from './lib/seo'
 
@@ -240,6 +241,7 @@ function AppShell() {
         <Route path="/shop/:handle" element={<Shop />} />
         <Route path="/search" element={<Search />} />
         <Route path="/category/:slug" element={<Category />} />
+        <Route path="/edit/:slug" element={<OccasionEdit />} />
         <Route path="/likes" element={<Likes />} />
         <Route path="/bag" element={<Bag />} />
         <Route path="/inbox/t/:handle" element={<Thread />} />
