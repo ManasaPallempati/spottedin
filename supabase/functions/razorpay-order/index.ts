@@ -20,6 +20,7 @@ import {
   type PaymentItem,
   type PaymentRow,
 } from '../_shared/razorpay.ts'
+import { heldListingIds, holdCutoffIso, type HoldPaymentRow } from '../_shared/checkoutHold.ts'
 
 const MAX_ITEMS = 20
 const MAX_CHARGE_INR = 500_000
@@ -121,6 +122,32 @@ async function createOrder(
 ): Promise<Response> {
   const resolved = await resolveItems(admin, uid, body, supabaseUrl)
   if (resolved instanceof Response) return resolved
+
+  // Soft hold: refuse if another buyer has an unpaid payment open on any of
+  // these listings (see _shared/checkoutHold.ts). Stops two buyers paying for
+  // the same one-off item.
+  const { data: openPayments, error: holdError } = await admin
+    .from('payments')
+    .select('user_id, items')
+    .eq('status', 'created')
+    .in('context', ['bag', 'offer']) // boost payments (round 16) are not purchases
+    .neq('user_id', uid)
+    .gte('created_at', holdCutoffIso())
+  if (holdError) {
+    console.error('hold lookup failed', holdError.message)
+    return json(500, { error: 'internal', message: 'Something went wrong starting the payment.' })
+  }
+  const held = heldListingIds(
+    (openPayments ?? []) as HoldPaymentRow[],
+    resolved.items.map((it) => it.listing_id),
+    uid
+  )
+  if (held.length > 0) {
+    return json(409, {
+      error: 'listing_held',
+      message: `Someone else is checking out ${held.length > 1 ? 'some of these items' : 'this item'} right now. Please try again in a few minutes.`,
+    })
+  }
 
   const itemTotal = resolved.items.reduce((sum, it) => sum + it.price_inr, 0)
   const charged = itemTotal + SHIPPING_INR
