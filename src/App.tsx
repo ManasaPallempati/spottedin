@@ -27,6 +27,7 @@ import Signup from './pages/Signup'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
 import NotFound from './pages/NotFound'
+import AdminReports from './pages/AdminReports'
 import { setPageIndexing } from './lib/seo'
 
 function RouteIndexingPolicy() {
@@ -249,6 +250,7 @@ function AppShell() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/sell/new" element={<SellNew />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
         {/* An unmatched hash renders the 404 page instead of silently bouncing home. */}
         <Route path="*" element={<NotFound />} />
       </Routes>
