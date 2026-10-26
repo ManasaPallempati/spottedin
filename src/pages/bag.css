@@ -265,3 +265,13 @@
   padding-top: 12px;
   border-top: 1px solid var(--hairline);
 }
+
+.bag-row-unavailable .bag-row-thumb {
+  opacity: 0.5;
+}
+
+.bag-row-sold {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
