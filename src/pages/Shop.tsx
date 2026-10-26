@@ -10,6 +10,7 @@ import { applyFilters, emptyFilters, type Filters, type Sort } from '../lib/filt
 import FilterBar from '../components/FilterBar'
 import ProductCard from '../components/ProductCard'
 import ShareButton from '../components/ShareButton'
+import { profileShareText } from '../lib/whatsappShare'
 import { canonicalUrl } from '../lib/seo'
 import SellerAvatar from '../components/SellerAvatar'
 import './shop.css'
@@ -77,6 +78,7 @@ export default function Shop() {
       title={`@${handle} on SPOTTED`}
       url={canonicalUrl(`/shop/${encodeURIComponent(handle)}`)}
       label="Share this shop"
+      text={profileShareText(handle)}
     />
   )
 

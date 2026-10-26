@@ -21,3 +21,18 @@
 .share-live {
   position: fixed;
 }
+
+/* Options inside the share sheet (text mode). Reuses .btn / .btn-outline. */
+.share-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}

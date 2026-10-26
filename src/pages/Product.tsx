@@ -14,6 +14,7 @@ import BottomSheet from '../components/BottomSheet'
 import BoostSheet from '../components/BoostSheet'
 import Chip from '../components/Chip'
 import ShareButton from '../components/ShareButton'
+import { listingShareText } from '../lib/whatsappShare'
 import ListingPhoto from '../components/ListingPhoto'
 import SellerAvatar from '../components/SellerAvatar'
 import { INDIAN_CATEGORIES, normalizeCategory } from '../data/taxonomy'
@@ -298,6 +299,7 @@ export default function Product() {
           title={`${listing.brand} - Size ${listing.size} | SPOTTED`}
           url={canonicalUrl(listingPath(listing.id, listing.brand))}
           label="Share this listing"
+          text={listingShareText(title, listing.price)}
         />
       </div>
 
