@@ -28,7 +28,7 @@ and file GSTR-8).
 | Piece | Where | State |
 |---|---|---|
 | Buyer pays through Razorpay, server-side amounts | `supabase/functions/razorpay-order`, `razorpay-webhook` | Built, switched off (`RAZORPAY_ENABLED`) |
-| Order has a seller, status, `delivered_at` | `supabase/round7-shipping-fulfilment.sql` | Built (PR #59), SQL not yet run |
+| Order has a seller, status, `delivered_at` | `supabase/round20-shipping-fulfilment.sql` | Built (PR #59), SQL not yet run |
 | Delivery detected automatically | `supabase/functions/courier-tracking` | Built (PR #59), switched off (`SHIPROCKET_ENABLED`) |
 | Razorpay payment id stored per order | `payments.razorpay_payment_id` (round 6) | Built |
 | Seller linked accounts, transfers, hold/release | none | **Not built** |
@@ -62,7 +62,7 @@ Only the account owner can do these. Agents never see the keys.
 
 Each step is a small PR. None can go live before the blockers above.
 
-1. **SQL (round 9)**: `seller_payout_accounts` (seller → `acc_…` id, status:
+1. **SQL (round 22)**: `seller_payout_accounts` (seller → `acc_…` id, status:
    `not_started`/`kyc_pending`/`activated`/`suspended`) and
    `seller_transfers` (order → transfer id, amount, status:
    `on_hold`/`released`/`reversed`/`failed`, `release_after`). Service-role
