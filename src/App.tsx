@@ -23,6 +23,7 @@ import Sizes from './pages/onboarding/Sizes'
 import Brands from './pages/onboarding/Brands'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import AccountPassword from './pages/AccountPassword'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
 import { setPageIndexing } from './lib/seo'
@@ -74,6 +75,7 @@ function AppShell() {
     isFullBleed ||
     location.pathname === '/login' ||
     location.pathname === '/signup' ||
+    location.pathname === '/account/password' ||
     location.pathname === '/sell' ||
     location.pathname === '/sell/new' ||
     location.pathname.startsWith('/onboarding')
@@ -123,6 +125,7 @@ function AppShell() {
         <Route path="/onboarding/brands" element={<Brands />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/account/password" element={<AccountPassword />} />
         <Route path="/sell/new" element={<SellNew />} />
         {/* Without this an unmatched hash renders an empty shell rather than a page. */}
         <Route path="*" element={<Navigate to="/" replace />} />

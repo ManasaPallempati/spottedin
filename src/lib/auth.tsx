@@ -22,6 +22,11 @@ export type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  // True when the account can sign in with email + password (email signup, or a
+  // password added later from Account settings).
+  hasPassword: boolean
+  setPassword: (password: string, nonce?: string) => Promise<{ error: string | null; code: string | null }>
+  sendReauthCode: () => Promise<{ error: string | null }>
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -94,6 +99,13 @@ async function ensureProfile(userId: string, meta: { handle?: string; name?: str
 
   console.warn(error)
   return null
+}
+
+function userHasPassword(session: Session | null): boolean {
+  const user = session?.user
+  if (!user) return false
+  if (user.user_metadata?.has_password === true) return true
+  return (user.identities ?? []).some((i) => i.provider === 'email')
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -174,6 +186,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }
 
+  // Lets OAuth-only users (e.g. Google) add a password so they can also log in with
+  // email + password. If Supabase's "Secure password change" is on and the session
+  // isn't recent, this fails with code 'reauthentication_needed'; the caller then
+  // sends a code via sendReauthCode() and retries with it as `nonce`.
+  async function setPassword(password: string, nonce?: string): Promise<{ error: string | null; code: string | null }> {
+    const { error } = await supabase.auth.updateUser({
+      password,
+      nonce,
+      data: { has_password: true },
+    })
+    return { error: error?.message ?? null, code: error?.code ?? null }
+  }
+
+  async function sendReauthCode(): Promise<{ error: string | null }> {
+    const { error } = await supabase.auth.reauthenticate()
+    return { error: error?.message ?? null }
+  }
+
   async function signOut(): Promise<void> {
     await supabase.auth.signOut()
   }
@@ -187,6 +217,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInWithOAuth,
     signOut,
+    hasPassword: userHasPassword(session),
+    setPassword,
+    sendReauthCode,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
