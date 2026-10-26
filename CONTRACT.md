@@ -690,7 +690,7 @@ a one-line Total that expands into a receipt (`PriceBreakdown`), a "Ships to" ro
 (`AddressPicker`: saved addresses + inline add form, validated against the table's checks),
 and the payment row. Placing an order needs an address.
 
-`supabase/round7-shipping-fulfilment.sql`: `spotted_addresses` (own-row select/insert/delete),
+`supabase/round20-shipping-fulfilment.sql`: `spotted_addresses` (own-row select/insert/delete),
 orders gains `seller_id`, `ship_to` (address snapshot), `shipping_inr`, `buyer_fee_inr`,
 `status` (`paid` → `shipped` → `delivered`, or `cancelled`), `courier`, `tracking_number`,
 `shipped_at`, `delivered_at`. Clients may insert only the charge/snapshot columns; status
@@ -717,7 +717,7 @@ integration, a "large parcel" shipping tier.
 
 | Agent | Owns |
 |---|---|
-| single session | supabase/round7-shipping-fulfilment.sql, supabase/functions/_shared/razorpay.ts, supabase/functions/razorpay-order/index.ts, src/lib/pricing.ts, src/lib/addresses.ts, src/lib/appState.tsx, src/lib/payments.ts, src/components/AddressPicker.tsx, src/components/PriceBreakdown.tsx, src/components/checkout.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, src/pages/Bag.tsx, src/pages/bag.css, src/pages/Order.tsx, src/pages/order.css, src/pages/Profile.tsx, src/pages/profile.css, src/pages/Product.tsx (Buy now link), src/App.tsx (route), docs/launch/RAZORPAY.md, CONTRACT.md |
+| single session | supabase/round20-shipping-fulfilment.sql, supabase/functions/_shared/razorpay.ts, supabase/functions/razorpay-order/index.ts, src/lib/pricing.ts, src/lib/addresses.ts, src/lib/appState.tsx, src/lib/payments.ts, src/components/AddressPicker.tsx, src/components/PriceBreakdown.tsx, src/components/checkout.css, src/components/OfferCheckout.tsx, src/components/OfferCheckout.css, src/pages/Bag.tsx, src/pages/bag.css, src/pages/Order.tsx, src/pages/order.css, src/pages/Profile.tsx, src/pages/profile.css, src/pages/Product.tsx (Buy now link), src/App.tsx (route), docs/launch/RAZORPAY.md, CONTRACT.md |
 
 ## Round 8 — Shiprocket labels and automatic tracking (server-gated)
 
@@ -740,4 +740,4 @@ Client: `src/lib/courier.ts` (`fetchCourierEnabled`, `bookCourier`, `usePickupAd
 
 | Agent | Owns |
 |---|---|
-| single session | supabase/round8-courier-labels.sql, supabase/functions/_shared/shiprocket.ts, supabase/functions/courier-label/index.ts, supabase/functions/courier-tracking/index.ts, src/lib/courier.ts, src/lib/appState.tsx, src/components/AddressPicker.tsx, src/pages/Order.tsx, src/pages/order.css, src/pages/Bag.tsx, src/components/OfferCheckout.tsx, docs/launch/SHIPROCKET.md, CONTRACT.md |
+| single session | supabase/round21-courier-labels.sql, supabase/functions/_shared/shiprocket.ts, supabase/functions/courier-label/index.ts, supabase/functions/courier-tracking/index.ts, src/lib/courier.ts, src/lib/appState.tsx, src/components/AddressPicker.tsx, src/pages/Order.tsx, src/pages/order.css, src/pages/Bag.tsx, src/components/OfferCheckout.tsx, docs/launch/SHIPROCKET.md, CONTRACT.md |

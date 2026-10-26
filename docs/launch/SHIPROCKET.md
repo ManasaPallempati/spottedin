@@ -1,4 +1,4 @@
-# Shiprocket labels and tracking — setup & activation (Round 8)
+# Shiprocket labels and tracking — setup & activation (SQL round 21)
 
 Spotted books the courier for every **Razorpay-paid** order. The seller picks a
 pickup address, taps "Get shipping label", prints the label and hands the
@@ -41,7 +41,7 @@ secret, both functions fail closed and the app shows the manual form.
   statuses get a 200 so Shiprocket does not retry. The function name avoids
   "shiprocket" because Shiprocket rejects webhook URLs containing
   "shiprocket", "kartrocket", "sr" or "kr".
-- `supabase/round8-courier-labels.sql`: `spotted_seller_pickup` (one row per
+- `supabase/round21-courier-labels.sql`: `spotted_seller_pickup` (one row per
   seller; the client can set `address_id` and only ever clear
   `courier_location`), courier columns on `orders` (service-role writes
   only), and a `mark_order_shipped` that refuses Shiprocket-booked orders.
@@ -56,8 +56,8 @@ charged to the Shiprocket wallet; keep it topped up.
 2. Create an API user (Settings → API → Configure / Create API user) with an
    email different from the account login. Never paste its password into
    chat or commit it.
-3. Run `supabase/round8-courier-labels.sql` in the Supabase SQL editor
-   (after round 7).
+3. Run `supabase/round21-courier-labels.sql` in the Supabase SQL editor
+   (after round 20).
 4. Deploy the functions:
    ```
    supabase functions deploy courier-label
