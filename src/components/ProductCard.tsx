@@ -4,6 +4,7 @@ import { Heart } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useAppState } from '../lib/appState'
 import { listingPath } from '../lib/listingUrls'
+import ListingPhoto from './ListingPhoto'
 import './ProductCard.css'
 
 type ProductCardProps = {
@@ -23,7 +24,12 @@ export default function ProductCard({ listing }: ProductCardProps) {
   return (
     <Link to={listingPath(id, brand)} className="product-card">
       <div className="product-card-image-wrap">
-        <img src={img} alt={brand} loading="lazy" />
+        <ListingPhoto src={img} alt={brand} loading="lazy" />
+        {/* Contract (Round 4): only `status === 'sold'` means sold — undefined is live. */}
+        {listing.status === 'sold' && <span className="product-card-sold">Sold</span>}
+        {listing.boostedUntil != null && listing.boostedUntil > Date.now() && (
+          <span className="product-card-boosted">Boosted</span>
+        )}
         <button
           className={`product-card-like${justLiked ? ' heart-burst' : ''}`}
           aria-label="Like"
@@ -40,11 +46,17 @@ export default function ProductCard({ listing }: ProductCardProps) {
         </button>
       </div>
       <div className="product-card-info">
-        <p className="product-card-brand">{brand}</p>
-        <p className="product-card-size">{size}</p>
         <p className="product-card-price">
           {formatInr(price)}
-          {originalPrice && <span className="product-card-original">{formatInr(originalPrice)}</span>}
+          {originalPrice != null && originalPrice > price && (
+            <s className="product-card-original" aria-label={`was ${formatInr(originalPrice)}`}>
+              {formatInr(originalPrice)}
+            </s>
+          )}
+        </p>
+        <p className="product-card-meta">
+          <span className="product-card-brand">{brand}</span>
+          {size && <span className="product-card-size"> · {size}</span>}
         </p>
       </div>
     </Link>

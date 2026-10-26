@@ -18,10 +18,10 @@ export default function Sell() {
 
       <div className="sell-polaroids" aria-hidden="true">
         <div className="sell-polaroid sell-polaroid-1">
-          <img src="https://picsum.photos/seed/spotted-sell-p1/400/500" alt="" />
+          <img src="/images/catalog/chikankari-kurta-ivory.webp" alt="" />
         </div>
         <div className="sell-polaroid sell-polaroid-2">
-          <img src="https://picsum.photos/seed/spotted-sell-p2/400/500" alt="" />
+          <img src="/images/catalog/sharara-marigold.webp" alt="" />
         </div>
       </div>
 

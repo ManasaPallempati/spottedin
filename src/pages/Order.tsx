@@ -6,6 +6,7 @@ import { formatAddress, type Address } from '../lib/addresses'
 import { bookCourier, CourierError, fetchCourierEnabled, usePickupAddress } from '../lib/courier'
 import { formatInr } from '../lib/pricing'
 import AddressPicker from '../components/AddressPicker'
+import ListingPhoto from '../components/ListingPhoto'
 import './order.css'
 
 // Sellers are asked to ship within this many days of the order.
@@ -37,6 +38,10 @@ function statusCopy(order: OrderModel, isSeller: boolean): { title: string; deta
     case 'cancelled':
       return { title: 'Order cancelled', detail: `Placed: ${formatDate(order.placedAt)}` }
     default:
+      // Sellers never see demo orders (is_order_seller), so this is the buyer's view.
+      if (order.paymentStatus === 'demo') {
+        return { title: 'Demo order', detail: "No payment was taken, so the seller won't ship this." }
+      }
       return {
         title: isSeller ? 'Ready to ship' : 'Waiting for the seller to ship',
         detail: `Ship by ${shipBy}`,
@@ -277,7 +282,7 @@ export default function Order() {
       <div className="order-body">
         {order.items.map((item) => (
           <div className="order-item" key={item.listingId}>
-            <img className="order-item-img" src={item.img ?? `https://picsum.photos/seed/${item.listingId}/200/200`} alt="" />
+            <ListingPhoto className="order-item-img" src={item.img} alt={item.title ?? 'Ordered item'} compact />
             <div className="order-item-info">
               <p className="order-item-title">{item.title ?? 'Item'}</p>
               {item.size && <p className="order-item-size">{item.size}</p>}
