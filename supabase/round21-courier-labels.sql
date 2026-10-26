@@ -1,9 +1,9 @@
--- Spotted Round 8 — Shiprocket labels and automatic tracking
+-- Spotted round 21 (was round 8) — Shiprocket labels and automatic tracking
 -- No agent applies this migration — a human runs it in the Supabase SQL editor.
--- Requires round7-shipping-fulfilment.sql. Idempotent; safe to re-run.
+-- Requires round20-shipping-fulfilment.sql. Idempotent; safe to re-run.
 --
 -- Before running: confirm `spotted_seller_pickup` does not already exist
--- (information_schema.tables) — see the note in round7.
+-- (information_schema.tables) — see the note in round20.
 
 -- ============================================================================
 -- spotted_seller_pickup — where each seller's parcels are collected from

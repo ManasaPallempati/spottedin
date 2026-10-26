@@ -45,7 +45,7 @@ service role (Edge Functions) can write them. The demo path keeps inserting
 `(id, buyer_id, code, total_inr)` plus Round 7's `(seller_id, ship_to,
 shipping_inr, buyer_fee_inr)` and lands on the `'demo'` default. Order
 `status`, courier and tracking move only through the `mark_order_shipped` /
-`mark_order_received` functions (`supabase/round7-shipping-fulfilment.sql`).
+`mark_order_received` functions (`supabase/round20-shipping-fulfilment.sql`).
 
 Amount conventions: `orders.total_inr` stays **item-price-only** (existing app
 convention); the actual charge (`payments.charged_inr`) is items + ₹79
@@ -58,7 +58,7 @@ both together.
 ## Activation prerequisites (human, in order — none performed by agents)
 
 1. Run `supabase/round6-razorpay-checkout.sql`, then
-   `supabase/round7-shipping-fulfilment.sql`, in the Supabase SQL editor.
+   `supabase/round20-shipping-fulfilment.sql`, in the Supabase SQL editor.
 2. Deploy the functions (Supabase CLI, logged into project `masdygvcssrtwseopfmj`):
    ```
    supabase functions deploy razorpay-order

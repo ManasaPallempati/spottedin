@@ -1,4 +1,4 @@
--- Spotted Round 7 — saved addresses, buyer fee + flat shipping, order tracking
+-- Spotted round 20 (was round 7) — saved addresses, buyer fee + flat shipping, order tracking
 -- No agent applies this migration — a human runs it in the Supabase SQL editor.
 -- Requires round6-razorpay-checkout.sql (payments table, orders.payment_*).
 -- Idempotent: guarded creates, drop-before-create policies, exception-guarded

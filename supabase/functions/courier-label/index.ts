@@ -186,7 +186,7 @@ async function book(admin: SupabaseClient, uid: string, sellerEmail: string, bod
     courierName = assigned.response?.data?.courier_name ?? 'Courier'
     if (!awb) throw new ShiprocketError('assign courier', 'no AWB returned')
     // From here the order belongs to Shiprocket: tracking updates move it, and
-    // the manual "mark as shipped" path is closed (round8 mark_order_shipped).
+    // the manual "mark as shipped" path is closed (round21 mark_order_shipped).
     await admin
       .from('orders')
       .update({ courier_provider: 'shiprocket', courier: courierName, tracking_number: awb, courier_status: 'AWB ASSIGNED' })
