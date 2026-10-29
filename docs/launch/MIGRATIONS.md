@@ -16,7 +16,7 @@ now:
 | `round8-courier-labels.sql` | `round21-courier-labels.sql` |
 
 `TEST2026.02` keeps its own `round7-account-deletion.sql` and
-`round8-handle-rules.sql`. Next free number on both lines: **22**.
+`round8-handle-rules.sql`. Next free number on both lines: **23** (22 is `round22-saves.sql`).
 
 ## Run order
 
@@ -28,6 +28,12 @@ other.
 1. `round6-razorpay-checkout.sql`, if not already run
 2. `round20-shipping-fulfilment.sql`
 3. `round21-courier-labels.sql`
+
+**Saves (PR #70):**
+
+1. `round22-saves.sql`. It only needs `profiles`, so it can run at any time.
+   Until it runs, the Save button does nothing lasting (the app logs a
+   warning and the Saves tab stays empty).
 
 **Moderation (PR #64, on `TEST2026.02`):**
 
@@ -80,6 +86,14 @@ where routine_schema = 'public' and routine_name in ('is_order_seller', 'mark_or
 
 select table_name from information_schema.tables
 where table_schema = 'public' and table_name = 'spotted_seller_pickup';
+-- Expect: 0 rows on a first run.
+```
+
+### round22-saves.sql
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' and table_name = 'saves';
 -- Expect: 0 rows on a first run.
 ```
 
@@ -232,6 +246,16 @@ commit;
 The Razorpay Edge Functions from PR #59 write these columns. If the
 Razorpay or Shiprocket functions were deployed, redeploy the earlier versions
 or unset `RAZORPAY_ENABLED` / `SHIPROCKET_ENABLED` before rolling back.
+
+### Roll back round22-saves.sql
+
+```sql
+begin;
+
+drop table if exists public.saves;  -- also drops its policies and index; every saved item is lost
+
+commit;
+```
 
 ### Roll back round19-moderation-queue.sql
 
