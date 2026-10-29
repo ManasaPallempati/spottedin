@@ -110,8 +110,23 @@ where table_schema = 'public' and table_name = 'moderators';
 - **round21:** nothing changes in the app until Shiprocket is switched on (see
   `SHIPROCKET.md`). Check that the seller's order page still shows the manual
   "Mark as shipped" form.
-- **round19:** add yourself to `public.moderators`. The SQL is at the top of
-  the file. Then open `/admin/reports`.
+- **round19:** add yourself to `public.moderators`, then open `/admin/reports`.
+  If you don't know your handle, look it up by your login email:
+
+  ```sql
+  select p.handle from public.profiles p
+  join auth.users u on u.id = p.id
+  where u.email = 'you@example.com';
+
+  insert into public.moderators (user_id)
+  select id from public.profiles where handle = '<your handle>';
+  -- Expect: 1 row. 0 rows means the handle didn't match.
+  ```
+
+  Supabase warns that round17, round19, round20 and round21 contain
+  "destructive operations". The warning comes from `drop policy if exists`
+  (and `drop trigger if exists` in round21), which re-create rules; no
+  existing rows are deleted.
 
 Tested on 2026-10-26 against a scratch Postgres 16 with Supabase stand-ins
 for `auth.uid()` and the roles (not against Supabase itself):
