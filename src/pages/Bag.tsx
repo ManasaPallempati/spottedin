@@ -363,7 +363,7 @@ export default function Bag() {
             <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
           </div>
           <div className="bag-checkout-section bag-checkout-divider">
-            <p className="bag-checkout-label">Payment</p>
+            <p className="checkout-section-heading">Payment</p>
             <div className="bag-checkout-payment-row">
               {live ? (
                 <span>Razorpay · UPI, cards, netbanking</span>

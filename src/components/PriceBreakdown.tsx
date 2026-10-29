@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
+import { ChevronRight, HelpCircle } from 'lucide-react'
 import { formatInr, type Charges } from '../lib/pricing'
+import FullScreenPanel from './FullScreenPanel'
 import './checkout.css'
 
 type PriceBreakdownProps = {
@@ -8,25 +9,26 @@ type PriceBreakdownProps = {
   itemLabel: string
 }
 
-// One-line total that opens into the full receipt: item, shipping, buyer
-// protection fee (with an explainer) and total.
+// "Order summary" row with the total; tapping it opens the full receipt on its
+// own screen: item, shipping, buyer protection fee (with an explainer), total.
 export default function PriceBreakdown({ charges, itemLabel }: PriceBreakdownProps) {
   const [open, setOpen] = useState(false)
   const [feeInfo, setFeeInfo] = useState(false)
 
   return (
     <div className="checkout-breakdown">
-      <button type="button" className="checkout-row-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <p className="checkout-section-heading">Order summary</p>
+      <button type="button" className="checkout-row-btn" aria-haspopup="dialog" onClick={() => setOpen(true)}>
         <span className="checkout-row-text">
           <span className="checkout-total-line">Total: {formatInr(charges.total)}</span>
           <span className="checkout-row-value">
             Includes {formatInr(charges.shipping)} shipping and {formatInr(charges.buyerFee)} buyer protection fee
           </span>
         </span>
-        {open ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        <ChevronRight size={20} />
       </button>
 
-      {open && (
+      <FullScreenPanel open={open} onClose={() => setOpen(false)} title="Checkout summary">
         <div className="checkout-receipt">
           <div className="checkout-receipt-row">
             <span className="checkout-receipt-item">{itemLabel}</span>
@@ -61,7 +63,7 @@ export default function PriceBreakdown({ charges, itemLabel }: PriceBreakdownPro
             <span>{formatInr(charges.total)}</span>
           </div>
         </div>
-      )}
+      </FullScreenPanel>
     </div>
   )
 }

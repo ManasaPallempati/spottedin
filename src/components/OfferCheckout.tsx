@@ -143,7 +143,7 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
             <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
           </div>
           <div className="offer-checkout-section offer-checkout-divider">
-            <p className="offer-checkout-label">Payment</p>
+            <p className="checkout-section-heading">Payment</p>
             <div className="offer-checkout-payment-row">
               {live ? (
                 <span>Razorpay · UPI, cards, netbanking</span>
