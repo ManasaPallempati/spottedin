@@ -319,7 +319,7 @@ export default function Bag() {
                         onClick={() => {
                           const live = liveItems(group)
                           if (live.length === 1) navigate(`${listingPath(live[0].id, live[0].brand)}?offer=1`)
-                          else navigate(`/inbox/t/${encodeURIComponent(group.seller.handle)}`)
+                          else navigate(`/inbox/t/${encodeURIComponent(group.seller.handle)}?listing=${encodeURIComponent(live[0].id)}`)
                         }}
                       >
                         {count > 1 ? 'Message seller' : 'Make offer'}
