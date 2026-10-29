@@ -125,7 +125,8 @@ where table_schema = 'public' and table_name = 'moderators';
 
   Supabase warns that round17, round19, round20 and round21 contain
   "destructive operations". The warning comes from `drop policy if exists`
-  (and `drop trigger if exists` in round21), which re-create rules; no
+  (plus `revoke` in round19 and `drop trigger if exists` in round21). These
+  only reset access rules before re-creating them; no
   existing rows are deleted.
 
 Tested on 2026-10-26 against a scratch Postgres 16 with Supabase stand-ins
