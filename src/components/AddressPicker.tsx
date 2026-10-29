@@ -6,6 +6,8 @@ import './checkout.css'
 type AddressPickerProps = {
   selected: Address | null
   onSelect: (address: Address) => void
+  // Called when the selected address is removed, so the parent can drop it.
+  onClear?: () => void
   label?: string
   // Pick the most recent saved address automatically (checkout). Off where
   // choosing is a deliberate save, like a seller's pickup address.
@@ -32,10 +34,14 @@ export default function AddressPicker({
   label = 'Ships to',
   autoSelect = true,
   selectedId = null,
+  onClear,
 }: AddressPickerProps) {
-  const { addresses, loading, addAddress } = useAddresses()
+  const { addresses, loading, addAddress, removeAddress } = useAddresses()
   const [expanded, setExpanded] = useState(false)
   const [adding, setAdding] = useState(false)
+  // There is no update policy on spotted_addresses: an edit saves a new row
+  // and removes the old one. Orders keep their own copy of the address.
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AddressDraft>(EMPTY_ADDRESS)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -59,9 +65,9 @@ export default function AddressPicker({
     setError(null)
     try {
       const saved = await addAddress(draft)
+      if (editingId) await removeAddress(editingId)
       onSelect(saved)
-      setDraft(EMPTY_ADDRESS)
-      setAdding(false)
+      closeForm()
       setExpanded(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this address.')
@@ -70,7 +76,34 @@ export default function AddressPicker({
     }
   }
 
-  const showForm = adding || (!loading && addresses.length === 0 && expanded)
+  function closeForm() {
+    setDraft(EMPTY_ADDRESS)
+    setAdding(false)
+    setEditingId(null)
+    setError(null)
+  }
+
+  function startEdit(a: Address) {
+    const { id, ...fields } = a
+    setDraft(fields)
+    setEditingId(id)
+    setAdding(false)
+    setError(null)
+  }
+
+  async function handleRemove(a: Address) {
+    if (!window.confirm(`Remove ${a.name}, ${formatAddress(a)}?`)) return
+    setError(null)
+    try {
+      await removeAddress(a.id)
+      if (editingId === a.id) closeForm()
+      if (selected?.id === a.id) onClear?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove this address.')
+    }
+  }
+
+  const showForm = adding || editingId !== null || (!loading && addresses.length === 0 && expanded)
 
   return (
     <div className="checkout-ships-to">
@@ -98,23 +131,39 @@ export default function AddressPicker({
       {expanded && (
         <div className="checkout-address-panel">
           {addresses.map((a) => (
-            <label key={a.id} className="checkout-address-option">
-              <input
-                type="radio"
-                name={label}
-                checked={selected?.id === a.id}
-                onChange={() => {
-                  onSelect(a)
-                  setExpanded(false)
-                }}
-              />
-              <span>
-                <span className="checkout-address-name">{a.name}</span>
-                <span className="checkout-address-line">{formatAddress(a)}</span>
-                <span className="checkout-address-line">{a.phone}</span>
-              </span>
-            </label>
+            <div key={a.id} className="checkout-address-item">
+              <label className="checkout-address-option">
+                <input
+                  type="radio"
+                  name={label}
+                  checked={selected?.id === a.id}
+                  onChange={() => {
+                    onSelect(a)
+                    setExpanded(false)
+                  }}
+                />
+                <span>
+                  <span className="checkout-address-name">{a.name}</span>
+                  <span className="checkout-address-line">{formatAddress(a)}</span>
+                  <span className="checkout-address-line">{a.phone}</span>
+                </span>
+              </label>
+              <div className="checkout-address-actions">
+                <button type="button" onClick={() => startEdit(a)}>
+                  Edit
+                </button>
+                <button type="button" onClick={() => void handleRemove(a)}>
+                  Remove
+                </button>
+              </div>
+            </div>
           ))}
+
+          {error && !showForm && (
+            <p className="checkout-error" role="alert">
+              {error}
+            </p>
+          )}
 
           {showForm ? (
             <form className="checkout-address-form" onSubmit={handleSave} noValidate>
@@ -139,7 +188,7 @@ export default function AddressPicker({
               )}
               <div className="checkout-address-form-actions">
                 {addresses.length > 0 && (
-                  <button type="button" className="btn btn-outline" onClick={() => setAdding(false)}>
+                  <button type="button" className="btn btn-outline" onClick={closeForm}>
                     Cancel
                   </button>
                 )}

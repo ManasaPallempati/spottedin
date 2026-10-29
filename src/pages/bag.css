@@ -278,6 +278,15 @@
   margin-top: 6px;
 }
 
+.bag-group-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.bag-group-actions .bag-checkout-btn {
+  flex: 1;
+}
+
 /* --- checkout sheet --- */
 
 .bag-checkout {

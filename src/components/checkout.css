@@ -61,6 +61,28 @@
   cursor: pointer;
 }
 
+.checkout-address-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkout-address-actions {
+  display: flex;
+  gap: 18px;
+  padding-left: 12px;
+}
+
+.checkout-address-actions button {
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .checkout-address-option input {
   margin-top: 3px;
   accent-color: var(--accent);

@@ -149,6 +149,19 @@ export default function Product() {
   const [offerSent, setOfferSent] = useState(false)
   const [offerAmount, setOfferAmount] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
+
+  // The bag's "Make offer" links here with ?offer=1: open the offer sheet once
+  // the listing has loaded, then drop the flag so a refresh doesn't reopen it.
+  const wantsOffer = new URLSearchParams(location.search).get('offer') === '1'
+  useEffect(() => {
+    if (!wantsOffer || !listing) return
+    navigate(location.pathname, { replace: true })
+    const ownListing = !!listing.sellerId && profile?.id === listing.sellerId
+    if (!isAuthed || ownListing || listing.status === 'sold') return
+    setOfferAmount(Math.round(listing.price * 0.9))
+    setOfferSent(false)
+    setOfferOpen(true)
+  }, [wantsOffer, listing, isAuthed, profile?.id, navigate, location.pathname])
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

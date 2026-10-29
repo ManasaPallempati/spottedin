@@ -90,5 +90,18 @@ export function useAddresses() {
     [uid]
   )
 
-  return { addresses, loading, addAddress }
+  const removeAddress = useCallback(
+    async (id: string): Promise<void> => {
+      if (!uid) throw new Error('Log in to change your addresses.')
+      const { error } = await supabase.from('spotted_addresses').delete().eq('id', id).eq('user_id', uid)
+      if (error) {
+        console.warn(error)
+        throw new Error('Could not remove this address. Try again.')
+      }
+      setAddresses((prev) => prev.filter((a) => a.id !== id))
+    },
+    [uid]
+  )
+
+  return { addresses, loading, addAddress, removeAddress }
 }

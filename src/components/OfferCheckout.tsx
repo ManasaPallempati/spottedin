@@ -140,7 +140,7 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
             <PriceBreakdown charges={charges} itemLabel={listing.brand} />
           </div>
           <div className="offer-checkout-section offer-checkout-divider">
-            <AddressPicker selected={shipTo} onSelect={setShipTo} />
+            <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
           </div>
           <div className="offer-checkout-section offer-checkout-divider">
             <p className="offer-checkout-label">Payment</p>

@@ -179,6 +179,7 @@ function CourierShipping({ order }: { order: OrderModel }) {
           selectedId={addressId}
           selected={pickup}
           onSelect={choosePickup}
+          onClear={() => setPickup(null)}
         />
       )}
       {error && (
