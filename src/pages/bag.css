@@ -60,6 +60,51 @@
   font-weight: 700;
 }
 
+.bag-seller-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bag-seller-count {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.bag-seller-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.bag-seller-subtotal {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bag-seller-shipping {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.bag-protection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 20px 20px;
+  padding: 12px 14px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bag-protection-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .bag-row {
   display: flex;
   align-items: center;
@@ -70,6 +115,25 @@
   height: 72px;
   border-radius: var(--radius-card);
   background: var(--surface);
+}
+
+.bag-row-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.bag-row-sold {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-card);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .bag-row-thumb {
@@ -181,7 +245,7 @@
   width: 100%;
 }
 
-/* --- summary card --- */
+/* --- per-seller checkout --- */
 
 .bag-summary {
   margin: 24px 20px 0;
@@ -212,6 +276,15 @@
 .bag-checkout-btn {
   width: 100%;
   margin-top: 6px;
+}
+
+.bag-group-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.bag-group-actions .bag-checkout-btn {
+  flex: 1;
 }
 
 /* --- checkout sheet --- */
@@ -261,7 +334,27 @@
   color: var(--accent);
 }
 
-.bag-checkout-summary {
-  padding-top: 12px;
+.bag-checkout-divider {
+  padding-top: 16px;
   border-top: 1px solid var(--hairline);
+}
+
+.bag-checkout-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bag-checkout-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bag-checkout-item img {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-card);
+  object-fit: cover;
+  background: var(--surface);
 }

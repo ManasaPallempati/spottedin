@@ -4,11 +4,13 @@ import { CheckCircle } from 'lucide-react'
 import { useAppState, type Offer, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentConfig } from '../lib/payments'
+import { chargesFor, formatInr } from '../lib/pricing'
+import type { Address } from '../lib/addresses'
 import type { Listing } from '../data/listings'
 import BottomSheet from './BottomSheet'
+import AddressPicker from './AddressPicker'
+import PriceBreakdown from './PriceBreakdown'
 import './OfferCheckout.css'
-
-const SHIPPING_INR = 49
 
 type OfferCheckoutProps = {
   offer: Offer
@@ -26,10 +28,10 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
   const [payConfig, setPayConfig] = useState<PaymentConfig | null>(null)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
-  const amount = offer.amountInr.toLocaleString('en-IN')
-  // Displayed Total is item price + shipping, matching Bag.tsx's checkout sheet
-  // convention — only the persisted Order.totalInr (via placeOrder) is item-price-only.
-  const displayTotal = (offer.amountInr + SHIPPING_INR).toLocaleString('en-IN')
+  const [shipTo, setShipTo] = useState<Address | null>(null)
+  // Displayed Total is item + shipping + buyer fee, matching Bag.tsx's checkout
+  // sheet — only the persisted Order.totalInr (via placeOrder) is item-price-only.
+  const charges = chargesFor(offer.amountInr)
 
   // Demo is the default; live mode only after the Edge Function confirms the
   // server-side Razorpay gate is open. Any error resolves to demo (fail closed).
@@ -48,9 +50,11 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
   const checkingPay = payConfig === null
 
   function handlePlaceOrder() {
+    if (!shipTo) return
     const order = placeOrder(
       [{ listingId: listing.id, priceInr: offer.amountInr }],
-      { [listing.id]: { title: listing.brand, img: listing.img, size: listing.size } }
+      { [listing.id]: { title: listing.brand, img: listing.img, size: listing.size } },
+      { shipTo, shippingInr: charges.shipping, buyerFeeInr: charges.buyerFee, sellerId: listing.sellerId ?? null, sellerHandle: offer.peerHandle }
     )
     if (order) {
       sendMessage(
@@ -62,14 +66,35 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
   }
 
   async function handlePayNow() {
+    if (!shipTo) return
     setPaying(true)
     setPayError(null)
     try {
       const paid = await startRazorpayPayment(
-        { context: 'offer', offerId: offer.id },
+        { context: 'offer', offerId: offer.id, addressId: shipTo.id },
         { name: profile?.name, email: session?.user?.email }
       )
-      const order: Order = { id: paid.code, uuid: paid.uuid, items: paid.items, totalInr: paid.totalInr, placedAt: paid.placedAt }
+      const order: Order = {
+        id: paid.code,
+        uuid: paid.uuid,
+        items: paid.items.map((it) => ({ ...it, title: listing.brand, img: listing.img, size: listing.size })),
+        totalInr: paid.totalInr,
+        placedAt: paid.placedAt,
+        shippingInr: paid.shippingInr,
+        buyerFeeInr: paid.buyerFeeInr,
+        shipTo,
+        status: 'paid',
+        courier: null,
+        trackingNumber: null,
+        shippedAt: null,
+        deliveredAt: null,
+        buyerHandle: null,
+        sellerHandle: offer.peerHandle,
+        paymentStatus: 'paid',
+        courierProvider: null,
+        courierStatus: null,
+        labelUrl: null,
+      }
       applyPaidOrder(order)
       sendMessage(
         offer.peerHandle,
@@ -98,24 +123,26 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
           <h2 className="offer-checkout-confirm-title">Order placed!</h2>
           <p className="offer-checkout-confirm-id">{placedOrder.id}</p>
           <p className="offer-checkout-confirm-copy">
-            {placedLive ? '₹' + displayTotal + ' paid via Razorpay.' : 'This is a demo — no payment was taken.'}
+            {placedLive ? formatInr(charges.total) + ' paid via Razorpay.' : 'This is a demo — no payment was taken.'}
           </p>
           <div className="offer-checkout-confirm-actions">
             <button type="button" className="btn btn-primary" onClick={handleKeepBrowsing}>
               Keep browsing
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/profile')}>
-              View purchases
+            <button type="button" className="btn btn-outline" onClick={() => navigate(`/order/${placedOrder.uuid}`)}>
+              Track order
             </button>
           </div>
         </div>
       ) : (
         <div className="offer-checkout">
           <div className="offer-checkout-section">
-            <p className="offer-checkout-label">Shipping address</p>
-            <p className="offer-checkout-address">{profile?.name ?? 'Manasa P'}, 221 MG Road, Bengaluru 560001</p>
+            <PriceBreakdown charges={charges} itemLabel={listing.brand} />
           </div>
-          <div className="offer-checkout-section">
+          <div className="offer-checkout-section offer-checkout-divider">
+            <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
+          </div>
+          <div className="offer-checkout-section offer-checkout-divider">
             <p className="offer-checkout-label">Payment</p>
             <div className="offer-checkout-payment-row">
               {live ? (
@@ -128,37 +155,28 @@ export default function OfferCheckout({ offer, listing, open, onClose }: OfferCh
               )}
             </div>
           </div>
-          <div className="offer-checkout-section offer-checkout-summary">
-            <div className="offer-checkout-summary-row">
-              <span>Item price</span>
-              <span>₹{amount}</span>
-            </div>
-            <div className="offer-checkout-summary-row">
-              <span>Shipping</span>
-              <span>₹{SHIPPING_INR}</span>
-            </div>
-            <div className="offer-checkout-summary-row offer-checkout-summary-total">
-              <span>Total</span>
-              <span>₹{displayTotal}</span>
-            </div>
-          </div>
           {payError && (
             <p className="offer-checkout-pay-error" role="alert">
               {payError}
             </p>
           )}
           {live ? (
-            <button type="button" className="btn btn-primary offer-checkout-place-btn" disabled={paying} onClick={handlePayNow}>
-              {paying ? 'Processing…' : `Pay ₹${displayTotal}`}
+            <button
+              type="button"
+              className="btn btn-primary offer-checkout-place-btn"
+              disabled={paying || !shipTo}
+              onClick={handlePayNow}
+            >
+              {paying ? 'Processing…' : !shipTo ? 'Add an address to continue' : `Pay ${formatInr(charges.total)}`}
             </button>
           ) : (
             <button
               type="button"
               className="btn btn-primary offer-checkout-place-btn"
-              disabled={checkingPay}
+              disabled={checkingPay || !shipTo}
               onClick={handlePlaceOrder}
             >
-              {checkingPay ? 'Checking payment options…' : 'Place order (demo)'}
+              {checkingPay ? 'Checking payment options…' : !shipTo ? 'Add an address to continue' : 'Place order (demo)'}
             </button>
           )}
         </div>
