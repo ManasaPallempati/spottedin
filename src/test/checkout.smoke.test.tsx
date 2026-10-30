@@ -173,11 +173,12 @@ describe('per-seller checkout', () => {
     visit('/bag')
 
     await screen.findByText('₹1,550')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Checkout' })[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Checkout' }))[0])
 
     expect(await screen.findByText('Total: ₹1,753')).toBeTruthy()
     expect(screen.getByText('Includes ₹79 shipping and ₹124 buyer protection fee')).toBeTruthy()
-    await screen.findByText(/Asha Rao, 12 MG Road/)
+    // The Ships to row shows the saved address (name, then the address line).
+    await screen.findByRole('button', { name: /Asha Rao.*12 MG Road/ })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Place order (demo)' }))
     expect(await screen.findByText('Order placed!')).toBeTruthy()
@@ -214,13 +215,15 @@ describe('per-seller checkout', () => {
     visit('/bag')
 
     await screen.findByText('₹200')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Checkout' })[1])
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Checkout' }))[1])
 
     expect(await screen.findByText('Total: ₹308')).toBeTruthy()
     const blocked = await screen.findByRole('button', { name: 'Add an address to continue' })
     expect((blocked as HTMLButtonElement).disabled).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: /Ships to/ }))
+    // With no saved address, the Ships to row opens the Add address screen.
+    fireEvent.click(screen.getByRole('button', { name: 'Add new address' }))
+    expect(screen.getByRole('dialog', { name: 'Add address' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Asha Rao' } })
     fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9876543210' } })
     fireEvent.change(screen.getByLabelText('House no., building, street'), { target: { value: '12 MG Road' } })
