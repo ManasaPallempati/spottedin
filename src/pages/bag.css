@@ -278,6 +278,15 @@
   margin-top: 6px;
 }
 
+.bag-group-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.bag-group-actions .bag-checkout-btn {
+  flex: 1;
+}
+
 /* --- checkout sheet --- */
 
 .bag-checkout {
@@ -290,14 +299,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.bag-checkout-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 .bag-checkout-address {
