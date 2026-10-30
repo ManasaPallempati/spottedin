@@ -28,6 +28,7 @@ import Signup from './pages/Signup'
 import AccountPassword from './pages/AccountPassword'
 import SellNew from './pages/SellNew'
 import Category from './pages/Category'
+import OccasionEdit from './pages/OccasionEdit'
 import NotFound from './pages/NotFound'
 import AdminReports from './pages/AdminReports'
 import { setPageIndexing } from './lib/seo'
@@ -244,6 +245,7 @@ function AppShell() {
         <Route path="/shop/:handle" element={<Shop />} />
         <Route path="/search" element={<Search />} />
         <Route path="/category/:slug" element={<Category />} />
+        <Route path="/edit/:slug" element={<OccasionEdit />} />
         <Route path="/likes" element={<Likes />} />
         <Route path="/bag" element={<Bag />} />
         <Route path="/order/:uuid" element={<Order />} />

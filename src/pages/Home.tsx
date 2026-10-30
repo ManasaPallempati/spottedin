@@ -6,6 +6,7 @@ import ProductCard from '../components/ProductCard'
 import ListingPhoto from '../components/ListingPhoto'
 import { PrelovedSeal } from '../components/BoutiqueTag'
 import SkeletonCard from '../components/SkeletonCard'
+import OccasionRow from '../components/OccasionRow'
 import type { Listing } from '../data/listings'
 import { sellerFor } from '../data/sellers'
 import { FEATURED_CATEGORIES, listingMatchesCategory } from '../data/taxonomy'
@@ -169,6 +170,8 @@ export default function Home() {
           })}
         </nav>
       </section>
+
+      <OccasionRow listings={listings} loading={loading} />
 
       <div className="home-promo">
         <div className="home-promo-polaroid">

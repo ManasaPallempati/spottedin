@@ -1,0 +1,94 @@
+/* Occasion edits: home row + /edit/:slug page. Existing tokens only. */
+.occasion-row {
+  padding: 0 16px;
+  margin-bottom: 28px;
+}
+
+.occasion-row-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.occasion-row-heading h2 {
+  font-size: 24px;
+  line-height: 1.12;
+}
+
+.occasion-row-scroll {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.occasion-row-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.occasion-tile {
+  flex: 0 0 148px;
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  scroll-snap-align: start;
+}
+
+.occasion-tile-label {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.occasion-tile-sub {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.occasion-page-seal {
+  float: right;
+  margin: 0 4px 8px 12px;
+}
+
+.occasion-switcher {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px 22px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.occasion-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+.occasion-switcher a {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.occasion-switcher a[aria-current='page'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
