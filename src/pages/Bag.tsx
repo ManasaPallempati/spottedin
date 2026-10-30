@@ -11,6 +11,7 @@ import { sellerFor, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
 import AddressPicker from '../components/AddressPicker'
+import { listingPath } from '../lib/listingUrls'
 import PriceBreakdown from '../components/PriceBreakdown'
 import ListingPhoto from '../components/ListingPhoto'
 import SellerAvatar from '../components/SellerAvatar'
@@ -309,14 +310,29 @@ export default function Bag() {
                   ))}
                   {/* No checkout for items whose seller is unknown (still loading, or deleted). */}
                   {group.seller.handle && (
-                    <button
-                      type="button"
-                      className="btn btn-primary bag-checkout-btn"
-                      disabled={!loaded || count === 0}
-                      onClick={() => setCheckoutAnchor(group.items[0].listingId)}
-                    >
-                      Checkout
-                    </button>
+                    <div className="bag-group-actions">
+                      {/* Offers are per listing: one item opens its offer sheet; a bundle goes to a chat with the seller. */}
+                      <button
+                        type="button"
+                        className="btn btn-outline bag-checkout-btn"
+                        disabled={!loaded || count === 0}
+                        onClick={() => {
+                          const live = liveItems(group)
+                          if (live.length === 1) navigate(`${listingPath(live[0].id, live[0].brand)}?offer=1`)
+                          else navigate(`/inbox/t/${encodeURIComponent(group.seller.handle)}?listing=${encodeURIComponent(live[0].id)}`)
+                        }}
+                      >
+                        {count > 1 ? 'Message seller' : 'Make offer'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary bag-checkout-btn"
+                        disabled={!loaded || count === 0}
+                        onClick={() => setCheckoutAnchor(group.items[0].listingId)}
+                      >
+                        Checkout
+                      </button>
+                    </div>
                   )}
                 </div>
               )
@@ -344,10 +360,10 @@ export default function Bag() {
             <PriceBreakdown charges={charges} itemLabel={itemLabel} />
           </div>
           <div className="bag-checkout-section bag-checkout-divider">
-            <AddressPicker selected={shipTo} onSelect={setShipTo} />
+            <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
           </div>
           <div className="bag-checkout-section bag-checkout-divider">
-            <p className="bag-checkout-label">Payment</p>
+            <p className="checkout-section-heading">Payment</p>
             <div className="bag-checkout-payment-row">
               {live ? (
                 <span>Razorpay · UPI, cards, netbanking</span>

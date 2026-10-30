@@ -16,7 +16,7 @@ now:
 | `round8-courier-labels.sql` | `round21-courier-labels.sql` |
 
 `TEST2026.02` keeps its own `round7-account-deletion.sql` and
-`round8-handle-rules.sql`. Next free number on both lines: **22**.
+`round8-handle-rules.sql`. Next free number on both lines: **23** (22 is `round22-saves.sql`).
 
 ## Run order
 
@@ -28,6 +28,12 @@ other.
 1. `round6-razorpay-checkout.sql`, if not already run
 2. `round20-shipping-fulfilment.sql`
 3. `round21-courier-labels.sql`
+
+**Saves (PR #70):**
+
+1. `round22-saves.sql`. It only needs `profiles`, so it can run at any time.
+   Until it runs, the Save button does nothing lasting (the app logs a
+   warning and the Saves tab stays empty).
 
 **Moderation (PR #64, on `TEST2026.02`):**
 
@@ -83,6 +89,14 @@ where table_schema = 'public' and table_name = 'spotted_seller_pickup';
 -- Expect: 0 rows on a first run.
 ```
 
+### round22-saves.sql
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' and table_name = 'saves';
+-- Expect: 0 rows on a first run.
+```
+
 ### round17-reports-and-blocks.sql
 
 ```sql
@@ -110,8 +124,24 @@ where table_schema = 'public' and table_name = 'moderators';
 - **round21:** nothing changes in the app until Shiprocket is switched on (see
   `SHIPROCKET.md`). Check that the seller's order page still shows the manual
   "Mark as shipped" form.
-- **round19:** add yourself to `public.moderators`. The SQL is at the top of
-  the file. Then open `/admin/reports`.
+- **round19:** add yourself to `public.moderators`, then open `/admin/reports`.
+  If you don't know your handle, look it up by your login email:
+
+  ```sql
+  select p.handle from public.profiles p
+  join auth.users u on u.id = p.id
+  where u.email = 'you@example.com';
+
+  insert into public.moderators (user_id)
+  select id from public.profiles where handle = '<your handle>';
+  -- Expect: 1 row. 0 rows means the handle didn't match.
+  ```
+
+  Supabase warns that round17, round19, round20 and round21 contain
+  "destructive operations". The warning comes from `drop policy if exists`
+  (plus `revoke` in round19 and `drop trigger if exists` in round21). These
+  only reset access rules before re-creating them; no
+  existing rows are deleted.
 
 Tested on 2026-10-26 against a scratch Postgres 16 with Supabase stand-ins
 for `auth.uid()` and the roles (not against Supabase itself):
@@ -216,6 +246,16 @@ commit;
 The Razorpay Edge Functions from PR #59 write these columns. If the
 Razorpay or Shiprocket functions were deployed, redeploy the earlier versions
 or unset `RAZORPAY_ENABLED` / `SHIPROCKET_ENABLED` before rolling back.
+
+### Roll back round22-saves.sql
+
+```sql
+begin;
+
+drop table if exists public.saves;  -- also drops its policies and index; every saved item is lost
+
+commit;
+```
 
 ### Roll back round19-moderation-queue.sql
 

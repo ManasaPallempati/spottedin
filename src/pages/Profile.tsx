@@ -12,7 +12,7 @@ import BottomSheet from '../components/BottomSheet'
 import ListingPhoto from '../components/ListingPhoto'
 import './profile.css'
 
-const TABS = ['Shop', 'Sold', 'Purchases', 'Likes'] as const
+const TABS = ['Shop', 'Sold', 'Purchases', 'Likes', 'Saves'] as const
 type Tab = (typeof TABS)[number]
 
 const SORT_OPTIONS: { value: Sort; label: string }[] = [
@@ -58,7 +58,7 @@ export default function Profile() {
   const [sort, setSort] = useState<Sort>('newest')
   const [followerCount, setFollowerCount] = useState(0)
 
-  const { follows, orders, sales, likedIds } = useAppState()
+  const { follows, orders, sales, likedIds, savedIds } = useAppState()
   const { listings: liveListings } = useListings()
   const { listings: myLiveListings } = useMyListings('live')
   const { listings: mySoldListings } = useMyListings('sold')
@@ -102,6 +102,11 @@ export default function Profile() {
   const likedListings = useMemo(
     () => likedIds.map((id) => knownListings.get(id)).filter((l): l is Listing => !!l),
     [likedIds, knownListings]
+  )
+
+  const savedListings = useMemo(
+    () => savedIds.map((id) => knownListings.get(id)).filter((l): l is Listing => !!l),
+    [savedIds, knownListings]
   )
 
   const sortedOrders = useMemo(() => [...orders].sort((a, b) => b.placedAt - a.placedAt), [orders])
@@ -319,6 +324,20 @@ export default function Profile() {
               ) : (
                 <div className="profile-grid">
                   {likedListings.map((listing) => (
+                    <ProductCard key={listing.id} listing={listing} />
+                  ))}
+                </div>
+              ))}
+
+            {activeTab === 'Saves' &&
+              (savedListings.length === 0 ? (
+                <div className="profile-empty-simple">
+                  <p className="profile-empty-simple-title">Nothing saved yet</p>
+                  <p className="profile-empty-simple-copy">Tap the bookmark on any item to keep it here. Only you can see your saves.</p>
+                </div>
+              ) : (
+                <div className="profile-grid">
+                  {savedListings.map((listing) => (
                     <ProductCard key={listing.id} listing={listing} />
                   ))}
                 </div>

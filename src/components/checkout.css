@@ -25,6 +25,12 @@
   font-size: 15px;
 }
 
+.checkout-section-heading {
+  margin-bottom: 8px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
 .checkout-row-value {
   font-size: 14px;
   color: var(--text-dim);
@@ -44,51 +50,51 @@
 
 /* --- address panel --- */
 
-.checkout-address-panel {
+.checkout-address-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 20px;
 }
 
-.checkout-address-option {
+.checkout-address-item {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkout-address-actions {
+  display: flex;
+  gap: 28px;
+}
+
+.checkout-address-actions button {
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .checkout-address-option input {
-  margin-top: 3px;
-  accent-color: var(--accent);
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  accent-color: var(--text);
 }
 
 .checkout-address-name {
   display: block;
-  font-size: 14px;
-  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 16px;
 }
 
 .checkout-address-line {
   display: block;
   font-size: 13px;
   color: var(--text-dim);
-}
-
-.checkout-add-address {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 0;
-  background: none;
-  border: 0;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .checkout-address-form {
@@ -114,12 +120,6 @@
   font-size: 15px;
 }
 
-.checkout-address-form-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
 .checkout-error {
   font-size: 13px;
   color: var(--accent);
@@ -130,10 +130,11 @@
 .checkout-receipt {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--hairline);
+  gap: 14px;
+  margin-top: 8px;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 
 .checkout-receipt-row {
