@@ -41,6 +41,11 @@
   align-items: center;
   gap: 6px;
   margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .shop-stars {
@@ -190,4 +195,36 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--text-dim);
+}
+
+.shop-reviews {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px;
+}
+
+.shop-review {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.shop-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shop-review-date,
+.shop-review-author {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.shop-review-comment {
+  font-size: 15px;
+  white-space: pre-wrap;
 }

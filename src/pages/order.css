@@ -177,7 +177,8 @@
   color: var(--text-dim);
 }
 
-.order-field input {
+.order-field input,
+.order-field textarea {
   padding: 10px 12px;
   border-radius: var(--radius-card);
   border: 1px solid var(--hairline);
@@ -239,4 +240,20 @@
   padding: 12px;
   border-radius: var(--radius-card);
   background: var(--bg);
+}
+
+.order-field textarea {
+  font-family: inherit;
+  resize: vertical;
+}
+
+.order-review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-review-comment {
+  font-size: 14px;
+  white-space: pre-wrap;
 }

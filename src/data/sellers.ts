@@ -29,7 +29,7 @@ export type Seller = {
   handle: string
   name: string
   bio: string
-  // null until the seller has sales and a real rating; there is no review system yet.
+  // null until the seller has sales and a real rating from buyer reviews (round 23).
   rating: number | null
   sold: number
 }

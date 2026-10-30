@@ -16,7 +16,7 @@ now:
 | `round8-courier-labels.sql` | `round21-courier-labels.sql` |
 
 `TEST2026.02` keeps its own `round7-account-deletion.sql` and
-`round8-handle-rules.sql`. Next free number on both lines: **23** (22 is `round22-saves.sql`).
+`round8-handle-rules.sql`. Next free number on both lines: **24** (22 is `round22-saves.sql`, 23 is `round23-reviews.sql`).
 
 ## Run order
 
@@ -34,6 +34,12 @@ other.
 1. `round22-saves.sql`. It only needs `profiles`, so it can run at any time.
    Until it runs, the Save button does nothing lasting (the app logs a
    warning and the Saves tab stays empty).
+
+**Reviews:**
+
+1. `round23-reviews.sql`, after round20 (it reads `orders.status`). Until it
+   runs, shops show "New seller" and no reviews, and posting a review fails
+   with "Couldn't save your review".
 
 **Moderation (PR #64, on `TEST2026.02`):**
 
@@ -94,6 +100,14 @@ where table_schema = 'public' and table_name = 'spotted_seller_pickup';
 ```sql
 select table_name from information_schema.tables
 where table_schema = 'public' and table_name = 'saves';
+-- Expect: 0 rows on a first run.
+```
+
+### round23-reviews.sql
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' and table_name = 'spotted_reviews';
 -- Expect: 0 rows on a first run.
 ```
 
@@ -246,6 +260,17 @@ commit;
 The Razorpay Edge Functions from PR #59 write these columns. If the
 Razorpay or Shiprocket functions were deployed, redeploy the earlier versions
 or unset `RAZORPAY_ENABLED` / `SHIPROCKET_ENABLED` before rolling back.
+
+### Roll back round23-reviews.sql
+
+```sql
+begin;
+
+drop function if exists public.leave_review(uuid, integer, text);
+drop table if exists public.spotted_reviews;  -- every review is lost
+
+commit;
+```
 
 ### Roll back round22-saves.sql
 

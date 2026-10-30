@@ -1,7 +1,6 @@
 import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Star } from 'lucide-react'
 import { useAppState } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { useListingsBySeller, useProfileByHandle } from '../lib/useListings'
@@ -12,9 +11,11 @@ import ProductCard from '../components/ProductCard'
 import ShareButton from '../components/ShareButton'
 import { canonicalUrl } from '../lib/seo'
 import SellerAvatar from '../components/SellerAvatar'
+import StarRating from '../components/StarRating'
+import { averageRating, useSellerReviews } from '../lib/reviews'
 import './shop.css'
 
-const TABS = ['Shop', 'Likes'] as const
+const TABS = ['Shop', 'Likes', 'Reviews'] as const
 type Tab = (typeof TABS)[number]
 
 export default function Shop() {
@@ -23,6 +24,7 @@ export default function Shop() {
   const { profile: myProfile } = useAuth()
   const { profile: realProfile, loading: profileLoading } = useProfileByHandle(handle)
   const { listings: realSellerListings } = useListingsBySeller(realProfile?.id ?? '')
+  const { reviews } = useSellerReviews(realProfile?.id ?? '')
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [sort, setSort] = useState<Sort>('newest')
@@ -80,7 +82,8 @@ export default function Shop() {
     />
   )
 
-  const rating = (realProfile.sales ?? 0) > 0 && realProfile.rating ? realProfile.rating : null
+  // Stars come from real buyer reviews (round 23), never from profiles.rating alone.
+  const rating = averageRating(reviews)
   const followerCount = followerBase
     ? followerBase.count + (following === followerBase.wasFollowing ? 0 : following ? 1 : -1)
     : 0
@@ -93,13 +96,10 @@ export default function Shop() {
       <h1 className="shop-handle">@{realProfile.handle}</h1>
 
       {rating != null ? (
-        <div className="shop-rating-row">
-          <div className="shop-stars">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} size={14} fill={i <= Math.round(rating) ? 'var(--text)' : 'none'} color="var(--text)" />
-            ))}
-          </div>
-        </div>
+        <button type="button" className="shop-rating-row" onClick={() => setActiveTab('Reviews')}>
+          <StarRating rating={rating} />
+          <span className="shop-review-count">({reviews.length})</span>
+        </button>
       ) : (
         <p className="shop-new-seller">New seller</p>
       )}
@@ -165,6 +165,31 @@ export default function Shop() {
             ))}
           </div>
         </div>
+      ) : activeTab === 'Reviews' ? (
+        reviews.length === 0 ? (
+          <div className="shop-likes-empty">
+            <p>No reviews yet</p>
+          </div>
+        ) : (
+          <ul className="shop-reviews">
+            {reviews.map((review) => (
+              <li key={review.id} className="shop-review">
+                <div className="shop-review-head">
+                  <StarRating rating={review.rating} />
+                  <span className="shop-review-date">
+                    {new Date(review.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+                {review.comment && <p className="shop-review-comment">{review.comment}</p>}
+                {review.reviewerHandle && (
+                  <Link to={`/shop/${encodeURIComponent(review.reviewerHandle)}`} className="shop-review-author">
+                    @{review.reviewerHandle}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )
       ) : (
         <div className="shop-likes-empty">
           <p>Nothing to see here yet</p>
