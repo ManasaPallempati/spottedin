@@ -502,6 +502,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         .then(({ error }) => {
           if (error) console.warn(error)
         })
+      // Deliberately NOT calling mark_listings_sold here. A demo order takes no
+      // payment, so it must never take a real listing off sale: one demo click
+      // would otherwise sell out a seller's item for nothing. Only the
+      // razorpay-order Edge Function marks listings sold, after a verified payment.
     })()
 
     return order
