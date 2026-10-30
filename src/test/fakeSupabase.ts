@@ -29,6 +29,11 @@ const missingRpcs = new Set<string>()
 export function setRpcMissing(name: string) {
   missingRpcs.add(name)
 }
+
+// Canned results for other database functions, by name: a value, or a
+// callback that gets the call's arguments.
+type RpcResult = unknown | ((args: Record<string, unknown>) => unknown)
+export const rpcResults: Record<string, RpcResult> = {}
 const listeners = new Set<AuthListener>()
 
 // provider 'google' makes an account with no password (signed up with Google).
@@ -132,7 +137,11 @@ export const supabase = {
   // my_profile() (round 18) returns the caller's own profile row; other
   // functions resolve to no data. setRpcMissing simulates a project where a
   // function is not deployed yet (PostgREST answers PGRST202).
-  rpc: vi.fn((name: string) => {
+  rpc: vi.fn((name: string, args: Record<string, unknown> = {}) => {
+    if (name in rpcResults) {
+      const result = rpcResults[name]
+      return Promise.resolve({ data: typeof result === 'function' ? result(args) : result, error: null })
+    }
     if (missingRpcs.has(name)) {
       return query('__rpc__', { error: { code: 'PGRST202', message: `Could not find the function public.${name}` } })
     }
@@ -161,6 +170,7 @@ export function resetFakeSupabase() {
   selects.length = 0
   listeners.clear()
   missingRpcs.clear()
+  for (const name of Object.keys(rpcResults)) delete rpcResults[name]
   currentSession = null
   vi.clearAllMocks()
 }
