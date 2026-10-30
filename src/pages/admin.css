@@ -1,0 +1,124 @@
+.admin-page {
+  padding: 16px 16px 96px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.admin-filter {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.admin-filter.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.admin-list,
+.admin-blocked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-report {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.admin-report-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-reason {
+  font-weight: 700;
+}
+
+.admin-when,
+.admin-meta {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.admin-target {
+  margin-top: 4px;
+}
+
+.admin-target a,
+.admin-blocked a {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.admin-details {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-meta {
+  margin-top: 6px;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.admin-error {
+  color: var(--accent);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.admin-empty {
+  color: var(--text-dim);
+  padding: 16px 0;
+}
+
+.admin-section {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 28px 0 4px;
+}
+
+.admin-blocked li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 14px;
+}
+
+.admin-blocked span {
+  color: var(--text-dim);
+  text-align: right;
+}

@@ -39,7 +39,12 @@ export default function Login() {
     const { error: signInError } = await signIn(email, password)
     if (signInError) {
       setPending(null)
-      setError(signInError)
+      // Google sign-ups have no password until they add one in Profile → Menu → Set password.
+      setError(
+        signInError === 'Invalid login credentials'
+          ? `${signInError}. Signed up with Google? Continue with Google, then set a password from your profile menu.`
+          : signInError,
+      )
       return
     }
     // Clear stale OAuth target so an abandoned Google sign-in can't hijack

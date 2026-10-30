@@ -51,11 +51,58 @@
   color: var(--text-dim);
 }
 
+.thread-listing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 20px 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+
+.thread-offer-btn {
+  width: 100%;
+}
+
+.thread-listing-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.thread-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 24px 0;
+  text-align: center;
+}
+
+.thread-intro-avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 26px;
+}
+
+.thread-intro-handle {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.thread-intro-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
 .thread-listing-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 12px 20px 0;
   padding: 10px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
