@@ -56,6 +56,8 @@ export type Offer = {
 
 export type AppState = {
   likedIds: string[]
+  // Private bookmarks (Depop's "saves"); unlike likes they don't add to a count.
+  savedIds: string[]
   bag: BagItem[]
   follows: string[]
   orders: Order[]
@@ -71,6 +73,8 @@ export type AppStateContextValue = AppState & {
   bagCount: number
   toggleLike: (id: string) => void
   isLiked: (id: string) => boolean
+  toggleSave: (id: string) => void
+  isSaved: (id: string) => boolean
   likeCountFor: (listing: Listing) => number
   addToBag: (id: string) => void
   removeFromBag: (id: string) => void
@@ -96,6 +100,7 @@ export type AppStateContextValue = AppState & {
 
 const EMPTY_STATE: AppState = {
   likedIds: [],
+  savedIds: [],
   bag: [],
   follows: [],
   orders: [],
@@ -232,8 +237,9 @@ function mapOffer(row: OfferRow, uid: string): Offer {
 }
 
 async function hydrateAll(uid: string): Promise<AppState> {
-  const [likesRes, bagRes, followsRes, ordersRes, threadsRes, offersRes] = await Promise.all([
+  const [likesRes, savesRes, bagRes, followsRes, ordersRes, threadsRes, offersRes] = await Promise.all([
     supabase.from('likes').select('listing_id').eq('user_id', uid),
+    supabase.from('saves').select('listing_id').eq('user_id', uid).order('created_at', { ascending: false }),
     supabase.from('bag_items').select('listing_id, added_at').eq('user_id', uid),
     supabase.from('follows').select('followee_handle').eq('user_id', uid),
     supabase.from('orders').select(ORDER_COLUMNS),
@@ -250,6 +256,9 @@ async function hydrateAll(uid: string): Promise<AppState> {
   ])
 
   const likedIds = ((likesRes.data ?? []) as LikeRow[]).map((r) => r.listing_id)
+  // Until round22 is applied the saves table is missing: start empty, don't fail.
+  if (savesRes.error) console.warn(savesRes.error)
+  const savedIds = ((savesRes.data ?? []) as LikeRow[]).map((r) => r.listing_id)
   const bag = ((bagRes.data ?? []) as BagRow[]).map((r) => ({ listingId: r.listing_id, addedAt: toMillis(r.added_at) }))
   const follows = ((followsRes.data ?? []) as FollowRow[]).map((r) => r.followee_handle)
   if (ordersRes.error) console.warn(ordersRes.error)
@@ -263,7 +272,7 @@ async function hydrateAll(uid: string): Promise<AppState> {
     .sort((a, b) => b.at - a.at)
   const threads = ((threadsRes.data ?? []) as ThreadRow[]).map((r) => mapThread(r, uid))
 
-  return { likedIds, bag, follows, orders, sales, offers, threads }
+  return { likedIds, savedIds, bag, follows, orders, sales, offers, threads }
 }
 
 const AppStateContext = createContext<AppStateContextValue | null>(null)
@@ -327,6 +336,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   function isLiked(id: string) {
     return state.likedIds.includes(id)
+  }
+
+  function toggleSave(id: string) {
+    if (!requireAuth()) return
+    const uid = session!.user.id
+    const wasSaved = state.savedIds.includes(id)
+    setState((prev) => ({
+      ...prev,
+      savedIds: wasSaved ? prev.savedIds.filter((x) => x !== id) : [id, ...prev.savedIds],
+    }))
+    const query = wasSaved
+      ? supabase.from('saves').delete().eq('user_id', uid).eq('listing_id', id)
+      : supabase.from('saves').insert({ user_id: uid, listing_id: id })
+    void query.then(({ error }) => {
+      if (error) console.warn(error)
+    })
+  }
+
+  function isSaved(id: string) {
+    return state.savedIds.includes(id)
   }
 
   function likeCountFor(listing: Listing) {
@@ -671,6 +700,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     bagCount: state.bag.length,
     toggleLike,
     isLiked,
+    toggleSave,
+    isSaved,
     likeCountFor,
     addToBag,
     removeFromBag,

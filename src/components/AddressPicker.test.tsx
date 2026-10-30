@@ -44,15 +44,26 @@ describe('AddressPicker', () => {
   it('removes the selected address and falls back to the next saved one', async () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByTestId('selected').textContent).toBe('a1'))
-    fireEvent.click(screen.getByRole('button', { name: /Ships to/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Lake Rd/ }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     await waitFor(() => expect(removeAddress).toHaveBeenCalledWith('a1'))
     await waitFor(() => expect(screen.getByTestId('selected').textContent).toBe('a2'))
   })
 
+  it('opens a Select address screen and applies the ticked address on Continue', async () => {
+    render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: /Lake Rd/ }))
+    expect(screen.getByRole('dialog', { name: 'Select address' })).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('radio')[1])
+    expect(screen.getByTestId('selected').textContent).toBe('a1')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(screen.getByTestId('selected').textContent).toBe('a2')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('edits an address by saving the new one and removing the old one', async () => {
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: /Ships to/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Lake Rd/ }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[1])
     const street = screen.getByLabelText('House no., building, street') as HTMLInputElement
     expect(street.value).toBe('4 MG Rd')

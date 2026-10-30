@@ -1,0 +1,62 @@
+.fs-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  background: var(--bg);
+  color: var(--text);
+  animation: fs-panel-slide-up 0.2s ease-out;
+}
+
+.fs-panel-header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.fs-panel-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.fs-panel-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fs-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 24px;
+}
+
+.fs-panel-footer {
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline);
+}
+
+.fs-panel-footer .btn {
+  width: 100%;
+}
+
+@keyframes fs-panel-slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fs-panel .icon-btn {
+  background: var(--surface);
+}
