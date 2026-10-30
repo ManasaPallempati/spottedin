@@ -52,17 +52,44 @@ Providers), with each provider's client ID/secret and the redirect/callback URL
 configured there. That dashboard step is external to this repo and is **not** performed by
 the app — until it is done, the social buttons surface the provider's "not enabled" error.
 
+## Environments
+
+Both environments are Netlify sites built from this one repository. GitHub Pages
+is no longer used: a Pages site is one-per-repository and cannot serve two
+environments, and it cannot return the SPA shell with HTTP 200 for dynamic routes
+(see `docs/launch/STAGING_ROUTING.md`).
+
+| | Branch | URL | Supabase project |
+|---|---|---|---|
+| Production | `main` | `www.spottedin.co` (apex 301s here) | `masdygvcssrtwseopfmj` |
+| Staging | `TEST2026.01` | `www.staging.spottedin.co` | `uxqumkfbchyiupwhddqw` |
+
+Feature branches merge into `TEST2026.01`, are verified on staging, then merge
+into `main` for release. Both branches require a pull request and a passing
+`test` check. Every pull request also gets its own Netlify deploy preview.
+
+Per-site environment variables are set in the Netlify UI, not in `netlify.toml`
+— each site builds its own branch under the `production` deploy context, so a
+`[context.<branch>]` block would never fire on staging. `netlify.toml` documents
+the full list.
+
 ## Backend
 
-The Home feed reads live listings from Supabase (staging project ref
-`masdygvcssrtwseopfmj`) via `src/lib/useListings.ts`. If the query errors or returns
-zero rows, it falls back to the mock listings in `src/data/mock.ts` so the grid is
-never blank.
+The Home feed reads live listings from Supabase via `src/lib/useListings.ts`. If
+the query errors or returns zero rows, it falls back to mock listings so the grid
+is never blank — which is why staging, whose database is empty, still renders a
+populated feed.
 
 The client (`src/lib/supabase.ts`) reads `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY` from the environment, falling back to the staging project's
-public URL and anon key if unset. To point at a different project, set both in a
-local `.env` file — Vite picks up `VITE_`-prefixed vars automatically.
+`VITE_SUPABASE_ANON_KEY` from the environment, falling back to the **production**
+project when unset. That fallback means an unconfigured deploy writes to
+production data, so staging must always set both.
+
+Storage URLs derive from `VITE_SUPABASE_URL` rather than being hardcoded, so each
+environment serves listing images from its own bucket.
+
+To build a new environment from scratch, see `supabase/baseline/README.md` — the
+`round*.sql` files cannot create the schema on their own.
 
 ## History
 
