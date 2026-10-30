@@ -5,8 +5,10 @@ import { useAppState, type Order as OrderModel } from '../lib/appState'
 import { formatAddress, type Address } from '../lib/addresses'
 import { bookCourier, CourierError, fetchCourierEnabled, usePickupAddress } from '../lib/courier'
 import { formatInr } from '../lib/pricing'
+import { REVIEW_MAX_LENGTH, useOrderReview } from '../lib/reviews'
 import AddressPicker from '../components/AddressPicker'
 import ListingPhoto from '../components/ListingPhoto'
+import StarRating from '../components/StarRating'
 import './order.css'
 
 // Sellers are asked to ship within this many days of the order.
@@ -214,6 +216,66 @@ function SellerShipping({ order }: { order: OrderModel }) {
   return courierOn || order.courierProvider === 'shiprocket' ? <CourierShipping order={order} /> : <ShipForm order={order} />
 }
 
+// Buyers review the seller once a paid order is delivered (round 23).
+function ReviewSeller({ order }: { order: OrderModel }) {
+  const { review, loading, leaveReview } = useOrderReview(order.uuid, true)
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (rating < 1) {
+      setError('Tap a star to rate the seller.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    const problem = await leaveReview(rating, comment)
+    setSaving(false)
+    if (problem) setError(problem)
+  }
+
+  if (loading) return null
+
+  if (review) {
+    return (
+      <div className="order-section order-review">
+        <p className="order-section-title">Your review</p>
+        <StarRating rating={review.rating} size={18} />
+        {review.comment && <p className="order-review-comment">{review.comment}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <form className="order-action order-review" onSubmit={submit} noValidate>
+      <p className="order-section-title">Review {order.sellerHandle ? `@${order.sellerHandle}` : 'the seller'}</p>
+      <p className="order-action-copy">How did it go? Your review shows on their shop.</p>
+      <StarRating rating={rating} size={28} onChange={setRating} />
+      <label className="order-field">
+        <span>Comment (optional)</span>
+        <textarea
+          value={comment}
+          maxLength={REVIEW_MAX_LENGTH}
+          rows={3}
+          placeholder="Item as described? Packed well? Quick to ship?"
+          onChange={(e) => setComment(e.target.value)}
+        />
+      </label>
+      {error && (
+        <p className="order-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" className="btn btn-primary" disabled={saving}>
+        {saving ? 'Saving…' : 'Post review'}
+      </button>
+    </form>
+  )
+}
+
 function courierStatusLabel(status: string): string {
   return status.charAt(0) + status.slice(1).toLowerCase()
 }
@@ -336,6 +398,8 @@ export default function Order() {
             </button>
           </div>
         )}
+
+        {!isSeller && order.status === 'delivered' && order.paymentStatus === 'paid' && <ReviewSeller order={order} />}
 
         {order.shipTo && (
           <div className="order-section">

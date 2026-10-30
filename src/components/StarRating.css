@@ -1,0 +1,17 @@
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.star-rating-input {
+  gap: 4px;
+}
+
+.star-rating-input button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
