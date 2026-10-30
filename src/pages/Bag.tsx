@@ -1,24 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { ChevronLeft, ShoppingBag, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ShoppingBag, CheckCircle, ShieldCheck } from 'lucide-react'
 import { useAppState, type BagItem, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { fetchPaymentConfig, startRazorpayPayment, PaymentError, type PaymentConfig } from '../lib/payments'
+import { chargesFor, formatInr, SHIPPING_INR } from '../lib/pricing'
+import type { Address } from '../lib/addresses'
 import { useListing } from '../lib/useListings'
 import { sellerFor, type Seller } from '../data/sellers'
 import type { Listing } from '../data/listings'
 import BottomSheet from '../components/BottomSheet'
+import AddressPicker from '../components/AddressPicker'
+import { listingPath } from '../lib/listingUrls'
+import PriceBreakdown from '../components/PriceBreakdown'
 import ListingPhoto from '../components/ListingPhoto'
 import SellerAvatar from '../components/SellerAvatar'
 import './bag.css'
 
-const SHIPPING_INR = 49
-
-function formatInr(value: number) {
-  return `₹${value.toLocaleString('en-IN')}`
-}
-
-type BagGroup = { seller: Seller; items: BagItem[] }
+type BagGroup = { seller: Seller; sellerId: string | null; items: BagItem[] }
 
 type BagRowProps = {
   listingId: string
@@ -34,11 +33,26 @@ function BagRow({ listingId, onResolved }: BagRowProps) {
   }, [loading, listing, listingId, onResolved])
 
   if (loading) return <div className="bag-row bag-row-loading" />
-  if (!listing) return null
+  // Deleted or hidden since it was bagged: say so, so the buyer can clear it.
+  if (!listing) {
+    return (
+      <div className="bag-row">
+        <div className="bag-row-info">
+          <p className="bag-row-brand">This item is no longer available</p>
+        </div>
+        <button type="button" className="bag-row-remove" onClick={() => removeFromBag(listingId)}>
+          Remove
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="bag-row">
-      <ListingPhoto className="bag-row-thumb" src={listing.img} alt={listing.brand} compact />
+      <div className="bag-row-thumb-wrap">
+        <ListingPhoto className="bag-row-thumb" src={listing.img} alt={listing.brand} compact />
+        {listing.status === 'sold' && <span className="bag-row-sold">SOLD</span>}
+      </div>
       <div className="bag-row-info">
         <p className="bag-row-brand">{listing.brand}</p>
         <p className="bag-row-size">{listing.size}</p>
@@ -58,12 +72,16 @@ export default function Bag() {
   const { isAuthed, profile, session } = useAuth()
 
   const [resolved, setResolved] = useState<Record<string, Listing | null>>({})
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  // Checkout is per seller: the sheet opens for the group holding this listing.
+  const [checkoutAnchor, setCheckoutAnchor] = useState<string | null>(null)
+  const [shipTo, setShipTo] = useState<Address | null>(null)
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null)
   const [placedLive, setPlacedLive] = useState(false)
   const [payConfig, setPayConfig] = useState<PaymentConfig | null>(null)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+
+  const checkoutOpen = checkoutAnchor !== null
 
   // Demo is the default; live mode only after the Edge Function confirms the
   // server-side Razorpay gate is open. Any error resolves to demo (fail closed).
@@ -82,16 +100,20 @@ export default function Bag() {
   const checkingPay = payConfig === null
 
   useEffect(() => {
-    if (searchParams.get('checkout') === '1' && bag.length > 0) {
-      setCheckoutOpen(true)
-    }
+    const requested = searchParams.get('checkout')
+    if (!requested || bag.length === 0) return
+    // ?checkout=<listingId> from Buy now; the legacy ?checkout=1 opens the most recently added item's seller.
+    const anchor = bag.some((b) => b.listingId === requested)
+      ? requested
+      : [...bag].sort((a, b) => b.addedAt - a.addedAt)[0].listingId
+    setCheckoutAnchor(anchor)
     // only react to the URL that mounted this page, not to later bag/state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function handleResolved(id: string, listing: Listing | null) {
+  const handleResolved = useCallback((id: string, listing: Listing | null) => {
     setResolved((prev) => (prev[id] === listing ? prev : { ...prev, [id]: listing }))
-  }
+  }, [])
 
   const groups = useMemo(() => {
     const map = new Map<string, BagGroup>()
@@ -104,44 +126,89 @@ export default function Bag() {
         : { handle: '', name: '', bio: '', rating: null, sold: 0 }
       const existing = map.get(seller.handle)
       if (existing) existing.items.push(item)
-      else map.set(seller.handle, { seller, items: [item] })
+      else map.set(seller.handle, { seller, sellerId: resolvedListing?.sellerId ?? null, items: [item] })
     }
     return Array.from(map.values())
   }, [bag, resolved])
 
-  const subtotal = bag.reduce((sum, item) => sum + (resolved[item.listingId]?.price ?? 0), 0)
-  const total = bag.length > 0 ? subtotal + SHIPPING_INR : 0
+  function liveItems(group: BagGroup): Listing[] {
+    return group.items
+      .map((item) => resolved[item.listingId])
+      .filter((l): l is Listing => !!l && l.status !== 'sold')
+  }
+
+  function groupSubtotal(group: BagGroup): number {
+    return liveItems(group).reduce((sum, l) => sum + l.price, 0)
+  }
+
+  const activeGroup = checkoutAnchor
+    ? groups.find((g) => g.items.some((i) => i.listingId === checkoutAnchor)) ?? null
+    : null
+  const activeItems = activeGroup ? liveItems(activeGroup) : []
+  const charges = chargesFor(activeItems.reduce((sum, l) => sum + l.price, 0))
+  const itemLabel =
+    activeItems.length === 1 ? activeItems[0].brand : `${activeItems.length} items from @${activeGroup?.seller.handle ?? ''}`
+
+  function closeCheckout() {
+    setCheckoutAnchor(null)
+    setPayError(null)
+  }
 
   function handlePlaceOrder() {
-    const items = bag.map((item) => ({
-      listingId: item.listingId,
-      priceInr: resolved[item.listingId]?.price ?? 0,
-    }))
+    if (!shipTo || activeItems.length === 0) return
+    const items = activeItems.map((l) => ({ listingId: l.id, priceInr: l.price }))
     const snapshots: Record<string, { title: string; img: string; size: string }> = {}
-    for (const item of bag) {
-      const listing = resolved[item.listingId]
-      if (listing) snapshots[item.listingId] = { title: listing.brand, img: listing.img, size: listing.size }
-    }
-    const order = placeOrder(items, snapshots)
+    for (const l of activeItems) snapshots[l.id] = { title: l.brand, img: l.img, size: l.size }
+    const order = placeOrder(items, snapshots, {
+      shipTo,
+      shippingInr: charges.shipping,
+      buyerFeeInr: charges.buyerFee,
+      sellerId: activeGroup?.sellerId ?? null,
+      sellerHandle: activeGroup?.seller.handle ?? null,
+    })
     if (order) {
       setPlacedOrder(order)
-      setCheckoutOpen(false)
+      closeCheckout()
     }
   }
 
   async function handlePayNow() {
+    if (!shipTo || activeItems.length === 0) return
     setPaying(true)
     setPayError(null)
     try {
       const paid = await startRazorpayPayment(
-        { context: 'bag', listingIds: bag.map((item) => item.listingId) },
+        { context: 'bag', listingIds: activeItems.map((l) => l.id), addressId: shipTo.id },
         { name: profile?.name, email: session?.user?.email }
       )
-      const order: Order = { id: paid.code, uuid: paid.uuid, items: paid.items, totalInr: paid.totalInr, placedAt: paid.placedAt }
+      const order: Order = {
+        id: paid.code,
+        uuid: paid.uuid,
+        items: paid.items.map((it) => {
+          const l = activeItems.find((x) => x.id === it.listingId)
+          return { ...it, title: l?.brand, img: l?.img, size: l?.size }
+        }),
+        totalInr: paid.totalInr,
+        placedAt: paid.placedAt,
+        shippingInr: paid.shippingInr,
+        buyerFeeInr: paid.buyerFeeInr,
+        shipTo,
+        status: 'paid',
+        courier: null,
+        trackingNumber: null,
+        shippedAt: null,
+        deliveredAt: null,
+        buyerHandle: null,
+        sellerHandle: activeGroup?.seller.handle ?? null,
+        paymentStatus: 'paid',
+        courierProvider: null,
+        courierStatus: null,
+        labelUrl: null,
+      }
       applyPaidOrder(order)
       setPlacedLive(true)
       setPlacedOrder(order)
-      setCheckoutOpen(false)
+      closeCheckout()
     } catch (err) {
       const e = err instanceof PaymentError ? err : new PaymentError('failed', 'Payment failed. You have not been charged.')
       setPayError(e.message)
@@ -151,6 +218,7 @@ export default function Bag() {
   }
 
   const showEmpty = bag.length === 0 && !checkoutOpen && !placedOrder
+  const canPay = !!shipTo && activeItems.length > 0
 
   return (
     <div className="bag-page">
@@ -169,16 +237,23 @@ export default function Bag() {
           <p className="bag-confirmation-id">{placedOrder.id}</p>
           <p className="bag-confirmation-copy">
             {placedLive
-              ? formatInr(placedOrder.totalInr + SHIPPING_INR) + ' paid via Razorpay.'
-              : 'This is a demo — no payment was taken.'}
+              ? formatInr(placedOrder.totalInr + placedOrder.shippingInr + placedOrder.buyerFeeInr) + ' paid via Razorpay.'
+              : 'This is a demo — no payment was taken.'}{' '}
+            We'll let you know when the seller ships it.
           </p>
           <div className="bag-confirmation-actions">
-            <Link to="/home" className="btn btn-primary">
-              Keep browsing
+            <Link to={`/order/${placedOrder.uuid}`} className="btn btn-primary">
+              Track order
             </Link>
-            <Link to="/profile" className="btn btn-outline">
-              View purchases
-            </Link>
+            {bag.length > 0 ? (
+              <button type="button" className="btn btn-outline" onClick={() => setPlacedOrder(null)}>
+                Back to bag
+              </button>
+            ) : (
+              <Link to="/home" className="btn btn-outline">
+                Keep browsing
+              </Link>
+            )}
           </div>
         </div>
       ) : !isAuthed ? (
@@ -199,54 +274,96 @@ export default function Bag() {
         </div>
       ) : (
         <>
+          <div className="bag-protection">
+            <ShieldCheck size={22} className="bag-protection-icon" />
+            <p>
+              Selling is free on Spotted. Every order is tracked from purchase to delivery.
+            </p>
+          </div>
           <div className="bag-list">
-            {groups.map((group) => (
-              <div className="bag-group" key={group.seller.handle || 'unknown-seller'}>
-                {group.seller.handle && (
+            {groups.map((group) => {
+              const subtotal = groupSubtotal(group)
+              const count = liveItems(group).length
+              // Wait for every item to load so the order never leaves one out by accident.
+              const loaded = group.items.every((item) => item.listingId in resolved)
+              return (
+                <div className="bag-group" key={group.seller.handle || 'unknown-seller'}>
+                  {group.seller.handle && (
                   <div className="bag-seller-header">
                     <SellerAvatar className="bag-seller-avatar" handle={group.seller.handle} name={group.seller.name} />
-                    <span className="bag-seller-handle">@{group.seller.handle}</span>
+                    <div className="bag-seller-meta">
+                      <span className="bag-seller-handle">@{group.seller.handle}</span>
+                      <span className="bag-seller-count">
+                        {group.items.length} item{group.items.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    {count > 0 && (
+                      <div className="bag-seller-price">
+                        <span className="bag-seller-subtotal">{formatInr(subtotal)}</span>
+                        <span className="bag-seller-shipping">+ {formatInr(SHIPPING_INR)} shipping</span>
+                      </div>
+                    )}
                   </div>
-                )}
-                {group.items.map((item) => (
-                  <BagRow key={item.listingId} listingId={item.listingId} onResolved={handleResolved} />
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <div className="bag-summary">
-            <div className="bag-summary-row">
-              <span>Subtotal</span>
-              <span>{formatInr(subtotal)}</span>
-            </div>
-            <div className="bag-summary-row">
-              <span>Shipping</span>
-              <span>{formatInr(SHIPPING_INR)}</span>
-            </div>
-            <div className="bag-summary-row bag-summary-total">
-              <span>Total</span>
-              <span>{formatInr(total)}</span>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary bag-checkout-btn"
-              onClick={() => setCheckoutOpen(true)}
-            >
-              Checkout
-            </button>
+                  )}
+                  {group.items.map((item) => (
+                    <BagRow key={item.listingId} listingId={item.listingId} onResolved={handleResolved} />
+                  ))}
+                  {/* No checkout for items whose seller is unknown (still loading, or deleted). */}
+                  {group.seller.handle && (
+                    <div className="bag-group-actions">
+                      {/* Offers are per listing: one item opens its offer sheet; a bundle goes to a chat with the seller. */}
+                      <button
+                        type="button"
+                        className="btn btn-outline bag-checkout-btn"
+                        disabled={!loaded || count === 0}
+                        onClick={() => {
+                          const live = liveItems(group)
+                          if (live.length === 1) navigate(`${listingPath(live[0].id, live[0].brand)}?offer=1`)
+                          else navigate(`/inbox/t/${encodeURIComponent(group.seller.handle)}?listing=${encodeURIComponent(live[0].id)}`)
+                        }}
+                      >
+                        {count > 1 ? 'Message seller' : 'Make offer'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary bag-checkout-btn"
+                        disabled={!loaded || count === 0}
+                        onClick={() => setCheckoutAnchor(group.items[0].listingId)}
+                      >
+                        Checkout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </>
       )}
 
-      <BottomSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)} title="Checkout">
+      <BottomSheet open={checkoutOpen} onClose={closeCheckout} title="Checkout">
         <div className="bag-checkout">
-          <div className="bag-checkout-section">
-            <p className="bag-checkout-label">Shipping address</p>
-            <p className="bag-checkout-address">{profile?.name ?? 'Manasa P'}, 221 MG Road, Bengaluru 560001</p>
+          <div className="bag-checkout-items">
+            {activeItems.map((l) => (
+              <div className="bag-checkout-item" key={l.id}>
+                <ListingPhoto src={l.img} alt={l.brand} compact />
+                <div>
+                  <p className="bag-row-brand">{l.brand}</p>
+                  <p className="bag-row-size">
+                    {l.size} | {formatInr(l.price)}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="bag-checkout-section">
-            <p className="bag-checkout-label">Payment</p>
+          <div className="bag-checkout-section bag-checkout-divider">
+            <PriceBreakdown charges={charges} itemLabel={itemLabel} />
+          </div>
+          <div className="bag-checkout-section bag-checkout-divider">
+            <AddressPicker selected={shipTo} onSelect={setShipTo} onClear={() => setShipTo(null)} />
+          </div>
+          <div className="bag-checkout-section bag-checkout-divider">
+            <p className="checkout-section-heading">Payment</p>
             <div className="bag-checkout-payment-row">
               {live ? (
                 <span>Razorpay · UPI, cards, netbanking</span>
@@ -258,32 +375,23 @@ export default function Bag() {
               )}
             </div>
           </div>
-          <div className="bag-checkout-section bag-checkout-summary">
-            <div className="bag-summary-row">
-              <span>Subtotal</span>
-              <span>{formatInr(subtotal)}</span>
-            </div>
-            <div className="bag-summary-row">
-              <span>Shipping</span>
-              <span>{formatInr(SHIPPING_INR)}</span>
-            </div>
-            <div className="bag-summary-row bag-summary-total">
-              <span>Total</span>
-              <span>{formatInr(total)}</span>
-            </div>
-          </div>
           {payError && (
             <p className="bag-pay-error" role="alert">
               {payError}
             </p>
           )}
           {live ? (
-            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={paying} onClick={handlePayNow}>
-              {paying ? 'Processing…' : `Pay ${formatInr(total)}`}
+            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={paying || !canPay} onClick={handlePayNow}>
+              {paying ? 'Processing…' : !shipTo ? 'Add an address to continue' : `Pay ${formatInr(charges.total)}`}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary bag-checkout-btn" disabled={checkingPay} onClick={handlePlaceOrder}>
-              {checkingPay ? 'Checking payment options…' : 'Place order (demo)'}
+            <button
+              type="button"
+              className="btn btn-primary bag-checkout-btn"
+              disabled={checkingPay || !canPay}
+              onClick={handlePlaceOrder}
+            >
+              {checkingPay ? 'Checking payment options…' : !shipTo ? 'Add an address to continue' : 'Place order (demo)'}
             </button>
           )}
         </div>
