@@ -1,0 +1,129 @@
+.boost-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.boost-intro {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.boost-tiers {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.boost-tiers-legend {
+  padding: 0;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.boost-tier {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.boost-tier.selected {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+/* Keep the native radio focusable for keyboard/screen-reader users while the
+   label carries the visuals. */
+.boost-tier-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boost-tier:has(.boost-tier-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.boost-tier-days {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.boost-tier-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.boost-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.boost-demo-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+
+.boost-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.boost-pay-btn {
+  width: 100%;
+}
+
+.boost-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.boost-confirm-icon {
+  color: var(--success);
+}
+
+.boost-confirm-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.boost-confirm-copy {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.boost-confirm-btn {
+  width: 100%;
+  margin-top: 6px;
+}

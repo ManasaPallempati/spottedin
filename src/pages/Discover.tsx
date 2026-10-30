@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import { DEPARTMENTS, categoriesForDepartment } from '../data/taxonomy'
 import { useListings } from '../lib/useListings'
+import ListingPhoto from '../components/ListingPhoto'
 import './discover.css'
 
 const heroSlides = [
@@ -83,7 +84,7 @@ export default function Discover() {
             {outfitCollages.map((group, i) => (
               <div className="outfit-collage" key={i}>
                 {group.map((item) => (
-                  <img key={item.id} src={item.img} alt={item.brand} />
+                  <ListingPhoto key={item.id} src={item.img} alt={item.brand} compact />
                 ))}
               </div>
             ))}
