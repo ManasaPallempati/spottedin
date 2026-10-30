@@ -36,13 +36,14 @@ type RpcResult = unknown | ((args: Record<string, unknown>) => unknown)
 export const rpcResults: Record<string, RpcResult> = {}
 const listeners = new Set<AuthListener>()
 
-export function makeSession(email = 'buyer@example.com', id = 'user-1'): FakeSession {
+// provider 'google' makes an account with no password (signed up with Google).
+export function makeSession(email = 'buyer@example.com', id = 'user-1', provider = 'email'): FakeSession {
   return {
     access_token: 'test-access-token',
     refresh_token: 'test-refresh-token',
     expires_in: 3600,
     token_type: 'bearer',
-    user: { id, email, user_metadata: {}, identities: [{}] },
+    user: { id, email, user_metadata: {}, identities: [{ provider }] },
   }
 }
 
@@ -123,7 +124,11 @@ const auth = {
   }),
   signInWithOAuth: vi.fn(async () => ({ data: {}, error: null })),
   resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
-  updateUser: vi.fn(async () => ({ data: { user: currentSession?.user ?? null }, error: null })),
+  updateUser: vi.fn(async (_attrs: Record<string, unknown>) => ({
+    data: { user: currentSession?.user ?? null },
+    error: null as { message: string; code?: string } | null,
+  })),
+  reauthenticate: vi.fn(async () => ({ data: {}, error: null })),
 }
 
 export const supabase = {
