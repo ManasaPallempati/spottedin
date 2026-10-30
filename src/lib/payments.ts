@@ -34,13 +34,17 @@ export type PaidOrder = {
   uuid: string
   code: string
   totalInr: number
+  shippingInr: number
+  buyerFeeInr: number
   placedAt: number
   items: { listingId: string; priceInr: number }[]
 }
 
+// One request = one seller's order. addressId is a spotted_addresses row the
+// server snapshots onto the order; it also recomputes shipping and the fee.
 export type PaymentRequest =
-  | { context: 'bag'; listingIds: string[] }
-  | { context: 'offer'; offerId: string }
+  | { context: 'bag'; listingIds: string[]; addressId: string }
+  | { context: 'offer'; offerId: string; addressId: string }
 
 export type PaymentErrorKind = 'cancelled' | 'unavailable' | 'failed' | 'unverified'
 
@@ -207,7 +211,15 @@ export async function startRazorpayPayment(
   }
 
   const order = verified.order as
-    | { uuid: string; code: string; totalInr: number; placedAt: string; items: { listingId: string; priceInr: number }[] }
+    | {
+        uuid: string
+        code: string
+        totalInr: number
+        shippingInr?: number
+        buyerFeeInr?: number
+        placedAt: string
+        items: { listingId: string; priceInr: number }[]
+      }
     | undefined
   if (!order?.uuid || !order.code) {
     throw new PaymentError(
@@ -221,6 +233,8 @@ export async function startRazorpayPayment(
     uuid: order.uuid,
     code: order.code,
     totalInr: order.totalInr,
+    shippingInr: order.shippingInr ?? 0,
+    buyerFeeInr: order.buyerFeeInr ?? 0,
     placedAt: Number.isNaN(placedAt) ? Date.now() : placedAt,
     items: order.items ?? [],
   }

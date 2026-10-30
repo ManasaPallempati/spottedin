@@ -10,6 +10,7 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import {
   SHIPPING_INR,
+  buyerFeeInr,
   corsHeaders,
   finalizePaidPayment,
   hmacSha256Hex,
@@ -19,6 +20,7 @@ import {
   type Gate,
   type PaymentItem,
   type PaymentRow,
+  type ShipTo,
 } from '../_shared/razorpay.ts'
 import { heldListingIds, holdCutoffIso, type HoldPaymentRow } from '../_shared/checkoutHold.ts'
 
@@ -32,6 +34,7 @@ type ListingRow = {
   price_inr: number
   image_path: string | null
   status: string
+  seller_id: string
 }
 
 function randomOrderCode(): string {
@@ -66,7 +69,7 @@ async function resolveItems(
   uid: string,
   body: Record<string, unknown>,
   supabaseUrl: string
-): Promise<{ items: PaymentItem[]; offerId: string | null } | Response> {
+): Promise<{ items: PaymentItem[]; offerId: string | null; sellerId: string } | Response> {
   const unavailable = json(409, {
     error: 'listing_unavailable',
     message: "This item isn't available for online payment.",
@@ -84,12 +87,16 @@ async function resolveItems(
     if (!Number.isInteger(offer.amount_inr) || offer.amount_inr <= 0) return json(409, { error: 'bad_amount' })
     const { data: listing } = await admin
       .from('listings')
-      .select('id, title, size, price_inr, image_path, status')
+      .select('id, title, size, price_inr, image_path, status, seller_id')
       .eq('id', offer.listing_id)
       .maybeSingle()
     if (!listing) return unavailable
     if (listing.status !== 'live') return json(409, { error: 'listing_sold', message: 'This item has already sold.' })
-    return { items: [toItem(listing as ListingRow, offer.amount_inr, supabaseUrl)], offerId: offer.id }
+    return {
+      items: [toItem(listing as ListingRow, offer.amount_inr, supabaseUrl)],
+      offerId: offer.id,
+      sellerId: (listing as ListingRow).seller_id,
+    }
   }
 
   if (body.context === 'bag') {
@@ -99,7 +106,7 @@ async function resolveItems(
     const ids = [...new Set(raw)]
     const { data: listings } = await admin
       .from('listings')
-      .select('id, title, size, price_inr, image_path, status')
+      .select('id, title, size, price_inr, image_path, status, seller_id')
       .in('id', ids)
     const rows = (listings ?? []) as ListingRow[]
     // Mock/demo listing ids ('1', 'my-3', …) have no DB row and land here.
@@ -107,7 +114,12 @@ async function resolveItems(
     if (rows.some((r) => r.status !== 'live')) {
       return json(409, { error: 'listing_sold', message: 'An item in your bag has already sold.' })
     }
-    return { items: rows.map((r) => toItem(r, r.price_inr, supabaseUrl)), offerId: null }
+    // One payment = one seller's parcel, so shipping is charged once per seller.
+    const sellerIds = new Set(rows.map((r) => r.seller_id))
+    if (sellerIds.size !== 1) {
+      return json(400, { error: 'multiple_sellers', message: 'Check out items from one seller at a time.' })
+    }
+    return { items: rows.map((r) => toItem(r, r.price_inr, supabaseUrl)), offerId: null, sellerId: rows[0].seller_id }
   }
 
   return json(400, { error: 'bad_request' })
@@ -149,8 +161,30 @@ async function createOrder(
     })
   }
 
+  if (typeof body.addressId !== 'string') {
+    return json(400, { error: 'address_required', message: 'Add a shipping address to continue.' })
+  }
+  const { data: address } = await admin
+    .from('spotted_addresses')
+    .select('user_id, name, phone, line1, line2, city, state, pincode')
+    .eq('id', body.addressId)
+    .maybeSingle()
+  if (!address || address.user_id !== uid) {
+    return json(400, { error: 'address_required', message: 'Add a shipping address to continue.' })
+  }
+  const shipTo: ShipTo = {
+    name: address.name,
+    phone: address.phone,
+    line1: address.line1,
+    line2: address.line2,
+    city: address.city,
+    state: address.state,
+    pincode: address.pincode,
+  }
+
   const itemTotal = resolved.items.reduce((sum, it) => sum + it.price_inr, 0)
-  const charged = itemTotal + SHIPPING_INR
+  const buyerFee = buyerFeeInr(itemTotal)
+  const charged = itemTotal + SHIPPING_INR + buyerFee
   if (charged > MAX_CHARGE_INR) return json(400, { error: 'amount_too_large' })
   const amountPaise = charged * 100
 
@@ -163,6 +197,10 @@ async function createOrder(
       items: resolved.items,
       item_total_inr: itemTotal,
       charged_inr: charged,
+      shipping_inr: SHIPPING_INR,
+      buyer_fee_inr: buyerFee,
+      seller_id: resolved.sellerId,
+      ship_to: shipTo,
       amount_paise: amountPaise,
       order_code: randomOrderCode(),
     })

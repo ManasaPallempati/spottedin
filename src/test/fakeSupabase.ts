@@ -29,15 +29,21 @@ const missingRpcs = new Set<string>()
 export function setRpcMissing(name: string) {
   missingRpcs.add(name)
 }
+
+// Canned results for other database functions, by name: a value, or a
+// callback that gets the call's arguments.
+type RpcResult = unknown | ((args: Record<string, unknown>) => unknown)
+export const rpcResults: Record<string, RpcResult> = {}
 const listeners = new Set<AuthListener>()
 
-export function makeSession(email = 'buyer@example.com', id = 'user-1'): FakeSession {
+// provider 'google' makes an account with no password (signed up with Google).
+export function makeSession(email = 'buyer@example.com', id = 'user-1', provider = 'email'): FakeSession {
   return {
     access_token: 'test-access-token',
     refresh_token: 'test-refresh-token',
     expires_in: 3600,
     token_type: 'bearer',
-    user: { id, email, user_metadata: {}, identities: [{}] },
+    user: { id, email, user_metadata: {}, identities: [{ provider }] },
   }
 }
 
@@ -118,7 +124,11 @@ const auth = {
   }),
   signInWithOAuth: vi.fn(async () => ({ data: {}, error: null })),
   resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
-  updateUser: vi.fn(async () => ({ data: { user: currentSession?.user ?? null }, error: null })),
+  updateUser: vi.fn(async (_attrs: Record<string, unknown>) => ({
+    data: { user: currentSession?.user ?? null },
+    error: null as { message: string; code?: string } | null,
+  })),
+  reauthenticate: vi.fn(async () => ({ data: {}, error: null })),
 }
 
 export const supabase = {
@@ -127,7 +137,11 @@ export const supabase = {
   // my_profile() (round 18) returns the caller's own profile row; other
   // functions resolve to no data. setRpcMissing simulates a project where a
   // function is not deployed yet (PostgREST answers PGRST202).
-  rpc: vi.fn((name: string) => {
+  rpc: vi.fn((name: string, args: Record<string, unknown> = {}) => {
+    if (name in rpcResults) {
+      const result = rpcResults[name]
+      return Promise.resolve({ data: typeof result === 'function' ? result(args) : result, error: null })
+    }
     if (missingRpcs.has(name)) {
       return query('__rpc__', { error: { code: 'PGRST202', message: `Could not find the function public.${name}` } })
     }
@@ -156,6 +170,7 @@ export function resetFakeSupabase() {
   selects.length = 0
   listeners.clear()
   missingRpcs.clear()
+  for (const name of Object.keys(rpcResults)) delete rpcResults[name]
   currentSession = null
   vi.clearAllMocks()
 }

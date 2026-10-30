@@ -2,7 +2,7 @@ import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight, Heart, ShieldCheck, Star } from 'lucide-react'
+import { Bookmark, ChevronRight, Heart, ShieldCheck, Star } from 'lucide-react'
 import { useListing, useListingImages, useListings } from '../lib/useListings'
 import { useAppState } from '../lib/appState'
 import { useAuth } from '../lib/auth'
@@ -127,7 +127,7 @@ export default function Product() {
   const sendToLogin = () => navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
   const { listing, loading } = useListing(id)
   const { images: galleryImages } = useListingImages(id)
-  const { toggleLike, isLiked, likeCountFor, addToBag, makeOffer } = useAppState()
+  const { toggleLike, isLiked, toggleSave, isSaved, likeCountFor, addToBag, makeOffer } = useAppState()
   const { isAuthed, profile } = useAuth()
   const { listings: allListings } = useListings()
 
@@ -149,6 +149,19 @@ export default function Product() {
   const [offerSent, setOfferSent] = useState(false)
   const [offerAmount, setOfferAmount] = useState(0)
   const [toastVisible, setToastVisible] = useState(false)
+
+  // The bag's "Make offer" links here with ?offer=1: open the offer sheet once
+  // the listing has loaded, then drop the flag so a refresh doesn't reopen it.
+  const wantsOffer = new URLSearchParams(location.search).get('offer') === '1'
+  useEffect(() => {
+    if (!wantsOffer || !listing) return
+    navigate(location.pathname, { replace: true })
+    const ownListing = !!listing.sellerId && profile?.id === listing.sellerId
+    if (!isAuthed || ownListing || listing.status === 'sold') return
+    setOfferAmount(Math.round(listing.price * 0.9))
+    setOfferSent(false)
+    setOfferOpen(true)
+  }, [wantsOffer, listing, isAuthed, profile?.id, navigate, location.pathname])
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -242,7 +255,7 @@ export default function Product() {
       return
     }
     addToBag(listing.id)
-    navigate('/bag?checkout=1')
+    navigate(`/bag?checkout=${encodeURIComponent(listing.id)}`)
   }
 
   function openOfferSheet() {
@@ -293,6 +306,15 @@ export default function Product() {
           <Heart size={22} fill={liked ? 'var(--accent)' : 'none'} color={liked ? 'var(--accent)' : 'currentColor'} />
         </button>
         <span className="product-like-count">{count} likes</span>
+        <button
+          type="button"
+          className="product-like-btn product-save-btn"
+          aria-label={isSaved(listing.id) ? 'Remove from saves' : 'Save'}
+          aria-pressed={isSaved(listing.id)}
+          onClick={() => toggleSave(listing.id)}
+        >
+          <Bookmark size={22} fill={isSaved(listing.id) ? 'currentColor' : 'none'} />
+        </button>
         <ShareButton
           className="product-share-btn"
           title={`${listing.brand} - Size ${listing.size} | SPOTTED`}
