@@ -11,14 +11,63 @@ export type Profile = {
   city: string | null
   rating: number | null
   sales: number | null
+  handleChangedAt: string | null
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string | null
+  interest: Interest | null
+  guardianEmail: string | null
+  guardianConsentAt: string | null
+}
+
+export type Interest = 'womenswear' | 'menswear' | 'both'
+
+// Mirrors profiles_deletion_reason_valid. Free text is deliberately not an
+// option: the list is fixed so it can be counted, and so nothing identifying
+// ends up attached to a row that has just been anonymised.
+export type DeletionReason =
+  | 'not_using'
+  | 'new_account'
+  | 'not_selling'
+  | 'transaction_issue'
+  | 'policies'
+  | 'fees'
+  | 'safety_privacy'
+  | 'other'
+
+export type ProfileEdit = {
+  handle: string
+  name: string
+  avatarEmoji: string
+  bio: string
+  city: string
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  dateOfBirth: string | null
+  country: string
+  interest: Interest | null
+  guardianEmail: string | null
 }
 
 export type AuthContextValue = {
   session: Session | null
   profile: Profile | null
+  // Set when a signed-in person has no profile *because creating one failed*,
+  // as opposed to not having one yet. Screens must not treat this as signed
+  // out — that is what hid a broken signup until a user reported it.
+  profileError: string | null
   isAuthed: boolean
   loading: boolean
-  signUp: (email: string, password: string, handle: string, name: string) => Promise<{ error: string | null }>
+  signUp: (
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInWithOAuth: (provider: OAuthProvider, options?: { redirectTo?: string }) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -27,6 +76,8 @@ export type AuthContextValue = {
   hasPassword: boolean
   setPassword: (password: string, nonce?: string) => Promise<{ error: string | null; code: string | null }>
   sendReauthCode: () => Promise<{ error: string | null }>
+  updateProfile: (edit: ProfileEdit) => Promise<{ error: string | null }>
+  deleteAccount: (reason?: DeletionReason) => Promise<{ error: string | null }>
 }
 
 export type OAuthProvider = 'google' | 'facebook'
@@ -40,6 +91,15 @@ type ProfileRow = {
   city: string | null
   rating: number | null
   sales: number | null
+  handle_changed_at?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  avatar_url?: string | null
+  date_of_birth?: string | null
+  country?: string | null
+  interest?: Interest | null
+  guardian_email?: string | null
+  guardian_consent_at?: string | null
 }
 
 function mapProfile(row: ProfileRow): Profile {
@@ -52,13 +112,27 @@ function mapProfile(row: ProfileRow): Profile {
     city: row.city,
     rating: row.rating,
     sales: row.sales,
+    handleChangedAt: row.handle_changed_at ?? null,
+    firstName: row.first_name ?? null,
+    lastName: row.last_name ?? null,
+    avatarUrl: row.avatar_url ?? null,
+    dateOfBirth: row.date_of_birth ?? null,
+    country: row.country ?? null,
+    interest: row.interest ?? null,
+    guardianEmail: row.guardian_email ?? null,
+    guardianConsentAt: row.guardian_consent_at ?? null,
   }
 }
 
+// Underscore is the only permitted separator (see round8-handle-rules.sql), so a
+// period in an email local part becomes one rather than being dropped —
+// manasa.pallempati arrives as manasa_pallempati instead of manasapallempati.
+// A handle must also start alphanumeric, hence the leading trim.
 function sanitizeHandle(email: string): string {
   const local = email.split('@')[0]?.toLowerCase() ?? 'user'
-  const cleaned = local.replace(/[^a-z0-9._]/g, '')
-  return cleaned.slice(0, 20) || 'user'
+  const cleaned = local.replace(/[.-]/g, '_').replace(/[^a-z0-9_]/g, '').replace(/^_+/, '')
+  const trimmed = cleaned.slice(0, 30)
+  return trimmed.length >= 3 ? trimmed : 'user'
 }
 
 function randomDigits(len: number): string {
@@ -67,38 +141,201 @@ function randomDigits(len: number): string {
   return out
 }
 
-const PROFILE_COLUMNS = 'id,handle,name,avatar_emoji,bio,city,rating,sales'
+const PROFILE_COLUMNS =
+  'id,handle,name,avatar_emoji,bio,city,rating,sales,handle_changed_at,guardian_email,guardian_consent_at,first_name,last_name,avatar_url,date_of_birth,country,interest'
 
-async function ensureProfile(userId: string, meta: { handle?: string; name?: string }, email: string): Promise<Profile | null> {
-  const { data: existing } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
-  if (existing) return mapProfile(existing as ProfileRow)
+// The signed-in person's own row, every column. Since round 18 the private
+// columns (date of birth, guardian email, legal name…) cannot be selected from
+// profiles directly by anyone, so the own row comes from my_profile(); and an
+// INSERT/UPDATE must not ask for the row back (RETURNING needs SELECT on every
+// column), so writers call this afterwards instead. Falls back to the direct
+// read where round 18 is not applied yet (PGRST202: function not found).
+async function readOwnProfile(userId: string) {
+  const viaFunction = await supabase.rpc('my_profile').select(PROFILE_COLUMNS).maybeSingle()
+  if (viaFunction.error?.code !== 'PGRST202') return viaFunction
+  return supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle()
+}
+
+// Distinguishes "this person has no profile yet" from "we could not create
+// one". Both used to return null, so a failed insert rendered as the
+// signed-out view with no explanation — which is how a missing INSERT grant on
+// date_of_birth broke every signup and was only found when a user complained.
+type EnsureProfileResult = { profile: Profile; error: null } | { profile: null; error: string }
+
+async function ensureProfile(
+  userId: string,
+  meta: { handle?: string; name?: string; date_of_birth?: string },
+  email: string,
+): Promise<EnsureProfileResult> {
+  const { data: existing, error: readError } = await readOwnProfile(userId)
+
+  if (existing) return { profile: mapProfile(existing as ProfileRow), error: null }
+  if (readError) {
+    console.warn('[auth] profile read failed:', readError)
+    return { profile: null, error: 'We could not load your profile. Please try again.' }
+  }
 
   const baseHandle = meta.handle ?? sanitizeHandle(email)
   const name = meta.name ?? (email.split('@')[0] || 'User')
+  // date_of_birth rides along from signup metadata. Without it the row is
+  // created with a null date, which is_adult() treats as an adult — so an
+  // OAuth signup, which has no date, is an adult until they set one.
+  const newRow = { id: userId, handle: baseHandle, name, date_of_birth: meta.date_of_birth ?? null }
 
-  const { data: inserted, error } = await supabase
-    .from('profiles')
-    .insert({ id: userId, handle: baseHandle, name })
-    .select(PROFILE_COLUMNS)
-    .single()
+  const { error } = await supabase.from('profiles').insert(newRow)
+  if (!error) return readCreatedProfile(userId)
 
-  if (!error && inserted) return mapProfile(inserted as ProfileRow)
-
-  // unique-violation on handle: retry once with 2 random digits appended
+  // unique-violation on handle: retry once with 2 random digits appended.
+  // Spreads the same row so the retry cannot quietly drop date_of_birth — an
+  // earlier version rebuilt the object by hand and did exactly that, making a
+  // minor an adult purely because their first choice of handle was taken.
   if (error && error.code === '23505') {
-    const retryHandle = `${baseHandle}${randomDigits(2)}`
-    const { data: retried, error: retryError } = await supabase
+    const { error: retryError } = await supabase
       .from('profiles')
-      .insert({ id: userId, handle: retryHandle, name })
-      .select(PROFILE_COLUMNS)
-      .single()
-    if (!retryError && retried) return mapProfile(retried as ProfileRow)
-    console.warn(retryError)
-    return null
+      .insert({ ...newRow, handle: `${baseHandle}${randomDigits(2)}` })
+    if (!retryError) return readCreatedProfile(userId)
+    console.warn('[auth] profile create failed on retry:', retryError)
+    return { profile: null, error: profileCreateMessage(retryError) }
   }
 
-  console.warn(error)
-  return null
+  console.warn('[auth] profile create failed:', error)
+  return { profile: null, error: profileCreateMessage(error) }
+}
+
+async function readCreatedProfile(userId: string): Promise<EnsureProfileResult> {
+  const { data, error } = await readOwnProfile(userId)
+  if (data) return { profile: mapProfile(data as ProfileRow), error: null }
+  console.warn('[auth] profile created but could not be read back:', error)
+  return { profile: null, error: profileCreateMessage(error) }
+}
+
+// Postgres errors here are almost always a schema or grant problem rather than
+// anything the person did, so the copy says so instead of blaming their input.
+// The code is included because it is what makes a bug report actionable.
+function profileCreateMessage(error: { code?: string; message?: string } | null): string {
+  if (error?.code === '42501') {
+    return 'We could not finish setting up your account (permission error). Please contact support.'
+  }
+  if (error?.code === '23514') {
+    return 'We could not finish setting up your account (invalid details). Please contact support.'
+  }
+  return `We could not finish setting up your account${error?.code ? ` (${error.code})` : ''}. Please try again.`
+}
+
+// Shape covers both the AuthError instances supabase-js rejects with (which carry a
+// stable `code` such as 'invalid_credentials' plus a `name` like 'AuthRetryableFetchError'
+// for network failures) and the plain { message, code? } we synthesise from a GoTrue
+// OAuth bounce-back query string in App.tsx, where there is no AuthError to unwrap.
+export type AuthErrorLike = { message: string; code?: string; name?: string }
+
+// Supabase surfaces provider, validation, and rate-limit failures as raw API strings such
+// as "Unsupported provider: provider is not enabled". Those name internal causes the
+// visitor cannot act on, so the ones we expect are translated here. `error.code` is stable
+// across GoTrue releases and is checked first; the message substring checks are a fallback
+// for the cases (older SDKs, synthesised OAuth-callback errors) where no code is present.
+// Anything unrecognised is passed through unchanged rather than swallowed — see the
+// console.warn below, which is what we grep for to add a new case.
+export function friendlyAuthError(error: AuthErrorLike, provider?: OAuthProvider): string {
+  const { code } = error
+  const m = error.message.toLowerCase()
+  const name = provider ? provider[0].toUpperCase() + provider.slice(1) : null
+
+  if (code === 'invalid_credentials' || m.includes('invalid login credentials')) {
+    return 'That email and password do not match. Please check and try again.'
+  }
+  if (code === 'email_not_confirmed' || m.includes('email not confirmed')) {
+    return 'Please confirm your email address first — check your inbox for the link.'
+  }
+  if (code === 'user_already_exists' || m.includes('user already registered') || m.includes('already been registered')) {
+    return 'An account with that email already exists. Try logging in instead.'
+  }
+  if (code === 'over_email_send_rate_limit' || m.includes('email rate limit')) {
+    // Shared by signUp and signIn (password-reset / magic-link paths hit the same limiter),
+    // so this can't say "sign-up emails". GoTrue's default window is ~1h, not "a few minutes".
+    return 'Too many emails have been sent to this address. Please wait a while before trying again.'
+  }
+  if (code === 'email_address_invalid' || (m.includes('email address') && m.includes('invalid'))) {
+    return "That email address doesn't look valid — please check it and try again."
+  }
+  // Checked before the generic validation_failed branch: GoTrue files the disabled-provider
+  // rejection under error_code 'validation_failed', and field-validation copy would be
+  // nonsense on a page where no fields were submitted.
+  if (m.includes('provider is not enabled') || m.includes('unsupported provider')) {
+    return name
+      ? `${name} sign-in isn't available yet. Please continue with email.`
+      : "This sign-in method isn't available yet. Please continue with email."
+  }
+  if (code === 'validation_failed') {
+    return 'There was a problem with the information you entered. Please check the fields and try again.'
+  }
+  // Network failures never reach GoTrue, so they carry no `code`. auth-js labels them
+  // AuthRetryableFetchError; the message is usually the fetch() rejection text verbatim
+  // (e.g. "Failed to fetch" in Chrome).
+  if (m.includes('failed to fetch') || (!code && error.name === 'AuthRetryableFetchError')) {
+    return "Couldn't connect. Please check your internet connection and try again."
+  }
+
+  console.warn('[auth] untranslated error:', error)
+  return error.message
+}
+
+// Turns a GoTrue OAuth bounce-back's error params (present in either the query string or
+// the URL fragment — see App.tsx) into the same copy used for in-app auth failures.
+// Returns null when none of the three params are present, so callers can use this as
+// both the "was there an error" check and the message lookup in one call.
+export function friendlyOAuthCallbackError(params: {
+  error?: string | null
+  error_code?: string | null
+  error_description?: string | null
+}): string | null {
+  if (!params.error && !params.error_code && !params.error_description) return null
+  // error_description is GoTrue's human-readable text (URL-decoded by URLSearchParams
+  // already); error is the short machine code (e.g. 'access_denied') used only if that's
+  // all we got.
+  const message = params.error_description || params.error || 'OAuth sign-in failed'
+  return friendlyAuthError({ message, code: params.error_code ?? undefined })
+}
+
+// Which OAuth providers to render buttons for. Only Google is enabled in the Supabase
+// projects today — Facebook's app is still pending review, and an unlisted provider 400s
+// in place on the supabase.co domain (no redirectTo, so the visitor is stranded off-site)
+// rather than failing gracefully in the app. Same VITE_-prefixed, comma-separated env
+// pattern as SITE_ORIGIN in lib/seo.ts; staging/prod can widen this via Netlify env without
+// a code change once Facebook is approved.
+// Distinguish "unset" (env var not defined at all — default to Google) from an explicit
+// empty/garbage value (operator's choice, honored as-is even if that means no buttons).
+const rawOAuthProviders: string | undefined = import.meta.env.VITE_OAUTH_PROVIDERS
+
+export const ENABLED_OAUTH_PROVIDERS: OAuthProvider[] =
+  rawOAuthProviders === undefined
+    ? ['google']
+    : rawOAuthProviders
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .filter((p): p is OAuthProvider => p === 'google' || p === 'facebook')
+
+// Offered when a username is already taken. Candidates are checked against the
+// table in one query rather than one-at-a-time, and only free ones are shown —
+// suggesting a name that is also taken is worse than suggesting nothing.
+// Nothing here reserves a name: two people can still be offered the same
+// suggestion, and whoever saves second gets the taken error again. The unique
+// index is the only real arbiter.
+export async function suggestHandles(base: string, wanted = 3): Promise<string[]> {
+  const root = base.replace(/_+$/, '').slice(0, 24) || 'user'
+  const candidates = new Set<string>()
+  while (candidates.size < wanted * 3) {
+    candidates.add(`${root}_${Math.floor(Math.random() * 9000) + 1000}`)
+    candidates.add(`${root}${Math.floor(Math.random() * 90) + 10}`)
+  }
+  const list = [...candidates].filter((h) => /^[a-z0-9][a-z0-9_]{2,29}$/.test(h))
+
+  const { data, error } = await supabase.from('profiles').select('handle').in('handle', list)
+  if (error) {
+    console.warn('[auth] handle suggestion lookup failed:', error)
+    return list.slice(0, wanted)
+  }
+  const taken = new Set((data ?? []).map((r: { handle: string }) => r.handle.replace(/^@/, '')))
+  return list.filter((h) => !taken.has(h)).slice(0, wanted)
 }
 
 function userHasPassword(session: Session | null): boolean {
@@ -113,6 +350,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profileError, setProfileError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -124,9 +362,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       if (data.session) {
         const meta = (data.session.user.user_metadata ?? {}) as { handle?: string; name?: string }
-        const p = await ensureProfile(data.session.user.id, meta, data.session.user.email ?? '')
+        const result = await ensureProfile(data.session.user.id, meta, data.session.user.email ?? '')
         if (cancelled) return
-        setProfile(p)
+        setProfile(result.profile)
+        setProfileError(result.error)
       }
       setLoading(false)
     }
@@ -138,14 +377,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(newSession)
         setLoading(true)
         const meta = (newSession.user.user_metadata ?? {}) as { handle?: string; name?: string }
-        ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((p) => {
+        // Deferred out of the callback deliberately. supabase-js holds an internal
+        // lock while it runs auth-state listeners, and ensureProfile calls
+        // supabase.from(), so invoking it here directly can deadlock — the promise
+        // never settles and setProfile is never reached. Line 219 above has already
+        // set the session synchronously, so isAuthed flips true while profile stays
+        // null, which renders the signed-out view to someone who is signed in.
+        // Password sign-in hid this because bootstrap() had already loaded the
+        // profile; OAuth reloads the page, so the listener is the only path.
+        setTimeout(() => {
           if (cancelled) return
-          setProfile(p)
-          setLoading(false)
-        })
+          ensureProfile(newSession.user.id, meta, newSession.user.email ?? '').then((result) => {
+            if (cancelled) return
+            setProfile(result.profile)
+            setProfileError(result.error)
+            setLoading(false)
+          })
+        }, 0)
       } else if (event === 'SIGNED_OUT') {
         setSession(null)
         setProfile(null)
+        setProfileError(null)
         setLoading(false)
       } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         setSession(newSession)
@@ -159,22 +411,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function signUp(email: string, password: string, handle: string, name: string): Promise<{ error: string | null }> {
-    const { error } = await supabase.auth.signUp({
+  async function signUp(
+    email: string,
+    password: string,
+    handle: string,
+    name: string,
+    dateOfBirth: string,
+  ): Promise<{ error: string | null }> {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { handle, name } },
+      options: { data: { handle, name, date_of_birth: dateOfBirth } },
     })
-    return { error: error?.message ?? null }
+    if (error) return { error: friendlyAuthError(error) }
+    // With email confirmation on, GoTrue answers an already-registered address
+    // with a success and an obfuscated user whose identities array is empty, so
+    // the form used to say "check your email" for an email that will never come.
+    if (data.user && !data.session && (data.user.identities?.length ?? 0) === 0) {
+      return { error: 'An account with this email already exists. Log in, or reset your password.' }
+    }
+    return { error: null }
   }
 
   async function signIn(email: string, password: string): Promise<{ error: string | null }> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+    return { error: error ? friendlyAuthError(error) : null }
   }
 
-  // Redirects the browser to the provider on success; only returns here when the request
-  // is rejected before the redirect (e.g. the provider isn't enabled in Supabase).
+  // In the browser, signInWithOAuth's _handleProviderSignIn always hardcodes error: null
+  // and navigates away (it builds the provider URL client-side; it never calls GoTrue to
+  // validate the provider first) — so this branch is effectively dead there, but harmless
+  // to keep for non-browser/SSR callers of this client. Rejections that actually happen
+  // server-side (disabled provider, consent denial, etc.) instead come back as query/hash
+  // params on the redirect back to us; see resolveOAuthCallbackError in App.tsx.
   async function signInWithOAuth(
     provider: OAuthProvider,
     options?: { redirectTo?: string },
@@ -183,7 +452,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider,
       options: { redirectTo: options?.redirectTo },
     })
-    return { error: error?.message ?? null }
+    return { error: error ? friendlyAuthError(error, provider) : null }
   }
 
   // Lets OAuth-only users (e.g. Google) add a password so they can also log in with
@@ -208,9 +477,102 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // Two failures here come from the database rather than from validation, and
+  // neither can be prevented client-side: another person can take a username
+  // between the form rendering and the save, and the 30-day limit is enforced by
+  // a trigger (round9) precisely so it cannot be bypassed. Both are translated
+  // rather than surfaced raw.
+  async function updateProfile(edit: ProfileEdit): Promise<{ error: string | null }> {
+    if (!session) return { error: 'You need to be signed in to change your profile.' }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        handle: edit.handle,
+        name: edit.name,
+        avatar_emoji: edit.avatarEmoji,
+        bio: edit.bio,
+        city: edit.city,
+        first_name: edit.firstName,
+        last_name: edit.lastName,
+        avatar_url: edit.avatarUrl,
+        date_of_birth: edit.dateOfBirth,
+        country: edit.country,
+        interest: edit.interest,
+        guardian_email: edit.guardianEmail,
+      })
+      .eq('id', session.user.id)
+
+    if (error) {
+      if (error.code === '23505') {
+        return { error: 'That username is already taken. Please choose another.' }
+      }
+      if (error.message.includes('handle_change_too_soon')) {
+        // The trigger puts the date the next change is allowed in the hint.
+        const next = (error as { hint?: string }).hint
+        return {
+          error: next
+            ? `You can change your username once every 30 days. You can change it again on ${next}.`
+            : 'You can change your username once every 30 days.',
+        }
+      }
+      if (error.message.includes('under_minimum_age')) {
+        // The trigger (round11) raises this below 13, not 18 — under-18s are
+        // allowed with restrictions. Same copy as the Signup form's own check.
+        return { error: 'You need to be 13 or over to use Spotted.' }
+      }
+      if (error.message.includes('date_of_birth_in_future')) {
+        return { error: 'Please enter a valid date of birth.' }
+      }
+      if (error.code === '23514') {
+        return { error: 'Some of those details are not valid. Please check and try again.' }
+      }
+      console.warn('[auth] profile update failed:', error)
+      return { error: 'We could not save your changes just now. Please try again.' }
+    }
+
+    // Saved; re-read rather than RETURNING (see readOwnProfile).
+    const { data, error: readError } = await readOwnProfile(session.user.id)
+    if (!data) {
+      console.warn('[auth] profile saved but could not be read back:', readError)
+      return { error: null }
+    }
+    setProfile(mapProfile(data as ProfileRow))
+    return { error: null }
+  }
+
+  // Anonymises the account rather than erasing its rows — orders and payments
+  // are retained records, and the other side of a completed sale still needs
+  // their history. The work happens in the delete-account Edge Function, which
+  // holds the service-role key; the browser only proves who is asking.
+  // Signs out locally afterwards because the server-side ban does not by itself
+  // clear the session already stored in this tab.
+  // The reason is recorded before the account is closed, because the Edge
+  // Function anonymises the row and the client loses its session immediately
+  // afterwards — there is no later opportunity to write it.
+  async function deleteAccount(reason?: DeletionReason): Promise<{ error: string | null }> {
+    if (reason && session) {
+      const { error: reasonError } = await supabase
+        .from('profiles')
+        .update({ deletion_reason: reason })
+        .eq('id', session.user.id)
+      // Losing the reason is not worth blocking someone from leaving.
+      if (reasonError) console.warn('[auth] could not record deletion reason:', reasonError)
+    }
+
+    const { error } = await supabase.functions.invoke('delete-account', { body: {} })
+    if (error) {
+      console.warn('[auth] delete-account failed:', error)
+      return { error: 'We could not close your account just now. Please try again.' }
+    }
+    await supabase.auth.signOut()
+    return { error: null }
+  }
+
   const value: AuthContextValue = {
     session,
     profile,
+    profileError,
     isAuthed: session !== null,
     loading,
     signUp,
@@ -220,6 +582,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasPassword: userHasPassword(session),
     setPassword,
     sendReauthCode,
+    updateProfile,
+    deleteAccount,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

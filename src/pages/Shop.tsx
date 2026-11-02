@@ -1,15 +1,17 @@
+import SafetyMenu from '../components/SafetyMenu'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
-import { sellers, sellerForListing } from '../data/sellers'
-import type { Listing } from '../data/listings'
 import { useAppState } from '../lib/appState'
 import { useAuth } from '../lib/auth'
-import { useListings, useListingsBySeller, useProfileByHandle } from '../lib/useListings'
+import { useListingsBySeller, useProfileByHandle } from '../lib/useListings'
 import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Filters, type Sort } from '../lib/filters'
 import FilterBar from '../components/FilterBar'
 import ProductCard from '../components/ProductCard'
+import ShareButton from '../components/ShareButton'
+import { canonicalUrl } from '../lib/seo'
+import SellerAvatar from '../components/SellerAvatar'
 import './shop.css'
 
 const TABS = ['Shop', 'Likes'] as const
@@ -19,7 +21,6 @@ export default function Shop() {
   const { handle = '' } = useParams<{ handle: string }>()
   const { follow, unfollow, isFollowing } = useAppState()
   const { profile: myProfile } = useAuth()
-  const { listings: liveListings } = useListings()
   const { profile: realProfile, loading: profileLoading } = useProfileByHandle(handle)
   const { listings: realSellerListings } = useListingsBySeller(realProfile?.id ?? '')
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
@@ -51,14 +52,13 @@ export default function Shop() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realProfile, handle])
 
-  const fictionalSeller = sellers.find((s) => s.handle === handle)
   const isOwnProfile = !!myProfile && myProfile.handle === handle
 
   if (profileLoading) {
     return <div className="shop-page shop-loading" />
   }
 
-  if (!realProfile && !fictionalSeller) {
+  if (!realProfile) {
     return (
       <div className="shop-not-found">
         <p className="shop-not-found-title">Shop not found</p>
@@ -69,110 +69,67 @@ export default function Shop() {
     )
   }
 
-  let headerContent: React.ReactNode
-  let sellerListings: Listing[]
+  // Absolutely positioned in the header's top corner (shop.css) so the
+  // centered column is undisturbed.
+  const shareButton = (
+    <ShareButton
+      className="shop-share-btn"
+      title={`@${handle} on SPOTTED`}
+      url={canonicalUrl(`/shop/${encodeURIComponent(handle)}`)}
+      label="Share this shop"
+    />
+  )
 
-  if (realProfile) {
-    const avatar = `https://picsum.photos/seed/spotted-seller-${handle}/300/300`
-    const rating = realProfile.rating
-    const followerCount = followerBase
-      ? followerBase.count + (following === followerBase.wasFollowing ? 0 : following ? 1 : -1)
-      : 0
-    sellerListings = realSellerListings
+  const rating = (realProfile.sales ?? 0) > 0 && realProfile.rating ? realProfile.rating : null
+  const followerCount = followerBase
+    ? followerBase.count + (following === followerBase.wasFollowing ? 0 : following ? 1 : -1)
+    : 0
+  const sellerListings = realSellerListings
 
-    headerContent = (
-      <header className="shop-header">
-        <img className="shop-avatar" src={avatar} alt={realProfile.name} />
-        <h1 className="shop-handle">@{realProfile.handle}</h1>
+  const headerContent = (
+    <header className="shop-header">
+      {shareButton}
+      <SellerAvatar className="shop-avatar" handle={realProfile.handle} name={realProfile.name} />
+      <h1 className="shop-handle">@{realProfile.handle}</h1>
 
-        {rating != null ? (
-          <div className="shop-rating-row">
-            <div className="shop-stars">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} size={14} fill={i <= Math.round(rating) ? 'var(--text)' : 'none'} color="var(--text)" />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="shop-new-seller">New seller</p>
-        )}
-
-        <p className="shop-sold">{realProfile.sales ?? 0} sold</p>
-
-        <div className="shop-follow-row">
-          <span className="shop-follow-stat">{followerCount} followers</span>
-          {!isOwnProfile && (
-            <button
-              type="button"
-              className={'shop-follow-btn' + (following ? ' shop-follow-btn-outline' : ' shop-follow-btn-solid')}
-              onClick={() => (following ? unfollow(handle) : follow(handle))}
-            >
-              {following ? 'Following' : 'Follow'}
-            </button>
-          )}
-        </div>
-
-        <p className="shop-name">{realProfile.name}</p>
-        {realProfile.bio && <p className="shop-bio">{realProfile.bio}</p>}
-
-        {!isOwnProfile && (
-          <Link to={`/inbox/t/${handle}`} className="shop-message-btn">
-            New message
-          </Link>
-        )}
-      </header>
-    )
-  } else {
-    const seller = fictionalSeller!
-    const followerCount = seller.followers + (following ? 1 : 0)
-    sellerListings = liveListings.filter((listing) => sellerForListing(listing.id).handle === handle)
-
-    headerContent = (
-      <header className="shop-header">
-        <img className="shop-avatar" src={seller.avatar} alt={seller.name} />
-        <h1 className="shop-handle">@{seller.handle}</h1>
-
+      {rating != null ? (
         <div className="shop-rating-row">
           <div className="shop-stars">
             {[1, 2, 3, 4, 5].map((i) => (
-              <Star
-                key={i}
-                size={14}
-                fill={i <= Math.round(seller.rating) ? 'var(--text)' : 'none'}
-                color="var(--text)"
-              />
+              <Star key={i} size={14} fill={i <= Math.round(rating) ? 'var(--text)' : 'none'} color="var(--text)" />
             ))}
           </div>
-          <span className="shop-review-count">{seller.reviewCount} reviews</span>
         </div>
+      ) : (
+        <p className="shop-new-seller">New seller</p>
+      )}
 
-        <p className="shop-sold">{seller.sold} sold · Active today</p>
+      <p className="shop-sold">{realProfile.sales ?? 0} sold</p>
 
-        <div className="shop-follow-row">
-          <span className="shop-follow-stat">{followerCount} followers</span>
-          <span className="shop-follow-stat">{seller.following} following</span>
-          {!isOwnProfile && (
-            <button
-              type="button"
-              className={'shop-follow-btn' + (following ? ' shop-follow-btn-outline' : ' shop-follow-btn-solid')}
-              onClick={() => (following ? unfollow(handle) : follow(handle))}
-            >
-              {following ? 'Following' : 'Follow'}
-            </button>
-          )}
-        </div>
-
-        <p className="shop-name">{seller.name}</p>
-        <p className="shop-bio">{seller.bio}</p>
-
+      <SafetyMenu targetType="profile" targetId={realProfile.handle} handle={realProfile.handle} label="Report or block this account" />
+      <div className="shop-follow-row">
+        <span className="shop-follow-stat">{followerCount} followers</span>
         {!isOwnProfile && (
-          <Link to={`/inbox/t/${handle}`} className="shop-message-btn">
-            New message
-          </Link>
+          <button
+            type="button"
+            className={'shop-follow-btn' + (following ? ' shop-follow-btn-outline' : ' shop-follow-btn-solid')}
+            onClick={() => (following ? unfollow(handle) : follow(handle))}
+          >
+            {following ? 'Following' : 'Follow'}
+          </button>
         )}
-      </header>
-    )
-  }
+      </div>
+
+      <p className="shop-name">{realProfile.name}</p>
+      {realProfile.bio && <p className="shop-bio">{realProfile.bio}</p>}
+
+      {!isOwnProfile && (
+        <Link to={`/inbox/t/${handle}`} className="shop-message-btn">
+          New message
+        </Link>
+      )}
+    </header>
+  )
 
   const filteredListings = applyFilters(sellerListings, filters, sort)
 

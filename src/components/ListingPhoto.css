@@ -1,0 +1,29 @@
+.listing-photo-missing {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--text-dim);
+}
+
+.listing-photo-missing-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.listing-photo-missing--compact {
+  gap: 0;
+}
+
+/* The tile is the final state, not a loading one: stop the shimmer that
+   motion.css runs on photo containers until an <img> loads. */
+.product-card-image-wrap:has(.listing-photo-missing),
+.product-gallery-slide:has(.listing-photo-missing),
+.home-recent-card:has(.listing-photo-missing) {
+  animation: none;
+}

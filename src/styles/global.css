@@ -10,6 +10,9 @@
   --success: #1f7a3d;      /* "New" pill */
   --radius-pill: 999px;
   --radius-card: 12px;
+  /* Editorial serif for headlines; Archivo stays the body and UI face. */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Archivo', system-ui, -apple-system, sans-serif;
 }
 
 .light {
@@ -34,12 +37,29 @@ body {
 body {
   background: #111;
   color: var(--text);
-  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, p, ul, figure {
   margin: 0;
+}
+
+/* Headlines: Fraunces at display optical size, a touch lighter than the old 800 Archivo
+   and less tightly tracked, so it reads editorial rather than shouty. */
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 em,
+h2 em,
+.display-italic {
+  font-style: italic;
+  font-weight: 500;
 }
 
 ul {
@@ -90,6 +110,13 @@ img {
 h1, h2, h3 {
   font-weight: 800;
   letter-spacing: -0.02em;
+}
+
+/* Must come after the rule above so the serif's lighter weight and tracking win. */
+h1,
+h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .btn {

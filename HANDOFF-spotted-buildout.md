@@ -33,14 +33,17 @@ Before starting a 5th round of unrequested scope, weigh surfacing this rather
 than silently building further — this was flagged once by a planning review
 early on and never circled back to.
 
-**Supabase:** project ref `masdygvcssrtwseopfmj`, staging tier, **shared with
+**Supabase:** production project ref `masdygvcssrtwseopfmj` (staging is
+`uxqumkfbchyiupwhddqw`, see README "Environments"), **shared with
 an unrelated, dead, never-merged Next.js prototype** (branch
 `codex/supabase-auth-rollout` in the separate `Palle017/maanster-market`
 repo — confirmed abandoned, do not resurrect, but its leftover schema
 objects (e.g. a `favorites` table, an original `messages` table) still
 physically exist in this same database and have already caused two
-name-collision bugs). Anon key is public and committed in
-`src/lib/supabase.ts` (intentional, RLS-protected). **Service-role key is
+name-collision bugs). The anon key is public (RLS-protected) but is no longer
+in code: each Netlify site sets VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, and
+local dev uses .env.local (see .env.example). There is no fallback to
+production; never add one back (src/lib/supabaseConfig.ts). **Service-role key is
 NOT in this repo and must never be committed** — retrieve it fresh each
 session from the Supabase dashboard → Settings → API, use it only from an
 uncommitted shell command, never paste it into a file that gets committed.

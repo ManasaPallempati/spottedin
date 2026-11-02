@@ -1,0 +1,33 @@
+.env-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: #b00020;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.env-warning__text {
+  flex: 1;
+  margin: 0;
+}
+
+.env-warning__hide {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

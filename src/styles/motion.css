@@ -73,11 +73,102 @@
   }
 }
 
+/* ---- Smoothness pass (Design 2/6) ---- */
+
+/* Page transition: each route's root remounts on navigation, so this replays per page.
+   Opacity only on the page root: a transform there would break position:fixed bars
+   (sticky Buy bar, sheets) while the animation runs. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.app-shell > :not(.bottom-nav):not(.toast) {
+  animation: page-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Cards rise gently into the grid. */
+.product-card {
+  animation: fade-up 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Image placeholders: a soft shimmer sits behind each photo until it loads,
+   then the photo fades in (src/lib/imageLoad.ts adds .is-loaded). */
+@keyframes placeholder-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.product-card-image-wrap,
+.product-gallery-slide,
+.home-recent-card {
+  background-color: var(--surface);
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.06) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: placeholder-shimmer 1.4s linear infinite;
+}
+
+.product-card-image-wrap img,
+.product-gallery-slide img,
+.home-recent-card img {
+  opacity: 0;
+  filter: blur(8px);
+  transform: scale(1.02);
+  transition: opacity 0.4s ease, filter 0.5s ease, transform 0.5s ease;
+}
+
+.product-card-image-wrap img.is-loaded,
+.product-gallery-slide img.is-loaded,
+.home-recent-card img.is-loaded {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+/* Stop the shimmer once the photo is in. */
+.product-card-image-wrap:has(img.is-loaded),
+.product-gallery-slide:has(img.is-loaded),
+.home-recent-card:has(img.is-loaded) {
+  animation: none;
+}
+
+/* Snap swipes: one photo per swipe on the listing gallery, smooth programmatic scrolls. */
+.product-gallery-track {
+  scroll-behavior: smooth;
+}
+
+.product-gallery-slide {
+  scroll-snap-stop: always;
+}
+
+.home-picks-row,
+.home-recent-row {
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* No fades or blur-up for reduced motion: photos appear as soon as they load. */
+  .product-card-image-wrap img,
+  .product-gallery-slide img,
+  .home-recent-card img {
+    filter: none;
+    transform: none;
   }
 }

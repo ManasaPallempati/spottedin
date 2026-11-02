@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Menu, Star, BarChart2, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, Menu, Star, BarChart2, SlidersHorizontal } from 'lucide-react'
 import type { Listing } from '../data/listings'
 import { useListings, useMyListings } from '../lib/useListings'
-import { useAppState } from '../lib/appState'
+import { useAppState, type Order } from '../lib/appState'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, type Sort } from '../lib/filters'
 import ProductCard from '../components/ProductCard'
 import BottomSheet from '../components/BottomSheet'
+import ListingPhoto from '../components/ListingPhoto'
 import './profile.css'
 
-const TABS = ['Shop', 'Sold', 'Purchases', 'Likes'] as const
+const TABS = ['Shop', 'Sold', 'Purchases', 'Likes', 'Saves'] as const
 type Tab = (typeof TABS)[number]
 
 const SORT_OPTIONS: { value: Sort; label: string }[] = [
@@ -33,6 +34,13 @@ function formatOrderDate(placedAt: number) {
   })
 }
 
+const STATUS_LABEL: Record<Order['status'], string> = {
+  paid: 'Purchased',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+}
+
 function initialsFor(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return ''
@@ -41,17 +49,16 @@ function initialsFor(name: string): string {
 }
 
 export default function Profile() {
-  const { isAuthed, profile, signOut, hasPassword } = useAuth()
+  const { isAuthed, profile, profileError, loading, signOut, hasPassword } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<Tab>('Shop')
-  const [showPromo, setShowPromo] = useState(true)
   const [sortOpen, setSortOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [sort, setSort] = useState<Sort>('newest')
   const [followerCount, setFollowerCount] = useState(0)
 
-  const { follows, orders, likedIds } = useAppState()
+  const { follows, orders, sales, likedIds, savedIds } = useAppState()
   const { listings: liveListings } = useListings()
   const { listings: myLiveListings } = useMyListings('live')
   const { listings: mySoldListings } = useMyListings('sold')
@@ -97,10 +104,41 @@ export default function Profile() {
     [likedIds, knownListings]
   )
 
-  const sortedOrders = useMemo(() => [...orders].sort((a, b) => b.placedAt - a.placedAt), [orders])
+  const savedListings = useMemo(
+    () => savedIds.map((id) => knownListings.get(id)).filter((l): l is Listing => !!l),
+    [savedIds, knownListings]
+  )
 
-  function thumbFor(listingId: string): string {
-    return knownListings.get(listingId)?.img ?? `https://picsum.photos/seed/${listingId}/200/200`
+  const sortedOrders = useMemo(() => [...orders].sort((a, b) => b.placedAt - a.placedAt), [orders])
+  // Orders waiting to ship first, then newest.
+  const sortedSales = useMemo(
+    () =>
+      [...sales].sort((a, b) => Number(b.status === 'paid') - Number(a.status === 'paid') || b.placedAt - a.placedAt),
+    [sales]
+  )
+  const toShipCount = sales.filter((o) => o.status === 'paid').length
+
+  function thumbFor(item: Order['items'][number]): string {
+    return item.img || knownListings.get(item.listingId)?.img || ''
+  }
+
+  function orderRow(order: Order, label: string) {
+    return (
+      <Link to={`/order/${order.uuid}`} className="profile-order-row" key={order.uuid}>
+        <div className="profile-order-thumbs">
+          {order.items.map((item, i) => (
+            <ListingPhoto key={item.listingId + i} className="profile-order-thumb" src={thumbFor(item)} alt="Ordered item" compact />
+          ))}
+        </div>
+        <div className="profile-order-details">
+          <p className="profile-order-date">{formatOrderDate(order.placedAt)}</p>
+          <p className="profile-order-count">
+            {order.items.length} item{order.items.length === 1 ? '' : 's'} · <span className="profile-order-status">{label}</span>
+          </p>
+        </div>
+        <p className="profile-order-total">{formatInr(order.totalInr)}</p>
+      </Link>
+    )
   }
 
   async function handleLogout() {
@@ -108,6 +146,7 @@ export default function Profile() {
     await signOut()
     navigate('/')
   }
+
 
   const headerTitle = isAuthed && profile ? profile.handle : 'Profile'
 
@@ -126,7 +165,34 @@ export default function Profile() {
         </div>
       </header>
 
-      {!isAuthed || !profile ? (
+      {/* `loading` is checked before the guest view because a signed-in visitor
+          whose profile has not resolved yet is not a guest. Without this, the
+          signed-out prompt flashes on every OAuth return, and stays put if the
+          profile lookup is slow. */}
+      {loading ? (
+        <div className="profile-guest">
+          <p className="profile-guest-copy">Loading your closet…</p>
+        </div>
+      ) : isAuthed && !profile && profileError ? (
+        /* Signed in, but their profile could not be created. Showing the
+           signed-out prompt here tells them to log in when they already are,
+           which is both useless and misleading. */
+        <div className="profile-guest">
+          <h2 className="profile-guest-title">Something went wrong</h2>
+          <p className="profile-guest-copy" role="alert">
+            {profileError}
+          </p>
+          <div className="profile-guest-actions">
+            <button
+              type="button"
+              className="btn btn-primary profile-guest-btn"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      ) : !isAuthed || !profile ? (
         <div className="profile-guest">
           <h2 className="profile-guest-title">Your closet lives here</h2>
           <p className="profile-guest-copy">Log in to see your likes, orders and listings</p>
@@ -178,27 +244,6 @@ export default function Profile() {
               <span>Earnings</span>
             </button>
 
-            {showPromo && (
-              <div className="profile-promo">
-                <button
-                  type="button"
-                  className="profile-promo-close"
-                  aria-label="Dismiss"
-                  onClick={() => setShowPromo(false)}
-                >
-                  <X size={16} />
-                </button>
-                <div className="profile-promo-image">
-                  <img src="https://picsum.photos/seed/spotted-flatlay/400/500" alt="" />
-                </div>
-                <div className="profile-promo-text">
-                  <p className="profile-promo-bold">Represent Spotted on Campus</p>
-                  <p>Become a Spotted Campus Manager</p>
-                  <p className="profile-promo-bold">Apply today</p>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'Shop' && (
               <>
                 <div className="profile-active-row">
@@ -235,6 +280,17 @@ export default function Profile() {
               </>
             )}
 
+            {activeTab === 'Sold' && sortedSales.length > 0 && (
+              <div className="profile-orders profile-sales">
+                <p className="profile-sales-title">
+                  Orders{toShipCount > 0 ? ` · ${toShipCount} to ship` : ''}
+                </p>
+                {sortedSales.map((order) =>
+                  orderRow(order, order.status === 'paid' ? 'To ship' : STATUS_LABEL[order.status])
+                )}
+              </div>
+            )}
+
             {activeTab === 'Sold' && (
               <div className="profile-grid">
                 {mySoldListings.map((listing) => (
@@ -255,27 +311,7 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="profile-orders">
-                  {sortedOrders.map((order) => (
-                    <div className="profile-order-row" key={order.id}>
-                      <div className="profile-order-thumbs">
-                        {order.items.map((item, i) => (
-                          <img
-                            key={item.listingId + i}
-                            className="profile-order-thumb"
-                            src={thumbFor(item.listingId)}
-                            alt=""
-                          />
-                        ))}
-                      </div>
-                      <div className="profile-order-details">
-                        <p className="profile-order-date">{formatOrderDate(order.placedAt)}</p>
-                        <p className="profile-order-count">
-                          {order.items.length} item{order.items.length === 1 ? '' : 's'}
-                        </p>
-                      </div>
-                      <p className="profile-order-total">{formatInr(order.totalInr)}</p>
-                    </div>
-                  ))}
+                  {sortedOrders.map((order) => orderRow(order, STATUS_LABEL[order.status]))}
                 </div>
               ))}
 
@@ -288,6 +324,20 @@ export default function Profile() {
               ) : (
                 <div className="profile-grid">
                   {likedListings.map((listing) => (
+                    <ProductCard key={listing.id} listing={listing} />
+                  ))}
+                </div>
+              ))}
+
+            {activeTab === 'Saves' &&
+              (savedListings.length === 0 ? (
+                <div className="profile-empty-simple">
+                  <p className="profile-empty-simple-title">Nothing saved yet</p>
+                  <p className="profile-empty-simple-copy">Tap the bookmark on any item to keep it here. Only you can see your saves.</p>
+                </div>
+              ) : (
+                <div className="profile-grid">
+                  {savedListings.map((listing) => (
                     <ProductCard key={listing.id} listing={listing} />
                   ))}
                 </div>
@@ -321,6 +371,18 @@ export default function Profile() {
             <Link to="/account/password" className="profile-sort-option" onClick={() => setMenuOpen(false)}>
               {hasPassword ? 'Change password' : 'Set password'}
             </Link>
+          )}
+          {isAuthed && (
+            <button
+              type="button"
+              className="profile-sort-option"
+              onClick={() => {
+                setMenuOpen(false)
+                navigate('/account')
+              }}
+            >
+              Account details
+            </button>
           )}
           <button type="button" className="profile-sort-option" onClick={handleLogout}>
             Log out
