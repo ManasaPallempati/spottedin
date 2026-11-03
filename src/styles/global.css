@@ -1,13 +1,28 @@
 :root {
-  --bg: #000;              /* app background */
-  --surface: #1c1c1e;      /* pills, cards, nav */
-  --surface-2: #2c2c2e;    /* pressed / secondary surface */
-  --text: #fff;
-  --text-dim: #9c9c9c;
-  --hairline: #2a2a2a;
-  --accent: #ff2300;       /* Spotted red — promos, badges */
-  --promo-olive: #57492f;  /* home promo strip */
-  --success: #1f7a3d;      /* "New" pill */
+  /* Manasa's Spotted brand board (pinterest.com/manasasai1999/spotted, summarised in
+     BRAND_DIRECTION.md): cream, burgundy, powder blue, blush, a muted red dot, mustard.
+     NEEDS MANASA'S APPROVAL before it ships; exact values are a first pass. */
+  --brand-cream: #f6efe3;
+  --brand-cream-2: #ede3d2;
+  --brand-burgundy: #6e1e2e;
+  --brand-burgundy-ink: #3b1520;
+  --brand-powder: #bfd3e6;
+  --brand-blush: #f2c9cf;
+  --brand-red: #c8432f;     /* muted red: the dot in "Spotted." and small accents */
+  --brand-mustard: #d9a13b;
+
+  --bg: var(--brand-cream);           /* app background */
+  --surface: #fbf7f0;                 /* pills, cards, nav */
+  --surface-2: var(--brand-cream-2);  /* pressed / secondary surface */
+  --text: var(--brand-burgundy-ink);
+  --text-dim: #7a5f62;
+  --hairline: #e2d5c3;
+  --accent: var(--brand-red);         /* promos, badges, liked hearts */
+  --promo-olive: var(--brand-powder); /* home promo strip (token name kept for compatibility) */
+  --success: #4f7a4a;                 /* "New" pill */
+  --highlight: var(--brand-mustard);
+  --on-primary: var(--brand-cream);
+  --primary: var(--brand-burgundy);
   --radius-pill: 999px;
   --radius-card: 12px;
   /* Editorial serif for headlines; Archivo stays the body and UI face. */
@@ -35,7 +50,7 @@ body {
 }
 
 body {
-  background: #111;
+  background: var(--brand-cream-2);
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -133,8 +148,8 @@ h2 {
 }
 
 .btn-primary {
-  background: #fff;
-  color: #000;
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
 .btn-disabled {
